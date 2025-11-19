@@ -1,0 +1,41 @@
+{
+ "custom_fields": [
+  {
+   "dt": "Pick List Item",
+   "fieldname": "c4_wo_required_qty",
+   "label": "WO Required Qty",
+   "fieldtype": "Float",
+   "insert_after": "qty",
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "in_list_view": 0
+  },
+  {
+   "dt": "Pick List Item",
+   "fieldname": "c4_balance_qty",
+   "label": "Balance Qty",
+   "fieldtype": "Float",
+   "insert_after": "c4_wo_required_qty",
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Remaining quantity to be consumed in Stock Entries"
+  },
+  {
+   "dt": "Pick List Item",
+   "fieldname": "c4_consumed_qty",
+   "label": "Consumed Qty",
+   "fieldtype": "Float",
+   "insert_after": "c4_balance_qty",
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Quantity consumed in Stock Entries"
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Pick List Item",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

@@ -5,18 +5,59 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 def execute():
     """
     Create Work Order custom fields for:
+      - C4 Required Items (editable items from BOM)
       - C4 Scrap & Process Loss tab
       - C4 Costing tab
     """
 
     custom_fields = {
         "Work Order": [
+            # --- C4 Required Items tab (NEW) ---
+            {
+                "fieldname": "c4_required_items_tab",
+                "label": "C4 Required Items",
+                "fieldtype": "Tab Break",
+                "insert_after": "required_items",
+            },
+            {
+                "fieldname": "c4_required_items",
+                "label": "Required Items (Editable)",
+                "fieldtype": "Table",
+                "options": "Work Order Item",
+                "insert_after": "c4_required_items_tab",
+                "allow_on_submit": 0,
+                "description": "Editable required items for this Work Order. Initially copied from BOM.",
+            },
+            {
+                "fieldname": "c4_items_section",
+                "label": "Item Balance Summary",
+                "fieldtype": "Section Break",
+                "insert_after": "c4_required_items",
+                "collapsible": 1,
+            },
+            {
+                "fieldname": "c4_total_picked_qty",
+                "label": "Total Picked Qty",
+                "fieldtype": "Float",
+                "insert_after": "c4_items_section",
+                "read_only": 1,
+                "allow_on_submit": 1,
+            },
+            {
+                "fieldname": "c4_total_consumed_qty",
+                "label": "Total Consumed Qty",
+                "fieldtype": "Float",
+                "insert_after": "c4_total_picked_qty",
+                "read_only": 1,
+                "allow_on_submit": 1,
+            },
+            
             # --- Scrap & Process Loss tab ---
             {
                 "fieldname": "c4_scrap_process_tab",
                 "label": "C4 Scrap & Process Loss",
                 "fieldtype": "Tab Break",
-                "insert_after": "operations",   # adjust position if you like
+                "insert_after": "operations",
             },
             {
                 "fieldname": "c4_scrap_items",
