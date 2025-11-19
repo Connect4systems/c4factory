@@ -1,6 +1,7 @@
 {
  "custom_fields": [
   {
+   "dt": "Stock Entry",
    "fieldname": "c4_pick_list",
    "label": "C4 Pick List",
    "fieldtype": "Link",

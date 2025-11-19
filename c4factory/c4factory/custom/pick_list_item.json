@@ -1,6 +1,7 @@
 {
  "custom_fields": [
   {
+   "dt": "Pick List Item",
    "fieldname": "c4_wo_required_qty",
    "label": "WO Required Qty",
    "fieldtype": "Float",
@@ -10,6 +11,7 @@
    "in_list_view": 0
   },
   {
+   "dt": "Pick List Item",
    "fieldname": "c4_balance_qty",
    "label": "Balance Qty",
    "fieldtype": "Float",
@@ -20,6 +22,7 @@
    "description": "Remaining quantity to be consumed in Stock Entries"
   },
   {
+   "dt": "Pick List Item",
    "fieldname": "c4_consumed_qty",
    "label": "Consumed Qty",
    "fieldtype": "Float",

@@ -1,6 +1,7 @@
 {
  "custom_fields": [
   {
+   "dt": "Pick List",
    "fieldname": "c4_work_order",
    "label": "Work Order",
    "fieldtype": "Link",
@@ -12,6 +13,7 @@
    "in_standard_filter": 1
   },
   {
+   "dt": "Pick List",
    "fieldname": "c4_status",
    "label": "C4 Status",
    "fieldtype": "Select",
@@ -24,6 +26,7 @@
    "in_standard_filter": 1
   },
   {
+   "dt": "Pick List",
    "fieldname": "c4_balance_section",
    "label": "Balance Summary",
    "fieldtype": "Section Break",
@@ -31,6 +34,7 @@
    "collapsible": 1
   },
   {
+   "dt": "Pick List",
    "fieldname": "c4_total_qty",
    "label": "Total Qty",
    "fieldtype": "Float",
@@ -39,6 +43,7 @@
    "allow_on_submit": 1
   },
   {
+   "dt": "Pick List",
    "fieldname": "c4_consumed_qty",
    "label": "Consumed Qty",
    "fieldtype": "Float",
@@ -47,6 +52,7 @@
    "allow_on_submit": 1
   },
   {
+   "dt": "Pick List",
    "fieldname": "c4_balance_qty",
    "label": "Balance Qty",
    "fieldtype": "Float",
