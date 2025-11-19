@@ -45,4 +45,3 @@ patches = [
     "c4factory.patches.v1_0.setup_work_order_custom_fields",
     "c4factory.patches.v1_0.setup_pick_list_custom_fields",
 ]
-.
