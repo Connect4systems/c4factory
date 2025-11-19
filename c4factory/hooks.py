@@ -36,8 +36,7 @@ doc_events = {
 
 # Override ERPNext's make_stock_entry for Work Order (Finish logic)
 override_whitelisted_methods = {
-    "erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry":
-        "c4factory.api.work_order_stock.make_stock_entry",
+    "erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry": "c4factory.api.work_order_stock.make_stock_entry",
 }
 
 # Database patches for custom fields
