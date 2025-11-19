@@ -9,7 +9,6 @@ app_license = "mit"
 doctype_js = {
     "Work Order": "public/js/doctype/work_order.js",
     "Pick List": "public/js/doctype/pick_list.js",
-    "BOM": "public/js/doctype/bom/bom_measurement_qty.js",
 }
 
 # Doc Events (server hooks)
