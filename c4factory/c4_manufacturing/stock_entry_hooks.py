@@ -36,6 +36,8 @@ def on_submit_update_work_order_costing(doc, method=None):
     Raw Material Cost itself only uses Material Transfer entries (see
     _get_raw_material_cost_from_material_transfers), so calling this on
     Manufacture won't double count.
+    
+    Also updates Pick List consumed quantities if linked.
     """
     if not getattr(doc, "work_order", None):
         return
@@ -43,7 +45,92 @@ def on_submit_update_work_order_costing(doc, method=None):
     if doc.stock_entry_type not in ("Material Transfer for Manufacture", "Manufacture"):
         return
 
+    # Update Work Order costing
     work_order_hooks.recalculate_costing_for_work_order(doc.work_order)
+    
+    # Update Pick List consumed quantities if linked
+    if getattr(doc, "c4_pick_list", None):
+        update_pick_list_consumed_qty(doc)
+
+
+def on_cancel_update_pick_list(doc, method=None):
+    """
+    Hook on Stock Entry on_cancel.
+    
+    When a Stock Entry linked to a Pick List is cancelled,
+    recalculate the Pick List balance.
+    """
+    if getattr(doc, "c4_pick_list", None):
+        # Import here to avoid circular dependency
+        from c4factory.c4_manufacturing import pick_list_hooks
+        pick_list_hooks.recalculate_pick_list_balance(doc.c4_pick_list)
+        
+        # Also update Work Order if linked
+        if getattr(doc, "work_order", None):
+            work_order_hooks.recalculate_costing_for_work_order(doc.work_order)
+
+
+def update_pick_list_consumed_qty(stock_entry_doc):
+    """
+    Update consumed quantities in Pick List when Stock Entry is submitted.
+    
+    This function:
+    1. Gets all items from Stock Entry that are being consumed (have s_warehouse)
+    2. Updates corresponding Pick List items with consumed quantities
+    3. Recalculates Pick List balance and status
+    """
+    if not stock_entry_doc.c4_pick_list:
+        return
+    
+    try:
+        # Import here to avoid circular dependency
+        from c4factory.c4_manufacturing import pick_list_hooks
+        
+        # Get Pick List
+        pick_list = frappe.get_doc("Pick List", stock_entry_doc.c4_pick_list)
+        
+        # Aggregate consumed quantities by item from Stock Entry
+        consumed_by_item = {}
+        for se_item in stock_entry_doc.get("items") or []:
+            # Only count items being consumed (have source warehouse)
+            if se_item.s_warehouse:
+                item_code = se_item.item_code
+                qty = float(se_item.qty or 0.0)
+                
+                if item_code in consumed_by_item:
+                    consumed_by_item[item_code] += qty
+                else:
+                    consumed_by_item[item_code] = qty
+        
+        # Update Pick List items
+        updated = False
+        for pl_item in pick_list.get("locations") or []:
+            if pl_item.item_code in consumed_by_item:
+                # Add to consumed quantity
+                current_consumed = float(pl_item.get("c4_consumed_qty") or 0.0)
+                pl_item.c4_consumed_qty = current_consumed + consumed_by_item[pl_item.item_code]
+                
+                # Recalculate balance
+                pl_item.c4_balance_qty = float(pl_item.qty or 0.0) - pl_item.c4_consumed_qty
+                updated = True
+        
+        if updated:
+            # Recalculate totals and status
+            pick_list_hooks.calculate_totals(pick_list)
+            pick_list_hooks.update_pick_list_status(pick_list)
+            
+            # Save Pick List
+            pick_list.flags.ignore_validate_update_after_submit = True
+            pick_list.flags.ignore_permissions = True
+            pick_list.save()
+            
+            frappe.db.commit()
+            
+    except Exception as e:
+        frappe.log_error(
+            message=str(e),
+            title=f"Error updating Pick List {stock_entry_doc.c4_pick_list} from Stock Entry {stock_entry_doc.name}"
+        )
 
 
 def _ensure_wip_target_warehouse(doc):

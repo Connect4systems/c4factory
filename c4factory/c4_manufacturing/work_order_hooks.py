@@ -38,6 +38,63 @@ def copy_scrap_from_bom(doc, method=None):
         _ensure_scrap_item_fields_from_item(new_row)
 
 
+def copy_required_items_from_bom(doc, method=None):
+    """
+    When a new Work Order is created from a BOM, copy BOM.items
+    into Work Order.c4_required_items (child table type: Work Order Item).
+
+    This allows users to edit required items before submission.
+    
+    - Runs only if:
+      * doc.bom_no is set
+      * c4_required_items is empty
+    """
+    if not getattr(doc, "bom_no", None):
+        return
+
+    # if there are already required item rows, do nothing
+    if getattr(doc, "c4_required_items", None):
+        if len(doc.c4_required_items):
+            return
+
+    bom = frappe.get_doc("BOM", doc.bom_no)
+    
+    # Calculate the multiplier based on work order qty vs BOM qty
+    multiplier = (doc.qty or 1.0) / (bom.quantity or 1.0)
+
+    # copy BOM Items to c4_required_items
+    for bom_item in bom.items:
+        required_qty = (bom_item.qty or 0.0) * multiplier
+        
+        new_row = doc.append("c4_required_items", {
+            "item_code": bom_item.item_code,
+            "item_name": bom_item.item_name,
+            "description": bom_item.description,
+            "source_warehouse": bom_item.source_warehouse or doc.source_warehouse,
+            "required_qty": required_qty,
+            "transferred_qty": 0.0,
+            "consumed_qty": 0.0,
+            "returned_qty": 0.0,
+            "available_qty_at_source_warehouse": 0.0,
+            "available_qty_at_wip_warehouse": 0.0,
+        })
+        
+        # Get item details
+        item = frappe.get_cached_value(
+            "Item", 
+            bom_item.item_code, 
+            ["stock_uom", "item_name", "description"], 
+            as_dict=True
+        )
+        
+        if item:
+            new_row.stock_uom = item.stock_uom
+            if not new_row.item_name:
+                new_row.item_name = item.item_name
+            if not new_row.description:
+                new_row.description = item.description
+
+
 def _ensure_scrap_item_fields_from_item(row):
     """
     Helper: for a BOM Scrap Item row, make sure:
@@ -162,6 +219,73 @@ def _get_raw_material_cost_from_material_transfers(work_order_name, wip_warehous
     return total
 
 
+def calculate_required_items_balance(doc, method=None):
+    """
+    Calculate balance quantities for c4_required_items based on:
+    - Pick Lists created from this Work Order
+    - Stock Entries linked to Pick Lists
+    
+    Updates:
+    - c4_total_picked_qty: Total quantity picked across all Pick Lists
+    - c4_total_consumed_qty: Total quantity consumed in Stock Entries
+    """
+    if not doc.name:
+        return
+    
+    # Get all Pick Lists for this Work Order
+    pick_lists = frappe.get_all(
+        "Pick List",
+        filters={
+            "c4_work_order": doc.name,
+            "docstatus": 1
+        },
+        pluck="name"
+    )
+    
+    total_picked = 0.0
+    total_consumed = 0.0
+    
+    if pick_lists:
+        # Get picked quantities from Pick List Items
+        picked_items = frappe.get_all(
+            "Pick List Item",
+            filters={
+                "parent": ["in", pick_lists]
+            },
+            fields=["item_code", "qty", "picked_qty"]
+        )
+        
+        for item in picked_items:
+            total_picked += float(item.get("picked_qty") or item.get("qty") or 0.0)
+        
+        # Get consumed quantities from Stock Entries linked to Pick Lists
+        stock_entries = frappe.get_all(
+            "Stock Entry",
+            filters={
+                "c4_pick_list": ["in", pick_lists],
+                "docstatus": 1,
+                "stock_entry_type": ["in", ["Material Transfer for Manufacture", "Manufacture"]]
+            },
+            pluck="name"
+        )
+        
+        if stock_entries:
+            consumed_items = frappe.get_all(
+                "Stock Entry Detail",
+                filters={
+                    "parent": ["in", stock_entries],
+                    "s_warehouse": ["is", "set"]  # Items being consumed (have source warehouse)
+                },
+                fields=["qty"]
+            )
+            
+            for item in consumed_items:
+                total_consumed += float(item.get("qty") or 0.0)
+    
+    doc.c4_total_picked_qty = total_picked
+    doc.c4_total_consumed_qty = total_consumed
+
+
 def recalculate_costing_for_work_order(work_order_name):
     """
     Utility: load a Work Order, recompute costing, and save it.
@@ -174,6 +298,7 @@ def recalculate_costing_for_work_order(work_order_name):
     wo = frappe.get_doc("Work Order", work_order_name)
     # Run the same logic used on validate
     update_scrap_and_costing(wo)
+    calculate_required_items_balance(wo)
 
     # We might be saving a submitted WO; ignore update-after-submit warnings
     wo.flags.ignore_validate_update_after_submit = True

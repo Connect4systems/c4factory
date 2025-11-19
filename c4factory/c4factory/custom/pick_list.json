@@ -1,0 +1,64 @@
+{
+ "custom_fields": [
+  {
+   "fieldname": "c4_work_order",
+   "label": "Work Order",
+   "fieldtype": "Link",
+   "options": "Work Order",
+   "insert_after": "purpose",
+   "allow_on_submit": 0,
+   "read_only": 0,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "c4_status",
+   "label": "C4 Status",
+   "fieldtype": "Select",
+   "options": "Open\nCompleted",
+   "default": "Open",
+   "insert_after": "c4_work_order",
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "c4_balance_section",
+   "label": "Balance Summary",
+   "fieldtype": "Section Break",
+   "insert_after": "c4_status",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "c4_total_qty",
+   "label": "Total Qty",
+   "fieldtype": "Float",
+   "insert_after": "c4_balance_section",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "c4_consumed_qty",
+   "label": "Consumed Qty",
+   "fieldtype": "Float",
+   "insert_after": "c4_total_qty",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "c4_balance_qty",
+   "label": "Balance Qty",
+   "fieldtype": "Float",
+   "insert_after": "c4_consumed_qty",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "bold": 1
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Pick List",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}
