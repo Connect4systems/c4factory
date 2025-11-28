@@ -1,106 +1,128 @@
+from __future__ import annotations
+
 import frappe
-from c4factory.c4_manufacturing import work_order_hooks
+from frappe.utils import flt
 
 
-def set_wip_target_warehouse(doc, method=None):
+# ============================================================
+# Helper: get WO items table regardless of field name
+# ============================================================
+
+def _get_wo_items(wo_doc):
+    """Return the Work Order items grid (v15 uses required_items)."""
+    return wo_doc.get("required_items") or wo_doc.get("items") or []
+
+
+# ============================================================
+# 1) Stock Entry.validate – default WIP target warehouse
+# ============================================================
+
+def set_wip_target_warehouse(doc, method: str | None = None) -> None:
     """
-    Hook on Stock Entry validate.
-
-    For Stock Entry of type 'Material Transfer for Manufacture' linked to a Work Order:
-      - Ensure each item row's t_warehouse is set to the Work Order WIP Warehouse
-        if it is empty.
-
-    For Stock Entry of type 'Manufacture' linked to a Work Order:
-      - Ensure fg_completed_qty / manufactured_qty / for_quantity are set
-        from the Finished Good row qty, so the "Manufactured Qty" mandatory
-        validation passes in v15.
+    If Stock Entry Type is 'Material Transfer for Manufacture' or 'Manufacture'
+    and a line has no t_warehouse, pull it from Work Order.wip_warehouse.
     """
+    se_type = (doc.stock_entry_type or doc.purpose or "").strip()
 
-    # Step 2 logic: Material Transfer for Manufacture → target WIP warehouse
-    if doc.stock_entry_type == "Material Transfer for Manufacture" and getattr(doc, "work_order", None):
-        _ensure_wip_target_warehouse(doc)
-
-    # Manufacture entries → ensure manufactured qty header fields
-    if doc.stock_entry_type == "Manufacture" and getattr(doc, "work_order", None):
-        _ensure_fg_qty_fields_from_finished_item(doc)
-
-
-def on_submit_update_work_order_costing(doc, method=None):
-    """
-    Hook on Stock Entry on_submit.
-
-    Whenever a Material Transfer for Manufacture (or Manufacture) Stock Entry
-    linked to a Work Order is submitted, recompute the Work Order costing
-    (raw + operating + scrap + total).
-
-    Raw Material Cost itself only uses Material Transfer entries (see
-    _get_raw_material_cost_from_material_transfers), so calling this on
-    Manufacture won't double count.
-    """
-    if not getattr(doc, "work_order", None):
+    if se_type not in ("Material Transfer for Manufacture", "Manufacture"):
         return
 
-    if doc.stock_entry_type not in ("Material Transfer for Manufacture", "Manufacture"):
+    if not doc.work_order:
         return
 
-    work_order_hooks.recalculate_costing_for_work_order(doc.work_order)
-
-
-def _ensure_wip_target_warehouse(doc):
-    """Set t_warehouse from Work Order WIP for transfer SE if missing."""
-    wip_warehouse = frappe.db.get_value("Work Order", doc.work_order, "wip_warehouse")
-    if not wip_warehouse:
+    wo = frappe.get_doc("Work Order", doc.work_order)
+    if not wo.wip_warehouse:
         return
-
-    for row in doc.get("items", []):
-        if not row.t_warehouse:
-            row.t_warehouse = wip_warehouse
-
-
-def _ensure_fg_qty_fields_from_finished_item(doc):
-    """
-    For Manufacture Stock Entry:
-
-    - Find the Finished Good row (is_finished_item or target = WO.fg_warehouse).
-    - Use its qty as the "manufactured quantity".
-    - Set header fields:
-        fg_completed_qty
-        manufactured_qty (if exists)
-        for_quantity (if exists)
-    so ERPNext's "Manufactured Qty is mandatory" validation is satisfied.
-    """
-
-    if not doc.items:
-        return
-
-    # Get the Work Order FG warehouse to help identify the FG row
-    fg_warehouse = frappe.db.get_value("Work Order", doc.work_order, "fg_warehouse")
-
-    finished_qty = 0.0
 
     for row in doc.items:
-        # Prefer explicit finished item flag
-        if getattr(row, "is_finished_item", None):
-            finished_qty = row.qty or 0.0
-            break
+        if not row.t_warehouse:
+            row.t_warehouse = wo.wip_warehouse
 
-    # If no explicit finished row flag, fall back to row with t_warehouse = fg_warehouse and no s_warehouse
-    if not finished_qty and fg_warehouse:
-        for row in doc.items:
-            if row.t_warehouse == fg_warehouse and not row.s_warehouse:
-                finished_qty = row.qty or 0.0
-                break
 
-    if not finished_qty:
-        # Nothing to set; let standard validations handle it if needed
+# ============================================================
+# 2) Work Order costing from submitted Stock Entries
+# ============================================================
+
+def on_submit_update_work_order_costing(doc, method: str | None = None) -> None:
+    """
+    Called on Stock Entry submit.
+    Recalculate the Work Order costing (raw / scrap / total) from all
+    submitted Stock Entries linked to this Work Order.
+    """
+    if not doc.work_order:
         return
 
-    # Set header "manufactured quantity" style fields
-    doc.fg_completed_qty = finished_qty
+    _recalculate_work_order_costs(doc.work_order)
 
-    # Some ERPNext versions use these additional fields; set them if present
-    if hasattr(doc, "manufactured_qty"):
-        doc.manufactured_qty = finished_qty
 
-    if hasattr(doc, "for_quantity"):
-        doc.for_quantity = finished_qty
+def recompute_work_order_costing(work_order_name: str) -> None:
+    """
+    Public helper for other modules (e.g. on Stock Entry cancel)
+    to recompute costing.
+    """
+    if not work_order_name:
+        return
+
+    _recalculate_work_order_costs(work_order_name)
+
+
+def _recalculate_work_order_costs(work_order_name: str) -> None:
+    """
+    Aggregate actual material cost for the given Work Order from all
+    submitted Stock Entries.
+
+    Logic:
+      - Look at all submitted Stock Entries with se.work_order = WO
+      - For each Stock Entry Detail row:
+          * ignore finished items (is_finished_item = 1)
+          * if is_scrap_item = 1 → goes to Scrap Material Cost
+          * else → goes to Raw Material Cost
+      - Use transfer_qty * basic_rate as the amount
+      - Total Cost = Raw + Scrap + Operating Cost (entered manually on WO)
+    """
+    wo = frappe.get_doc("Work Order", work_order_name)
+
+    # Fetch all Stock Entry rows for this Work Order
+    rows = frappe.db.sql(
+        """
+        SELECT
+            sed.is_finished_item,
+            sed.is_scrap_item,
+            sed.transfer_qty,
+            sed.basic_rate,
+            se.stock_entry_type
+        FROM `tabStock Entry Detail` sed
+        INNER JOIN `tabStock Entry` se
+            ON se.name = sed.parent
+        WHERE
+            se.docstatus = 1
+            AND se.work_order = %s
+        """,
+        (work_order_name,),
+        as_dict=True,
+    )
+
+    raw_material_cost = 0.0
+    scrap_material_cost = 0.0
+
+    for r in rows:
+        qty = flt(r.transfer_qty)
+        rate = flt(r.basic_rate)
+        amount = qty * rate
+
+        # finished item cost is not counted here (it is the result)
+        if r.is_scrap_item:
+            scrap_material_cost += amount
+        elif not r.is_finished_item:
+            raw_material_cost += amount
+
+    # Operating cost is entered on the Work Order manually
+    operating_cost = flt(wo.c4_operating_cost)
+
+    # Write back to Work Order custom fields
+    wo.db_set("c4_raw_material_cost", raw_material_cost)
+    wo.db_set("c4_scrap_material_cost", scrap_material_cost)
+    wo.db_set(
+        "c4_total_cost",
+        raw_material_cost + scrap_material_cost + operating_cost,
+    )
