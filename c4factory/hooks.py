@@ -15,22 +15,25 @@ doctype_js = {
     "Pick List": "public/js/doctype/pick_list.js",
     "BOM": "public/js/doctype/bom/bom_measurement_qty.js",
     "Work Order": "public/js/doctype/work_order.js",
-}
 
+    # moved from c4napata → c4factory
+    "Sales Order": "public/js/doctype/sales_order/request_bom.js",
+    "Sample Request": "public/js/doctype/sample_request/sample_request.js",
+}
 
 # ---------------------------------------------------------
 # Doc Events (server hooks)
 # ---------------------------------------------------------
 
 doc_events = {
-    # ... your other hooks ...
-
+    # Pick List custom flow
     "Pick List": {
         "validate": "c4factory.api.work_order_flow.on_pick_list_validate",
         "on_submit": "c4factory.api.work_order_flow.on_pick_list_submit",
         "on_cancel": "c4factory.api.work_order_flow.on_pick_list_cancel",
     },
 
+    # Stock Entry – costing + WO update
     "Stock Entry": {
         "validate": "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
         "on_submit": [
@@ -41,15 +44,13 @@ doc_events = {
     },
 }
 
-
 # ---------------------------------------------------------
-# Whitelisted method overrides
+# Whitelisted method / class overrides
 # ---------------------------------------------------------
 
 # Do NOT override Work Order.make_stock_entry here.
 # We keep the original finished-goods costing logic from c4pricing.
 override_doctype_class = {
-
     "Work Order": "c4factory.overrides.work_order.WorkOrder",
 }
 
