@@ -85,6 +85,12 @@ class WorkOrder(ERPNextWorkOrder):
       # Persist immediately when the document exists in DB
       if getattr(self, "name", None):
         try:
-          frappe.db.set_value("Work Order", self.name, "status", new_status)
+          frappe.db.set_value(
+            "Work Order",
+            self.name,
+            "status",
+            new_status,
+            update_modified=False,
+          )
         except Exception:
           frappe.log_error(frappe.get_traceback(), "C4Factory: WorkOrder.set_status db_set failed")

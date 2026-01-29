@@ -409,19 +409,28 @@ def _recompute_wo_material_transfer_from_pls(wo_name: str):
 
     total_for_qty = min(flt(total_for_qty), flt(wo.qty))
 
-    frappe.db.set_value(
-        "Work Order",
-        wo_name,
-        "material_transferred_for_manufacturing",
-        total_for_qty,
-    )
-    wo.material_transferred_for_manufacturing = total_for_qty
+    # Persist transferred qty without updating the document `modified` timestamp
+    try:
+        frappe.db.set_value(
+            "Work Order",
+            wo_name,
+            "material_transferred_for_manufacturing",
+            total_for_qty,
+            update_modified=False,
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "C4Factory: set material_transferred_for_manufacturing failed")
 
+    # Update in-memory object and recompute balances/status.
+    wo.material_transferred_for_manufacturing = total_for_qty
     _update_wo_item_balances(wo)
+
+    # _update_wo_status will persist status (using update_modified=False in override)
     _update_wo_status(wo)
 
-    wo.flags.ignore_validate_update_after_submit = True
-    wo.save(ignore_permissions=True)
+    # Do NOT call wo.save() here to avoid bumping the Work Order `modified`
+    # timestamp which causes the client-side "Document has been modified" alert
+    # when users have the Work Order open while Stock Entry is submitted.
 
 # ================================================================
 # Stock Entry hooks: keep Pick List + Work Order in sync on cancel
