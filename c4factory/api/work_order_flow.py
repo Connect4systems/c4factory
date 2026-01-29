@@ -350,37 +350,7 @@ def on_stock_entry_submit(doc, method=None):
             )
 
 
-def on_stock_entry_cancel(doc, method=None):
-    """
-    Hook: Stock Entry.on_cancel
-
-    Same as on_submit: only recompute related docs, never modify SE itself.
-    """
-    pl_name = doc.get("pick_list")
-    if pl_name:
-        try:
-            _update_pick_list_status_from_db(pl_name)
-        except Exception:
-            frappe.log_error(
-                frappe.get_traceback(), "C4Factory: on_stock_entry_cancel (Pick List)"
-            )
-
-    wo_name = doc.get("work_order")
-    if wo_name:
-        try:
-            _recompute_wo_material_transfer_from_pls(wo_name)
-        except Exception:
-            frappe.log_error(
-                frappe.get_traceback(), "C4Factory: on_stock_entry_cancel (WO)"
-            )
-
 from c4factory.c4_manufacturing.stock_entry_hooks import recompute_work_order_costing
-
-def on_stock_entry_cancel(doc, method=None):
-    # your existing logic that recalculates balances etc...
-
-    if doc.work_order:
-        recompute_work_order_costing(doc.work_order)
 
 # ================================================================
 # Recompute Work Order.material_transferred_for_manufacturing
@@ -441,14 +411,20 @@ def on_stock_entry_cancel(doc, method=None):
     """
     Stock Entry.on_cancel hook.
 
-    When a Material Transfer for Manufacture Stock Entry that was
-    created from a Pick List is cancelled, we want to recalculate:
-      - Pick List picked / balance quantities and status
-      - Work Order.material_transferred_for_manufacturing
-
-    To avoid transaction-timing issues, we enqueue a background job
-    that runs after the Stock Entry is fully cancelled and committed.
+    - Recompute Pick List balances/status and WO transferred qty.
+    - Recompute WO costing.
+    - Use background job to avoid transaction-timing issues.
     """
+    # Recompute costing immediately (safe on cancel)
+    if doc.work_order:
+        try:
+            recompute_work_order_costing(doc.work_order)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(), "C4Factory: on_stock_entry_cancel costing"
+            )
+
+    # Recompute balances/status after cancel is committed
     try:
         frappe.enqueue(
             "c4factory.api.work_order_flow.recompute_after_stock_entry",

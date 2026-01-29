@@ -62,5 +62,15 @@ patches = [
     # Work Order scrap & costing fields
     "c4factory.patches.v1_0.setup_work_order_custom_fields",
     # WO / Pick List / Stock Entry extra fields (includes custom_pl_qty)
-    "c4factory.patches.v1_1.setup_wo_pl_se_custom_fields",
+    "c4factory.patches.v1_0.setup_wo_pl_se_custom_fields",
 ]
+
+# ---------------------------------------------------------
+# Whitelisted method overrides
+# ---------------------------------------------------------
+
+override_whitelisted_methods = {
+    "erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry": (
+        "c4factory.api.work_order_stock.make_stock_entry"
+    ),
+}
