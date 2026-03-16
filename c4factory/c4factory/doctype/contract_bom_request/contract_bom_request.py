@@ -11,14 +11,26 @@ class ContractBOMRequest(Document):
 
 @frappe.whitelist()
 def create_bom_for_item(item, qty=1, company=None):
+	if not item:
+		frappe.throw("Please set Item before creating BOM.")
+
 	if not company:
 		company = frappe.defaults.get_default("company")
+
+	item_doc = frappe.get_cached_doc("Item", item)
 
 	bom = frappe.get_doc({
 		"doctype": "BOM",
 		"item": item,
-		"quantity": frappe.utils.flt(qty) or 1,
+		"quantity": 1,
 		"company": company,
+		"items": [
+			{
+				"item_code": item,
+				"qty": 1,
+				"uom": item_doc.stock_uom,
+			}
+		],
 	})
 	bom.insert(ignore_permissions=False)
 	frappe.db.commit()
