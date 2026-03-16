@@ -5,6 +5,16 @@ frappe.ui.form.on("Contract BOM Item", {
 	create_bom: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 
+		if (frm.is_new()) {
+			frappe.msgprint(__("Please save Contract BOM Request first, then create BOM."));
+			return;
+		}
+
+		if (row.__islocal || !row.name || row.name.indexOf("new-") === 0) {
+			frappe.msgprint(__("Please save the row first, then create BOM."));
+			return;
+		}
+
 		if (!row.item) {
 			frappe.msgprint(__("Please set an Item in the row before creating a BOM."));
 			return;
@@ -28,16 +38,21 @@ function do_create(frm, cdt, cdn, row) {
 		args: {
 			item: row.item,
 			qty: row.qty || 1,
-			company: frm.doc.company || frappe.defaults.get_default("company")
+			company: frm.doc.company || frappe.defaults.get_default("company"),
+			contract_bom_request: frm.doc.name,
+			contract_bom_item: row.name
 		},
 		freeze: true,
 		freeze_message: __("Creating BOM..."),
 		callback: function(r) {
 			if (r.message) {
 				frappe.model.set_value(cdt, cdn, "bom", r.message);
-				frm.save().then(function() {
+				frm.reload_doc().then(function() {
+					if (frm.dashboard && frm.dashboard.set_open_count) {
+						frm.dashboard.set_open_count();
+					}
 					frappe.show_alert({
-						message: __("BOM {0} created and saved.", [r.message]),
+						message: __("BOM {0} created and linked.", [r.message]),
 						indicator: "green"
 					});
 				});

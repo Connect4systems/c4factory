@@ -10,7 +10,7 @@ class ContractBOMRequest(Document):
 
 
 @frappe.whitelist()
-def create_bom_for_item(item, qty=1, company=None):
+def create_bom_for_item(item, qty=1, company=None, contract_bom_request=None, contract_bom_item=None):
 	if not item:
 		frappe.throw("Please set Item before creating BOM.")
 
@@ -33,5 +33,20 @@ def create_bom_for_item(item, qty=1, company=None):
 		],
 	})
 	bom.insert(ignore_permissions=False)
+
+	if contract_bom_request and contract_bom_item:
+		frappe.has_permission("Contract BOM Request", doc=contract_bom_request, throw=True)
+		row = frappe.db.get_value(
+			"Contract BOM Item",
+			contract_bom_item,
+			["parent", "parenttype"],
+			as_dict=True,
+		)
+		if not row or row.parenttype != "Contract BOM Request" or row.parent != contract_bom_request:
+			frappe.throw("Invalid Contract BOM row selected.")
+
+		# Persist link on child row so dashboard internal link can resolve exact BOM names.
+		frappe.db.set_value("Contract BOM Item", contract_bom_item, "bom", bom.name, update_modified=False)
+
 	frappe.db.commit()
 	return bom.name
