@@ -9,7 +9,9 @@
   "item",
   "item_name",
   "description",
-  "qty"
+  "qty",
+  "bom",
+  "create_bom"
  ],
  "fields": [
   {
@@ -39,6 +41,20 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "QTY"
+  },
+  {
+   "fieldname": "bom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "BOM",
+   "options": "BOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "create_bom",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Create BOM"
   }
  ],
  "grid_page_length": 50,
