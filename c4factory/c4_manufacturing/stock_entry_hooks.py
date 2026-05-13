@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import frappe
+from frappe import _
 from frappe.utils import flt
 
 
@@ -19,8 +20,12 @@ def _get_wo_items(wo_doc):
 
 def set_wip_target_warehouse(doc, method: str | None = None) -> None:
     """
-    If Stock Entry Type is 'Material Transfer for Manufacture' or 'Manufacture'
-    and a line has no t_warehouse, pull it from Work Order.wip_warehouse.
+        Keep warehouse mapping consistent for manufacturing entries.
+
+        - Material Transfer for Manufacture:
+            default missing target warehouse from Work Order.wip_warehouse.
+        - Manufacture:
+            raw rows must be source-only; finished/scrap rows must be target-only.
     """
     se_type = (doc.stock_entry_type or doc.purpose or "").strip()
 
@@ -31,12 +36,55 @@ def set_wip_target_warehouse(doc, method: str | None = None) -> None:
         return
 
     wo = frappe.get_doc("Work Order", doc.work_order)
-    if not wo.wip_warehouse:
+
+    if se_type == "Material Transfer for Manufacture":
+        if not wo.wip_warehouse:
+            return
+
+        for row in doc.items:
+            if not row.t_warehouse:
+                row.t_warehouse = wo.wip_warehouse
+
         return
 
+    # Manufacture only: ensure manufactured quantity fields are always set.
+    finished_qty = 0.0
     for row in doc.items:
-        if not row.t_warehouse:
-            row.t_warehouse = wo.wip_warehouse
+        if flt(row.get("is_finished_item")) == 1 and flt(row.get("is_scrap_item")) != 1:
+            finished_qty += flt(row.get("qty"))
+
+    if finished_qty > 0:
+        doc.fg_completed_qty = finished_qty
+        if hasattr(doc, "for_quantity"):
+            doc.for_quantity = finished_qty
+        if hasattr(doc, "manufactured_qty"):
+            doc.manufactured_qty = finished_qty
+    else:
+        frappe.throw(
+            _(
+                "Manufacture Stock Entry only: Finished item quantity is missing. "
+                "Please add a finished item row with Qty greater than 0."
+            )
+        )
+
+    # Manufacture only: normalize warehouses and provide clear message
+    # before ERPNext raises the generic same source/target alert.
+    for row in doc.items:
+        is_finished = flt(row.get("is_finished_item")) == 1
+        is_scrap = flt(row.get("is_scrap_item")) == 1
+
+        if is_finished or is_scrap:
+            row.s_warehouse = None
+        else:
+            row.t_warehouse = None
+
+        if row.s_warehouse and row.t_warehouse and row.s_warehouse == row.t_warehouse:
+            frappe.throw(
+                _(
+                    "Manufacture Stock Entry only: Row {0} has same Source and Target Warehouse. "
+                    "Raw material rows must have Source only, while Finished/Scrap rows must have Target only."
+                ).format(row.idx)
+            )
 
 
 # ============================================================

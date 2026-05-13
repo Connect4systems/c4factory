@@ -36,6 +36,7 @@ doc_events = {
     # Stock Entry – costing + WO update
     "Stock Entry": {
         "validate": "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
+        "before_submit": "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
         "on_submit": [
             "c4factory.c4_manufacturing.stock_entry_hooks.on_submit_update_work_order_costing",
             "c4factory.api.work_order_flow.on_stock_entry_submit",
