@@ -116,8 +116,7 @@ def create_pick_list(
     if count == 0:
         frappe.throw(_("No valid required items to pick for Work Order {0}.").format(wo.name))
 
-    pl.insert(ignore_permissions=True)
-    return pl.name
+    return pl.as_dict()
 
 
 def _get_pick_list_source_warehouse(wo, wo_item) -> str | None:
