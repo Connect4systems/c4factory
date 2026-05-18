@@ -863,7 +863,10 @@ def _ensure_job_cards_for_pick_list(pl_doc) -> None:
 
         for op_field, jc_field in (
             ("name", "work_order_operation"),
+            ("name", "operation_id"),
             ("idx", "sequence_id"),
+            ("idx", "operation_row_id"),
+            ("idx", "operation_row_number"),
             ("time_in_mins", "time_required"),
             ("time_in_mins", "for_time"),
             ("hour_rate", "hour_rate"),

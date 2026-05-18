@@ -2,6 +2,56 @@ import frappe
 from frappe.utils import flt
 
 
+def set_operation_row_reference(doc, method=None):
+    """
+    Backfill ERPNext's Job Card operation row reference fields from the linked
+    Work Order operation. This is needed for C4 Pick List-created Job Cards.
+    """
+    if not doc.get("work_order") or not doc.get("operation"):
+        return
+
+    if doc.get("operation_id") and doc.get("operation_row_number"):
+        return
+
+    filters = {
+        "parent": doc.get("work_order"),
+        "parenttype": "Work Order",
+        "operation": doc.get("operation"),
+    }
+
+    if doc.get("workstation"):
+        filters["workstation"] = doc.get("workstation")
+
+    op_row = frappe.db.get_value(
+        "Work Order Operation",
+        filters,
+        ["name", "idx", "sequence_id"],
+        as_dict=True,
+        order_by="idx asc",
+    )
+
+    if not op_row and doc.get("operation"):
+        op_row = frappe.db.get_value(
+            "Work Order Operation",
+            {
+                "parent": doc.get("work_order"),
+                "parenttype": "Work Order",
+                "operation": doc.get("operation"),
+            },
+            ["name", "idx", "sequence_id"],
+            as_dict=True,
+            order_by="idx asc",
+        )
+
+    if not op_row:
+        return
+
+    _set_if_field(doc, "operation_id", op_row.name)
+    _set_if_field(doc, "operation_row_id", op_row.idx)
+    _set_if_field(doc, "operation_row_number", op_row.idx)
+    _set_if_field(doc, "sequence_id", op_row.sequence_id or op_row.idx)
+
+
 def normalize_partial_completion(doc, method=None):
     """
     Prevent auto process loss on partial Job Card completion.
@@ -49,3 +99,8 @@ def sync_work_order_costing_from_job_card(doc, method=None):
     except Exception:
         # Do not block Job Card save/submit due to costing sync issues.
         frappe.log_error(frappe.get_traceback(), "C4Factory: Job Card costing sync failed")
+
+
+def _set_if_field(doc, fieldname: str, value) -> None:
+    if value is not None and doc.meta.has_field(fieldname):
+        doc.set(fieldname, value)
