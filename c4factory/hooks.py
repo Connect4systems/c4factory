@@ -26,6 +26,11 @@ doctype_js = {
 # ---------------------------------------------------------
 
 doc_events = {
+    # Work Order – source warehouse autofill from Item Group
+    "Work Order": {
+        "validate": "c4factory.c4_manufacturing.work_order_hooks.set_source_warehouse_from_item_group",
+    },
+
     # Pick List custom flow
     "Pick List": {
         "validate": "c4factory.api.work_order_flow.on_pick_list_validate",

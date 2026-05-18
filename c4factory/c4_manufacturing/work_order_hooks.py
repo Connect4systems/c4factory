@@ -179,3 +179,77 @@ def recalculate_costing_for_work_order(work_order_name):
     wo.flags.ignore_validate_update_after_submit = True
     wo.flags.ignore_permissions = True
     wo.save()
+
+
+def set_source_warehouse_from_item_group(doc, method=None):
+    """
+    On Work Order save/validate, fill each required item's source warehouse
+    from Item Group -> Default Warehouse.
+
+    Rules:
+    - Only fill when row.source_warehouse is empty (do not override manual edits).
+    - Resolve default warehouse from the item's group, with parent-group fallback.
+    """
+    rows = doc.get("required_items") or doc.get("items") or []
+    if not rows:
+        return
+
+    item_group_cache = {}
+    warehouse_cache = {}
+
+    for row in rows:
+        if not row.get("item_code"):
+            continue
+
+        # Respect manual value.
+        if row.get("source_warehouse"):
+            continue
+
+        item_code = row.get("item_code")
+        item_group = item_group_cache.get(item_code)
+        if item_group is None:
+            item_group = frappe.db.get_value("Item", item_code, "item_group")
+            item_group_cache[item_code] = item_group
+
+        if not item_group:
+            continue
+
+        warehouse = warehouse_cache.get(item_group)
+        if warehouse is None:
+            warehouse = _get_default_warehouse_from_item_group(item_group)
+            warehouse_cache[item_group] = warehouse
+
+        if warehouse:
+            row.source_warehouse = warehouse
+
+
+def _get_default_warehouse_from_item_group(item_group: str) -> str | None:
+    """
+    Return Item Group default warehouse, traversing parent_item_group upward
+    until a default warehouse is found.
+    """
+    seen = set()
+    current = item_group
+
+    while current and current not in seen:
+        seen.add(current)
+        row = frappe.db.get_value(
+            "Item Group",
+            current,
+            ["default_warehouse", "parent_item_group"],
+            as_dict=True,
+        )
+        if not row:
+            return None
+
+        default_wh = row.get("default_warehouse")
+        if default_wh:
+            return default_wh
+
+        parent = row.get("parent_item_group")
+        if not parent or parent == current:
+            return None
+
+        current = parent
+
+    return None
