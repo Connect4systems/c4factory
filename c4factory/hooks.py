@@ -36,6 +36,7 @@ doc_events = {
 
     # Pick List custom flow
     "Pick List": {
+        "before_insert": "c4factory.api.work_order_flow.on_pick_list_validate",
         "validate": "c4factory.api.work_order_flow.on_pick_list_validate",
         "on_submit": "c4factory.api.work_order_flow.on_pick_list_submit",
         "on_cancel": "c4factory.api.work_order_flow.on_pick_list_cancel",

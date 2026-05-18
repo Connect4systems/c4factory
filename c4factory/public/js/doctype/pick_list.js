@@ -18,6 +18,54 @@ frappe.ui.form.on("Pick List", {
   },
 });
 
+frappe.ui.form.on("Pick List", {
+  refresh(frm) {
+    apply_item_group_warehouses(frm);
+  },
+  onload_post_render(frm) {
+    apply_item_group_warehouses(frm);
+  },
+  company(frm) {
+    apply_item_group_warehouses(frm);
+  },
+});
+
+frappe.ui.form.on("Pick List Item", {
+  item_code(frm, cdt, cdn) {
+    set_pick_list_row_warehouse(frm, cdt, cdn);
+  },
+  locations_add(frm, cdt, cdn) {
+    set_pick_list_row_warehouse(frm, cdt, cdn);
+  },
+});
+
+async function apply_item_group_warehouses(frm) {
+  if (frm.doc.docstatus !== 0) return;
+
+  const rows = frm.doc.locations || [];
+  for (const row of rows) {
+    await set_pick_list_row_warehouse(frm, row.doctype, row.name);
+  }
+}
+
+async function set_pick_list_row_warehouse(frm, cdt, cdn) {
+  const row = locals[cdt] && locals[cdt][cdn];
+  if (!row || !row.item_code || frm.doc.docstatus !== 0) return;
+
+  const { message: warehouse } = await frappe.call({
+    method: "c4factory.c4_manufacturing.work_order_hooks.get_default_source_warehouse",
+    args: {
+      item_code: row.item_code,
+      item_group: row.item_group,
+      company: frm.doc.company,
+    },
+  });
+
+  if (warehouse && locals[cdt] && locals[cdt][cdn]) {
+    await frappe.model.set_value(cdt, cdn, "warehouse", warehouse);
+  }
+}
+
 // ----------------------------------------------
 // Dialog logic
 // ----------------------------------------------
