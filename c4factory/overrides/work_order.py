@@ -1,6 +1,7 @@
 from erpnext.manufacturing.doctype.work_order.work_order import WorkOrder as ERPNextWorkOrder
 import frappe
 from frappe.utils import flt
+from c4factory.c4_manufacturing.work_order_hooks import set_source_warehouse_from_item_group
 
 
 class WorkOrder(ERPNextWorkOrder):
@@ -25,11 +26,14 @@ class WorkOrder(ERPNextWorkOrder):
 
     # If there are no rows yet, use standard behaviour (populate from BOM)
     if not self.get("required_items"):
-      return super().set_required_items(reset_only_qty=reset_only_qty)
+      result = super().set_required_items(reset_only_qty=reset_only_qty)
+      set_source_warehouse_from_item_group(self)
+      return result
 
     # If rows already exist:
     # - when reset_only_qty is True, core would normally recompute required_qty.
     # - we skip this to keep the user edits.
+    set_source_warehouse_from_item_group(self)
     return
 
   def set_status(self):

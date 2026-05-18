@@ -7,6 +7,12 @@ frappe.ui.form.on("Work Order", {
   },
   onload_post_render(frm) {
     make_required_qty_editable(frm);
+  },
+  bom_no(frm) {
+    setTimeout(() => set_missing_source_warehouses(frm), 800);
+  },
+  company(frm) {
+    set_missing_source_warehouses(frm);
   }
 });
 
@@ -57,6 +63,7 @@ async function set_source_warehouse_from_item_group(frm, cdt, cdn) {
     method: "c4factory.c4_manufacturing.work_order_hooks.get_default_source_warehouse",
     args: {
       item_code: row.item_code,
+      item_group: row.item_group,
       company: frm.doc.company
     }
   });
