@@ -866,12 +866,12 @@ def _ensure_job_cards_for_pick_list(pl_doc) -> None:
             ("name", "operation_id"),
             ("idx", "sequence_id"),
             ("idx", "operation_row_id"),
-            ("idx", "operation_row_number"),
             ("time_in_mins", "time_required"),
             ("time_in_mins", "for_time"),
             ("hour_rate", "hour_rate"),
         ):
             _set_if_field(jc, jc_meta, jc_field, op.get(op_field))
+        _set_if_field(jc, jc_meta, "operation_row_number", op.name)
 
         jc.insert(ignore_permissions=True, ignore_mandatory=True)
 

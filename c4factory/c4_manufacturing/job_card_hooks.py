@@ -13,43 +13,98 @@ def set_operation_row_reference(doc, method=None):
     if doc.get("operation_id") and doc.get("operation_row_number"):
         return
 
-    filters = {
-        "parent": doc.get("work_order"),
-        "parenttype": "Work Order",
-        "operation": doc.get("operation"),
-    }
-
-    if doc.get("workstation"):
-        filters["workstation"] = doc.get("workstation")
-
-    op_row = frappe.db.get_value(
-        "Work Order Operation",
-        filters,
-        ["name", "idx", "sequence_id"],
-        as_dict=True,
-        order_by="idx asc",
+    op_row = _get_work_order_operation_row(
+        doc.get("work_order"),
+        operation=doc.get("operation"),
+        workstation=doc.get("workstation"),
+        operation_id=doc.get("operation_id"),
     )
-
-    if not op_row and doc.get("operation"):
-        op_row = frappe.db.get_value(
-            "Work Order Operation",
-            {
-                "parent": doc.get("work_order"),
-                "parenttype": "Work Order",
-                "operation": doc.get("operation"),
-            },
-            ["name", "idx", "sequence_id"],
-            as_dict=True,
-            order_by="idx asc",
-        )
 
     if not op_row:
         return
 
     _set_if_field(doc, "operation_id", op_row.name)
     _set_if_field(doc, "operation_row_id", op_row.idx)
-    _set_if_field(doc, "operation_row_number", op_row.idx)
+    _set_if_field(doc, "operation_row_number", op_row.name)
     _set_if_field(doc, "sequence_id", op_row.sequence_id or op_row.idx)
+
+
+@frappe.whitelist()
+def get_operation_row_reference(work_order, operation=None, workstation=None, operation_id=None):
+    op_row = _get_work_order_operation_row(
+        work_order,
+        operation=operation,
+        workstation=workstation,
+        operation_id=operation_id,
+    )
+    if not op_row:
+        return None
+
+    return {
+        "operation_id": op_row.name,
+        "operation_row_id": op_row.idx,
+        "operation_row_number": op_row.name,
+        "sequence_id": op_row.sequence_id or op_row.idx,
+    }
+
+
+def _get_work_order_operation_row(work_order, operation=None, workstation=None, operation_id=None):
+    if not work_order:
+        return None
+
+    fields = ["name", "idx", "sequence_id"]
+
+    if operation_id:
+        op_row = frappe.db.get_value(
+            "Work Order Operation",
+            {"name": operation_id, "parent": work_order, "parenttype": "Work Order"},
+            fields,
+            as_dict=True,
+        )
+        if op_row:
+            return op_row
+
+    if operation:
+        filters = {
+            "parent": work_order,
+            "parenttype": "Work Order",
+            "operation": operation,
+        }
+
+        if workstation:
+            filters["workstation"] = workstation
+
+        op_row = frappe.db.get_value(
+            "Work Order Operation",
+            filters,
+            fields,
+            as_dict=True,
+            order_by="idx asc",
+        )
+        if op_row:
+            return op_row
+
+        op_row = frappe.db.get_value(
+            "Work Order Operation",
+            {
+                "parent": work_order,
+                "parenttype": "Work Order",
+                "operation": operation,
+            },
+            fields,
+            as_dict=True,
+            order_by="idx asc",
+        )
+        if op_row:
+            return op_row
+
+    return frappe.db.get_value(
+        "Work Order Operation",
+        {"parent": work_order, "parenttype": "Work Order"},
+        fields,
+        as_dict=True,
+        order_by="idx asc",
+    )
 
 
 def normalize_partial_completion(doc, method=None):

@@ -15,6 +15,7 @@ doctype_js = {
     "Pick List": "public/js/doctype/pick_list.js",
     "BOM": "public/js/doctype/bom/bom_measurement_qty.js",
     "Work Order": "public/js/doctype/work_order.js",
+    "Job Card": "public/js/doctype/job_card.js",
 
     # moved from c4napata → c4factory
     "Sales Order": "public/js/doctype/sales_order/request_bom.js",
@@ -56,6 +57,7 @@ doc_events = {
 
     # Job Card – keep partial completion from becoming process loss
     "Job Card": {
+        "before_validate": "c4factory.c4_manufacturing.job_card_hooks.set_operation_row_reference",
         "validate": "c4factory.c4_manufacturing.job_card_hooks.set_operation_row_reference",
         "before_submit": [
             "c4factory.c4_manufacturing.job_card_hooks.set_operation_row_reference",
