@@ -4,6 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from c4factory.c4_manufacturing.work_order_hooks import get_default_source_warehouse
+
 
 # ================================================================
 # Work Order helpers and hooks
@@ -256,14 +258,53 @@ def get_pick_list_balance_rows(pick_list: str):
 
 def on_pick_list_validate(doc, method=None):
     """
-    Placeholder validate hook for Pick List.
-
-    Currently it does nothing and just allows save/submit.
-    We keep it so that hooks.py can safely call it without errors.
-    Later we can add extra validation logic here if needed.
+    Keep Pick List source warehouses aligned with the same Item Group
+    Defaults lookup used by Work Order required items.
     """
-    # no special validation required for now
-    return
+    set_pick_list_warehouses_from_item_group(doc)
+
+
+def set_pick_list_warehouses_from_item_group(doc):
+    """
+    For each Pick List Item, prefer Item Group Defaults -> default_warehouse.
+
+    ERPNext may prefill Pick List Item.warehouse from stock availability. For
+    manufacturing picks we want the warehouse mapping to follow the Item Group
+    defaults, matching the Work Order source warehouse behavior.
+    """
+    locations = doc.get("locations") or []
+    if not locations:
+        return
+
+    company = doc.get("company")
+    item_group_cache = {}
+    warehouse_cache = {}
+
+    for row in locations:
+        item_code = row.get("item_code")
+        if not item_code:
+            continue
+
+        item_group = row.get("item_group") or item_group_cache.get(item_code)
+        if item_group is None:
+            item_group = frappe.db.get_value("Item", item_code, "item_group")
+            item_group_cache[item_code] = item_group
+
+        if not item_group:
+            continue
+
+        cache_key = (item_code, item_group, company)
+        warehouse = warehouse_cache.get(cache_key)
+        if warehouse is None:
+            warehouse = get_default_source_warehouse(
+                item_code=item_code,
+                item_group=item_group,
+                company=company,
+            )
+            warehouse_cache[cache_key] = warehouse
+
+        if warehouse:
+            row.warehouse = warehouse
 
 
 # ================================================================
