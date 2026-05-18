@@ -14,6 +14,23 @@ def _get_wo_items(wo_doc):
     return wo_doc.get("required_items") or wo_doc.get("items") or []
 
 
+def _is_material_transfer_for_manufacture(doc) -> bool:
+    return "Material Transfer for Manufacture" in {
+        (doc.get("stock_entry_type") or "").strip(),
+        (doc.get("purpose") or "").strip(),
+    }
+
+
+def _is_manufacture_like_entry(doc) -> bool:
+    return bool(
+        {
+            (doc.get("stock_entry_type") or "").strip(),
+            (doc.get("purpose") or "").strip(),
+        }
+        & {"Manufacture", "Process Loss"}
+    )
+
+
 # ============================================================
 # 1) Stock Entry.validate – default WIP target warehouse
 # ============================================================
@@ -27,9 +44,10 @@ def set_wip_target_warehouse(doc, method: str | None = None) -> None:
         - Manufacture:
             raw rows must be source-only; finished/scrap rows must be target-only.
     """
-    se_type = (doc.stock_entry_type or doc.purpose or "").strip()
-
-    if se_type not in ("Material Transfer for Manufacture", "Manufacture"):
+    if not (
+        _is_material_transfer_for_manufacture(doc)
+        or _is_manufacture_like_entry(doc)
+    ):
         return
 
     if not doc.work_order:
@@ -37,7 +55,7 @@ def set_wip_target_warehouse(doc, method: str | None = None) -> None:
 
     wo = frappe.get_doc("Work Order", doc.work_order)
 
-    if se_type == "Material Transfer for Manufacture":
+    if _is_material_transfer_for_manufacture(doc):
         if not wo.wip_warehouse:
             return
 
@@ -125,12 +143,12 @@ def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
     - operation cost is taken from actual Job Card totals for the Work Order,
       allocated to this SE by produced quantity share.
     """
-    se_type = (doc.stock_entry_type or doc.purpose or "").strip()
-    if se_type != "Manufacture":
+    if not _is_manufacture_like_entry(doc):
         return
 
     finished_rows = []
     raw_material_cost = 0.0
+    transferred_rate_map = None
 
     for row in doc.items or []:
         is_finished = flt(row.get("is_finished_item")) == 1
@@ -145,10 +163,24 @@ def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
         if is_scrap:
             continue
 
-        # Prefer explicit row amount, fallback to qty * basic_rate
+        # Prefer explicit row amount, then the row rate, then the weighted
+        # valuation from submitted transfers into WIP for this Work Order.
         amount = abs(flt(row.get("basic_amount") or row.get("amount")))
         if amount <= 0 and qty > 0:
-            amount = qty * abs(flt(row.get("basic_rate")))
+            rate = _get_stock_entry_row_rate(row)
+            if rate <= 0 and wo_doc.get("wip_warehouse"):
+                if transferred_rate_map is None:
+                    transferred_rate_map = _get_transferred_wip_rate_map(
+                        wo_doc.name, wo_doc.wip_warehouse
+                    )
+                rate = transferred_rate_map.get(row.get("item_code"), 0.0)
+
+            if rate > 0:
+                amount = qty * rate
+                row.basic_rate = rate
+                if hasattr(row, "valuation_rate"):
+                    row.valuation_rate = rate
+
         raw_material_cost += amount
 
     finished_qty = sum(
@@ -177,8 +209,84 @@ def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
             continue
         row.qty = row_qty
         row.basic_rate = fg_rate
+        row.basic_amount = row_qty * fg_rate
+        row.amount = row.basic_amount
         if hasattr(row, "valuation_rate"):
             row.valuation_rate = fg_rate
+
+
+def _get_stock_entry_row_rate(row) -> float:
+    """Return the best material valuation rate already available on a row."""
+    return abs(
+        flt(row.get("valuation_rate"))
+        or flt(row.get("basic_rate"))
+        or flt(row.get("incoming_rate"))
+    )
+
+
+def _get_transferred_wip_rate_map(
+    work_order_name: str, wip_warehouse: str
+) -> dict[str, float]:
+    """
+    Return weighted valuation rates for materials transferred into WIP.
+
+    Manufacture Stock Entries in this app consume the actual transferred WIP
+    materials. If the new consumption rows have not been valued yet, this lets
+    the finished item cost still use the submitted transfer values.
+    """
+    if not work_order_name or not wip_warehouse:
+        return {}
+
+    rows = frappe.db.sql(
+        """
+        SELECT
+            sed.item_code,
+            sed.qty,
+            sed.transfer_qty,
+            sed.basic_rate,
+            sed.valuation_rate,
+            sed.basic_amount,
+            sed.amount
+        FROM `tabStock Entry Detail` sed
+        INNER JOIN `tabStock Entry` se
+            ON se.name = sed.parent
+        WHERE
+            se.docstatus = 1
+            AND se.work_order = %s
+            AND se.stock_entry_type = 'Material Transfer for Manufacture'
+            AND sed.t_warehouse = %s
+        """,
+        (work_order_name, wip_warehouse),
+        as_dict=True,
+    )
+
+    totals = {}
+    for row in rows:
+        item_code = row.get("item_code")
+        if not item_code:
+            continue
+
+        qty = abs(flt(row.get("transfer_qty")) or flt(row.get("qty")))
+        if qty <= 0:
+            continue
+
+        rate = abs(flt(row.get("valuation_rate")) or flt(row.get("basic_rate")))
+        amount = abs(flt(row.get("basic_amount")) or flt(row.get("amount")))
+        if amount <= 0 and rate > 0:
+            amount = qty * rate
+
+        if amount <= 0:
+            continue
+
+        totals.setdefault(item_code, {"qty": 0.0, "amount": 0.0})
+        totals[item_code]["qty"] += qty
+        totals[item_code]["amount"] += amount
+
+    return {
+        item_code: values["amount"] / values["qty"]
+        for item_code, values in totals.items()
+        if values["qty"] > 0 and values["amount"] > 0
+    }
 
 
 def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float:

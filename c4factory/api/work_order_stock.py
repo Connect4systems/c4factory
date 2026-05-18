@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import flt
 from erpnext.manufacturing.doctype.work_order.work_order import (
     make_stock_entry as erpnext_make_stock_entry,
 )
@@ -85,6 +86,8 @@ def make_stock_entry(work_order_id, purpose, qty=None):
 
     # 1) RAW MATERIAL ROWS – consumed from WIP
     for item in transferred_items:
+        rate = flt(item.get("valuation_rate") or item.get("basic_rate"))
+        amount = flt(item.get("amount")) or (flt(item["qty"]) * rate)
         row = se.append("items", {
             "item_code": item["item_code"],
             "qty": item["qty"],
@@ -93,9 +96,14 @@ def make_stock_entry(work_order_id, purpose, qty=None):
             "conversion_factor": 1,
             "is_finished_item": 0,
             "is_scrap_item": 0,
+            "valuation_rate": rate,
+            "basic_rate": rate,
+            "amount": amount,
+            "basic_amount": amount,
         })
         row._c4_role = "raw"
         row._c4_expected_qty = item["qty"]
+        row._c4_expected_rate = rate
 
     # 2) SCRAP ITEMS ROWS – created in Scrap Warehouse
     if wo.scrap_warehouse:
@@ -143,6 +151,12 @@ def make_stock_entry(work_order_id, purpose, qty=None):
             row.t_warehouse = None
             if expected_qty > 0:
                 row.qty = expected_qty
+            expected_rate = flt(getattr(row, "_c4_expected_rate", 0))
+            if expected_rate > 0:
+                row.valuation_rate = expected_rate
+                row.basic_rate = expected_rate
+                row.amount = flt(row.qty) * expected_rate
+                row.basic_amount = row.amount
 
         elif role == "scrap":
             # scrap: created in scrap warehouse, no source
@@ -161,8 +175,18 @@ def make_stock_entry(work_order_id, purpose, qty=None):
         # remove temporary attributes if present
         if hasattr(row, "_c4_expected_qty"):
             delattr(row, "_c4_expected_qty")
+        if hasattr(row, "_c4_expected_rate"):
+            delattr(row, "_c4_expected_rate")
         if hasattr(row, "_c4_role"):
             delattr(row, "_c4_role")
+
+    # Price the finished good immediately so the draft opened by the user
+    # already reflects material valuation + related operation cost.
+    from c4factory.c4_manufacturing.stock_entry_hooks import (
+        _set_manufacture_finished_item_valuation,
+    )
+
+    _set_manufacture_finished_item_valuation(se, wo)
 
     return se.as_dict()
 
@@ -197,7 +221,16 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
             "parent": ["in", se_names],
             "t_warehouse": wip_warehouse,
         },
-        fields=["item_code", "stock_uom", "qty"],
+        fields=[
+            "item_code",
+            "stock_uom",
+            "qty",
+            "transfer_qty",
+            "basic_rate",
+            "valuation_rate",
+            "basic_amount",
+            "amount",
+        ],
     )
 
     if not rows:
@@ -206,17 +239,31 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     aggregated = {}
     for r in rows:
         key = (r["item_code"], r["stock_uom"])
-        aggregated.setdefault(key, 0.0)
-        aggregated[key] += float(r["qty"] or 0.0)
+        aggregated.setdefault(key, {"qty": 0.0, "amount": 0.0})
+
+        row_qty = flt(r.get("transfer_qty")) or flt(r.get("qty"))
+        rate = flt(r.get("valuation_rate")) or flt(r.get("basic_rate"))
+        amount = flt(r.get("basic_amount")) or flt(r.get("amount"))
+        if amount <= 0 and row_qty > 0 and rate > 0:
+            amount = row_qty * rate
+
+        aggregated[key]["qty"] += row_qty
+        aggregated[key]["amount"] += amount
 
     result = []
-    for (item_code, stock_uom), total_qty in aggregated.items():
+    for (item_code, stock_uom), values in aggregated.items():
+        total_qty = flt(values["qty"])
         if total_qty <= 0:
             continue
+        total_amount = flt(values["amount"])
+        weighted_rate = (total_amount / total_qty) if total_amount > 0 else 0.0
         result.append({
             "item_code": item_code,
             "stock_uom": stock_uom,
             "qty": total_qty,
+            "valuation_rate": weighted_rate,
+            "basic_rate": weighted_rate,
+            "amount": total_amount,
         })
 
     return result
