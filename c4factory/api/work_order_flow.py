@@ -454,14 +454,14 @@ from c4factory.c4_manufacturing.stock_entry_hooks import recompute_work_order_co
 
 def _recompute_wo_material_transfer_from_pls(wo_name: str):
     """
-    Recompute Work Order.material_transferred_for_manufacturing from Pick Lists
-    that are actually completed by submitted material-transfer Stock Entries.
+    Recompute Work Order.material_transferred_for_manufacturing from actual
+    submitted material-transfer Stock Entry rows.
     """
     if not wo_name:
         return
 
     wo = frappe.get_doc("Work Order", wo_name)
-    total_for_qty = _get_completed_pick_list_for_qty(wo_name)
+    total_for_qty = _get_transferred_production_qty_from_stock_entries(wo_name)
 
     # Persist transferred qty without updating the document `modified` timestamp
     try:
@@ -487,53 +487,119 @@ def _recompute_wo_material_transfer_from_pls(wo_name: str):
     # when users have the Work Order open while Stock Entry is submitted.
 
 
-def _get_completed_pick_list_for_qty(wo_name: str) -> float:
-    pick_lists = frappe.db.sql(
+@frappe.whitelist()
+def sync_work_order_material_transfer(wo_name: str) -> float:
+    """Manually refresh material_transferred_for_manufacturing for one WO."""
+    _recompute_wo_material_transfer_from_pls(wo_name)
+    return flt(
+        frappe.db.get_value(
+            "Work Order", wo_name, "material_transferred_for_manufacturing"
+        )
+    )
+
+
+def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
+    """
+    Convert submitted PL material-transfer rows back to production quantity.
+
+    Example: a Pick List is for 2 finished units, but only half of every row was
+    moved by submitted Stock Entries. This returns 1, not the full PL for_qty.
+    """
+    rows = frappe.db.sql(
         """
-        SELECT DISTINCT se.pick_list
+        SELECT
+            se.pick_list,
+            sed.custom_pick_list_item,
+            sed.item_code,
+            COALESCE(SUM(ABS(sed.qty)), 0) AS transferred_qty
         FROM `tabStock Entry` se
+        INNER JOIN `tabStock Entry Detail` sed
+            ON sed.parent = se.name
         WHERE
             se.docstatus = 1
             AND se.work_order = %(wo)s
             AND se.pick_list IS NOT NULL
             AND se.pick_list != ''
             AND se.stock_entry_type = 'Material Transfer for Manufacture'
+            AND COALESCE(sed.is_finished_item, 0) = 0
+            AND COALESCE(sed.is_scrap_item, 0) = 0
+        GROUP BY se.pick_list, sed.custom_pick_list_item, sed.item_code
         """,
         {"wo": wo_name},
         as_dict=True,
     )
 
+    if not rows:
+        return 0.0
+
+    by_pick_list = {}
+    for row in rows:
+        by_pick_list.setdefault(row.pick_list, []).append(row)
+
     total = 0.0
-    for row in pick_lists:
-        pl_name = row.pick_list
+    for pl_name, transfer_rows in by_pick_list.items():
         if not frappe.db.exists("Pick List", pl_name):
             continue
 
         try:
-            _update_pick_list_status_from_db(pl_name)
             pl = frappe.get_doc("Pick List", pl_name)
-            balances = _get_pick_list_balances_map(pl)
-            has_balance = any(
-                flt(info.get("balance")) > 0.000001
-                for info in balances.values()
-            )
-            if has_balance:
+            row_ratios = _get_pick_list_transfer_ratios(pl, transfer_rows)
+            if not row_ratios:
                 continue
 
-            total += (
+            pl_for_qty = (
                 flt(pl.get("for_qty"))
                 or flt(pl.get("custom_for_qty"))
                 or flt(pl.get("qty"))
                 or 0.0
             )
+            total += min(row_ratios) * pl_for_qty
+            _update_pick_list_status_from_db(pl_name)
         except Exception:
             frappe.log_error(
                 frappe.get_traceback(),
-                f"C4Factory: completed PL qty failed ({pl_name})",
+                f"C4Factory: transferred production qty failed ({pl_name})",
             )
 
     wo_qty = flt(frappe.db.get_value("Work Order", wo_name, "qty"))
     return min(total, wo_qty) if wo_qty > 0 else total
+
+
+def _get_pick_list_transfer_ratios(pl, transfer_rows) -> list[float]:
+    transfers_by_pl_item = {}
+    transfers_by_item = {}
+    for row in transfer_rows:
+        transferred_qty = flt(row.get("transferred_qty"))
+        if transferred_qty <= 0:
+            continue
+
+        pl_item = row.get("custom_pick_list_item")
+        item_code = row.get("item_code")
+        if pl_item:
+            transfers_by_pl_item[pl_item] = (
+                flt(transfers_by_pl_item.get(pl_item)) + transferred_qty
+            )
+        elif item_code:
+            transfers_by_item[item_code] = (
+                flt(transfers_by_item.get(item_code)) + transferred_qty
+            )
+
+    ratios = []
+    for pl_row in pl.get("locations") or []:
+        pl_qty = flt(pl_row.get("custom_pl_qty")) or flt(pl_row.get("qty"))
+        if pl_qty <= 0:
+            continue
+
+        transferred_qty = flt(transfers_by_pl_item.get(pl_row.name))
+        if transferred_qty <= 0:
+            item_code = pl_row.get("item_code")
+            transferred_qty = min(flt(transfers_by_item.get(item_code)), pl_qty)
+            if item_code and transferred_qty > 0:
+                transfers_by_item[item_code] -= transferred_qty
+
+        ratios.append(min(transferred_qty / pl_qty, 1.0))
+
+    return ratios
 
 # ================================================================
 # Stock Entry hooks: keep Pick List + Work Order in sync on cancel
