@@ -149,6 +149,7 @@ def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
     finished_rows = []
     raw_material_cost = 0.0
     transferred_rate_map = None
+    pick_lists = set()
 
     for row in doc.items or []:
         is_finished = flt(row.get("is_finished_item")) == 1
@@ -162,6 +163,10 @@ def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
 
         if is_scrap:
             continue
+
+        pick_list = _get_pick_list_from_stock_entry_row(row)
+        if pick_list:
+            pick_lists.add(pick_list)
 
         # Prefer explicit row amount, then the row rate, then the weighted
         # valuation from submitted transfers into WIP for this Work Order.
@@ -193,12 +198,17 @@ def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
     wo_produced_before = max(flt(getattr(wo_doc, "produced_qty", 0)), 0.0)
     wo_produced_after = max(wo_produced_before + finished_qty, finished_qty)
 
-    total_op_cost = _get_work_order_operating_cost_from_job_cards(wo_doc.name)
+    if pick_lists:
+        allocated_op_cost = _get_work_order_operating_cost_from_job_cards(
+            wo_doc.name, pick_lists=pick_lists
+        )
+    else:
+        total_op_cost = _get_work_order_operating_cost_from_job_cards(wo_doc.name)
 
-    # Allocate operation cost to this finish quantity.
-    op_basis_qty = wo_produced_after if wo_produced_after > 0 else wo_qty
-    op_share = (finished_qty / op_basis_qty) if op_basis_qty > 0 else 0.0
-    allocated_op_cost = total_op_cost * op_share
+        # Allocate operation cost to this finish quantity.
+        op_basis_qty = wo_produced_after if wo_produced_after > 0 else wo_qty
+        op_share = (finished_qty / op_basis_qty) if op_basis_qty > 0 else 0.0
+        allocated_op_cost = total_op_cost * op_share
 
     total_fg_amount = raw_material_cost + allocated_op_cost
     fg_rate = (total_fg_amount / finished_qty) if finished_qty > 0 else 0.0
@@ -222,6 +232,14 @@ def _get_stock_entry_row_rate(row) -> float:
         or flt(row.get("basic_rate"))
         or flt(row.get("incoming_rate"))
     )
+
+
+def _get_pick_list_from_stock_entry_row(row) -> str | None:
+    pl_item = row.get("custom_pick_list_item")
+    if not pl_item:
+        return None
+
+    return frappe.db.get_value("Pick List Item", pl_item, "parent")
 
 
 def _get_transferred_wip_rate_map(
@@ -289,7 +307,9 @@ def _get_transferred_wip_rate_map(
     }
 
 
-def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float:
+def _get_work_order_operating_cost_from_job_cards(
+    work_order_name: str, pick_lists: set[str] | None = None
+) -> float:
     """Return actual operating cost from Job Cards linked to the Work Order."""
     if not work_order_name:
         return 0.0
@@ -320,14 +340,17 @@ def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float
         if jc_meta.has_field(fieldname):
             fields.append(fieldname)
 
-    jc_rows = frappe.get_all(
-        "Job Card",
-        filters={
-            "work_order": work_order_name,
-            "docstatus": ["<", 2],
-        },
-        fields=fields,
-    )
+    filters = {
+        "work_order": work_order_name,
+        "docstatus": ["<", 2],
+    }
+    if pick_lists:
+        if not jc_meta.has_field("custom_pick_list"):
+            return 0.0
+        filters["custom_pick_list"] = ["in", list(pick_lists)]
+        fields.append("custom_pick_list")
+
+    jc_rows = frappe.get_all("Job Card", filters=filters, fields=fields)
 
     total = 0.0
     for jc in jc_rows:
@@ -422,16 +445,18 @@ def _get_job_card_cost_from_work_order_operation(work_order_name: str, jc_row) -
     op = rows[0]
     cost = flt(op.get("actual_operating_cost")) or flt(op.get("planned_operating_cost"))
     op_completed_qty = flt(op.get("completed_qty"))
+    wo_qty = flt(frappe.db.get_value("Work Order", work_order_name, "qty"))
 
-    if cost > 0 and op_completed_qty > 0:
-        return cost * min(completed_qty / op_completed_qty, 1.0)
+    if cost > 0:
+        qty_basis = op_completed_qty or wo_qty or completed_qty
+        qty_share = (completed_qty / qty_basis) if qty_basis > 0 else 1.0
+        return cost * min(qty_share, 1.0)
 
     mins = flt(op.get("time_in_mins"))
     rate = flt(op.get("hour_rate")) or _get_job_card_hour_rate(jc_row)
     if mins <= 0 or rate <= 0:
         return 0.0
 
-    wo_qty = flt(frappe.db.get_value("Work Order", work_order_name, "qty"))
     qty_basis = op_completed_qty or wo_qty or completed_qty
     qty_share = (completed_qty / qty_basis) if qty_basis > 0 else 1.0
 

@@ -112,6 +112,20 @@ def execute():
                 "insert_after": "custom_work_order",
             },
         ],
+
+        # ---------------------------
+        # Job Card (parent)
+        # ---------------------------
+        "Job Card": [
+            {
+                "fieldname": "custom_pick_list",
+                "label": "Pick List (C4)",
+                "fieldtype": "Link",
+                "options": "Pick List",
+                "insert_after": "work_order",
+                "read_only": 1,
+            },
+        ],
     }
 
     create_custom_fields(custom_fields, update=True)

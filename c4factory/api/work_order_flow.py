@@ -401,6 +401,10 @@ def make_partial_stock_entry_from_pick_list(pick_list: str, items_json: str) -> 
             item.custom_pick_list_item = pl_row.name
         except Exception:
             pass
+        try:
+            item.custom_work_order_item = pl_row.get("custom_work_order_item")
+        except Exception:
+            pass
 
     if not se.get("items"):
         frappe.throw(_("No valid items to transfer for Work Order {0}").format(wo.name))
@@ -595,9 +599,17 @@ def on_pick_list_submit(doc, method: str | None = None):
     """
     Called from hooks on Pick List submit.
 
-    We only recompute the Pick List status and its balance view.
-    Work Order material transfer is driven by Stock Entries.
+    Create operation Job Cards for this Pick List and refresh its status.
+    Material transfer is still driven by Stock Entries.
     """
+    try:
+        _ensure_job_cards_for_pick_list(doc)
+    except Exception:
+        frappe.log_error(
+            title="C4Factory: auto Job Card from Pick List failed",
+            message=frappe.get_traceback(),
+        )
+
     try:
         _update_pick_list_status_from_db(doc.name)
     except Exception:
@@ -605,6 +617,113 @@ def on_pick_list_submit(doc, method: str | None = None):
             title="C4Factory: on_pick_list_submit failed",
             message=frappe.get_traceback(),
         )
+
+
+def _ensure_job_cards_for_pick_list(pl_doc) -> None:
+    """
+    Create one Job Card per Work Order operation for this Pick List.
+
+    The auto Job Cards are tied to the Pick List through custom_pick_list when
+    that custom field exists. They carry the Pick List's production quantity so
+    operation cost can be allocated to the same material lot that was picked.
+    """
+    wo_name = pl_doc.get("work_order")
+    if not wo_name:
+        return
+
+    wo = frappe.get_doc("Work Order", wo_name)
+    operations = wo.get("operations") or []
+    if not operations:
+        return
+
+    jc_meta = _ensure_job_card_pick_list_meta()
+    has_custom_pick_list = jc_meta.has_field("custom_pick_list")
+    pick_qty = (
+        flt(pl_doc.get("for_qty"))
+        or flt(pl_doc.get("custom_for_qty"))
+        or flt(pl_doc.get("qty"))
+        or 1.0
+    )
+
+    for op in operations:
+        operation = op.get("operation")
+        workstation = op.get("workstation")
+
+        filters = {"work_order": wo.name}
+        if has_custom_pick_list:
+            filters["custom_pick_list"] = pl_doc.name
+        if operation and jc_meta.has_field("operation"):
+            filters["operation"] = operation
+        if workstation and jc_meta.has_field("workstation"):
+            filters["workstation"] = workstation
+
+        if frappe.db.exists("Job Card", filters):
+            continue
+
+        jc = frappe.new_doc("Job Card")
+        _set_if_field(jc, jc_meta, "work_order", wo.name)
+        _set_if_field(jc, jc_meta, "company", wo.get("company"))
+        _set_if_field(jc, jc_meta, "bom_no", wo.get("bom_no"))
+        _set_if_field(jc, jc_meta, "production_item", wo.get("production_item"))
+        _set_if_field(jc, jc_meta, "item_name", wo.get("item_name"))
+        _set_if_field(jc, jc_meta, "operation", operation)
+        _set_if_field(jc, jc_meta, "workstation", workstation)
+        _set_if_field(jc, jc_meta, "for_quantity", pick_qty)
+        _set_if_field(jc, jc_meta, "total_completed_qty", pick_qty)
+        _set_if_field(jc, jc_meta, "completed_qty", pick_qty)
+        _set_if_field(jc, jc_meta, "process_loss_qty", 0)
+        _set_if_field(jc, jc_meta, "status", "Completed")
+        _set_if_field(jc, jc_meta, "custom_pick_list", pl_doc.name)
+
+        for op_field, jc_field in (
+            ("name", "work_order_operation"),
+            ("idx", "sequence_id"),
+            ("time_in_mins", "time_required"),
+            ("time_in_mins", "for_time"),
+            ("hour_rate", "hour_rate"),
+        ):
+            _set_if_field(jc, jc_meta, jc_field, op.get(op_field))
+
+        jc.insert(ignore_permissions=True, ignore_mandatory=True)
+
+
+def _set_if_field(doc, meta, fieldname: str, value) -> None:
+    if value is not None and meta.has_field(fieldname):
+        doc.set(fieldname, value)
+
+
+def _ensure_job_card_pick_list_meta():
+    meta = frappe.get_meta("Job Card")
+    if meta.has_field("custom_pick_list"):
+        return meta
+
+    try:
+        from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+        create_custom_fields(
+            {
+                "Job Card": [
+                    {
+                        "fieldname": "custom_pick_list",
+                        "label": "Pick List (C4)",
+                        "fieldtype": "Link",
+                        "options": "Pick List",
+                        "insert_after": "work_order",
+                        "read_only": 1,
+                    }
+                ]
+            },
+            update=True,
+        )
+        frappe.clear_cache(doctype="Job Card")
+        meta = frappe.get_meta("Job Card")
+    except Exception:
+        frappe.log_error(
+            title="C4Factory: ensure Job Card custom_pick_list failed",
+            message=frappe.get_traceback(),
+        )
+
+    return meta
 
 
 def on_pick_list_cancel(doc, method: str | None = None):

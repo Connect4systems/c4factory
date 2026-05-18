@@ -54,13 +54,14 @@ def make_stock_entry(work_order_id, purpose, qty=None):
             f"No remaining quantity to manufacture for Work Order {wo.name}."
         )
 
-    # Collect ACTUAL transfers to WIP for this WO
+    # Collect ACTUAL, not-yet-consumed Pick List transfers to WIP for this WO.
     transferred_items = _get_transferred_items_to_wip(wo.name, wo.wip_warehouse)
 
     if not transferred_items:
         frappe.throw(
-            "No submitted 'Material Transfer for Manufacture' Stock Entries found "
-            f"for Work Order {wo.name}. Please transfer materials to WIP before finishing."
+            "No unconsumed Pick List material transfers found "
+            f"for Work Order {wo.name}. Please transfer the next Pick List to WIP "
+            "before finishing another product."
         )
 
     # --------------------------------------------------------------------
@@ -101,6 +102,10 @@ def make_stock_entry(work_order_id, purpose, qty=None):
             "amount": amount,
             "basic_amount": amount,
         })
+        if item.get("custom_pick_list_item"):
+            row.custom_pick_list_item = item["custom_pick_list_item"]
+        if item.get("custom_work_order_item"):
+            row.custom_work_order_item = item["custom_work_order_item"]
         row._c4_role = "raw"
         row._c4_expected_qty = item["qty"]
         row._c4_expected_rate = rate
@@ -193,12 +198,11 @@ def make_stock_entry(work_order_id, purpose, qty=None):
 
 def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     """
-    Get total qty moved INTO WIP for this Work Order via
-    'Material Transfer for Manufacture' Stock Entries.
+    Get unconsumed Pick List material moved INTO WIP for this Work Order.
 
     Returns list of dicts:
     [
-        {"item_code": ..., "stock_uom": ..., "qty": ...},
+        {"item_code": ..., "stock_uom": ..., "qty": ..., "custom_pick_list_item": ...},
         ...
     ]
     """
@@ -230,28 +234,73 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
             "valuation_rate",
             "basic_amount",
             "amount",
+            "custom_pick_list_item",
+            "custom_work_order_item",
         ],
+        order_by="creation asc, idx asc",
     )
 
     if not rows:
         return []
 
-    aggregated = {}
+    transferred_by_pl_item = {}
     for r in rows:
-        key = (r["item_code"], r["stock_uom"])
-        aggregated.setdefault(key, {"qty": 0.0, "amount": 0.0})
+        pl_item = r.get("custom_pick_list_item")
+        if not pl_item:
+            continue
+
+        key = (pl_item, r["item_code"], r["stock_uom"])
+        transferred_by_pl_item.setdefault(key, {"qty": 0.0, "amount": 0.0})
 
         row_qty = flt(r.get("transfer_qty")) or flt(r.get("qty"))
+        if row_qty <= 0:
+            continue
+
         rate = flt(r.get("valuation_rate")) or flt(r.get("basic_rate"))
         amount = flt(r.get("basic_amount")) or flt(r.get("amount"))
         if amount <= 0 and row_qty > 0 and rate > 0:
             amount = row_qty * rate
 
-        aggregated[key]["qty"] += row_qty
-        aggregated[key]["amount"] += amount
+        transferred_by_pl_item[key]["qty"] += row_qty
+        transferred_by_pl_item[key]["amount"] += amount
+        transferred_by_pl_item[key]["custom_pick_list_item"] = pl_item
+        transferred_by_pl_item[key]["custom_work_order_item"] = r.get(
+            "custom_work_order_item"
+        )
+
+    consumed_qty_map = _get_consumed_pick_list_material_qty(work_order_name)
+    legacy_consumed_by_item = _get_legacy_consumed_material_qty(work_order_name)
+    aggregated = {}
+    for key, values in transferred_by_pl_item.items():
+        pl_item, item_code, _stock_uom = key
+        total_qty = flt(values["qty"])
+        consumed_qty = flt(consumed_qty_map.get((pl_item, item_code)))
+        remaining_qty = max(total_qty - consumed_qty, 0.0)
+        legacy_consumed_qty = min(
+            flt(legacy_consumed_by_item.get(item_code)), remaining_qty
+        )
+        if legacy_consumed_qty > 0:
+            remaining_qty -= legacy_consumed_qty
+            legacy_consumed_by_item[item_code] -= legacy_consumed_qty
+        if remaining_qty <= 0:
+            continue
+
+        total_amount = flt(values["amount"])
+        remaining_amount = (
+            total_amount * remaining_qty / total_qty
+            if total_qty > 0
+            else 0.0
+        )
+
+        aggregated[key] = {
+            "qty": remaining_qty,
+            "amount": remaining_amount,
+            "custom_pick_list_item": values.get("custom_pick_list_item"),
+            "custom_work_order_item": values.get("custom_work_order_item"),
+        }
 
     result = []
-    for (item_code, stock_uom), values in aggregated.items():
+    for (_pl_item, item_code, stock_uom), values in aggregated.items():
         total_qty = flt(values["qty"])
         if total_qty <= 0:
             continue
@@ -264,6 +313,69 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
             "valuation_rate": weighted_rate,
             "basic_rate": weighted_rate,
             "amount": total_amount,
+            "custom_pick_list_item": values.get("custom_pick_list_item"),
+            "custom_work_order_item": values.get("custom_work_order_item"),
         })
 
     return result
+
+
+def _get_consumed_pick_list_material_qty(work_order_name):
+    """Return quantities already consumed by submitted finish entries per PL row."""
+    rows = frappe.db.sql(
+        """
+        SELECT
+            sed.custom_pick_list_item,
+            sed.item_code,
+            COALESCE(SUM(ABS(sed.qty)), 0) AS qty
+        FROM `tabStock Entry Detail` sed
+        INNER JOIN `tabStock Entry` se
+            ON se.name = sed.parent
+        WHERE
+            se.docstatus = 1
+            AND se.work_order = %s
+            AND (se.stock_entry_type IN ('Manufacture', 'Process Loss')
+                 OR se.purpose IN ('Manufacture', 'Process Loss'))
+            AND COALESCE(sed.is_finished_item, 0) = 0
+            AND COALESCE(sed.is_scrap_item, 0) = 0
+            AND sed.custom_pick_list_item IS NOT NULL
+            AND sed.custom_pick_list_item != ''
+        GROUP BY sed.custom_pick_list_item, sed.item_code
+        """,
+        (work_order_name,),
+        as_dict=True,
+    )
+
+    return {
+        (row.custom_pick_list_item, row.item_code): flt(row.qty)
+        for row in rows
+    }
+
+
+def _get_legacy_consumed_material_qty(work_order_name):
+    """
+    Return consumed quantities from older finish entries that did not save PL row links.
+    """
+    rows = frappe.db.sql(
+        """
+        SELECT
+            sed.item_code,
+            COALESCE(SUM(ABS(sed.qty)), 0) AS qty
+        FROM `tabStock Entry Detail` sed
+        INNER JOIN `tabStock Entry` se
+            ON se.name = sed.parent
+        WHERE
+            se.docstatus = 1
+            AND se.work_order = %s
+            AND (se.stock_entry_type IN ('Manufacture', 'Process Loss')
+                 OR se.purpose IN ('Manufacture', 'Process Loss'))
+            AND COALESCE(sed.is_finished_item, 0) = 0
+            AND COALESCE(sed.is_scrap_item, 0) = 0
+            AND (sed.custom_pick_list_item IS NULL OR sed.custom_pick_list_item = '')
+        GROUP BY sed.item_code
+        """,
+        (work_order_name,),
+        as_dict=True,
+    )
+
+    return {row.item_code: flt(row.qty) for row in rows}
