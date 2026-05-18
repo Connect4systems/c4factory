@@ -104,7 +104,7 @@ def make_stock_entry(work_order_id, purpose, qty=None):
         })
         if item.get("custom_pick_list_item"):
             row.custom_pick_list_item = item["custom_pick_list_item"]
-        if item.get("custom_work_order_item"):
+        if item.get("custom_work_order_item") and row.meta.has_field("custom_work_order_item"):
             row.custom_work_order_item = item["custom_work_order_item"]
         row._c4_role = "raw"
         row._c4_expected_qty = item["qty"]
@@ -219,24 +219,28 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     if not se_names:
         return []
 
+    sed_meta = frappe.get_meta("Stock Entry Detail")
+    fields = [
+        "item_code",
+        "stock_uom",
+        "qty",
+        "transfer_qty",
+        "basic_rate",
+        "valuation_rate",
+        "basic_amount",
+        "amount",
+        "custom_pick_list_item",
+    ]
+    if sed_meta.has_field("custom_work_order_item"):
+        fields.append("custom_work_order_item")
+
     rows = frappe.get_all(
         "Stock Entry Detail",
         filters={
             "parent": ["in", se_names],
             "t_warehouse": wip_warehouse,
         },
-        fields=[
-            "item_code",
-            "stock_uom",
-            "qty",
-            "transfer_qty",
-            "basic_rate",
-            "valuation_rate",
-            "basic_amount",
-            "amount",
-            "custom_pick_list_item",
-            "custom_work_order_item",
-        ],
+        fields=fields,
         order_by="creation asc, idx asc",
     )
 
