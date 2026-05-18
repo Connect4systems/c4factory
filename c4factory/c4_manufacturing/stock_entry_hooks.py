@@ -111,6 +111,125 @@ def set_wip_target_warehouse(doc, method: str | None = None) -> None:
                 ).format(row.idx)
             )
 
+    # Manufacture only: set finished-item valuation from actual consumed
+    # material + allocated Job Card operating cost.
+    _set_manufacture_finished_item_valuation(doc, wo)
+
+
+def _set_manufacture_finished_item_valuation(doc, wo_doc) -> None:
+    """
+    For Manufacture entries, compute finished-item basic_rate as:
+      (raw_consumed_material_cost + allocated_operation_cost) / finished_qty
+
+    - raw cost is taken from raw rows in this Stock Entry.
+    - operation cost is taken from actual Job Card totals for the Work Order,
+      allocated to this SE by produced quantity share.
+    """
+    se_type = (doc.stock_entry_type or doc.purpose or "").strip()
+    if se_type != "Manufacture":
+        return
+
+    finished_rows = []
+    raw_material_cost = 0.0
+
+    for row in doc.items or []:
+        is_finished = flt(row.get("is_finished_item")) == 1
+        is_scrap = flt(row.get("is_scrap_item")) == 1
+
+        qty = abs(flt(row.get("transfer_qty")) or flt(row.get("qty")))
+
+        if is_finished and not is_scrap:
+            finished_rows.append(row)
+            continue
+
+        if is_scrap:
+            continue
+
+        # Prefer explicit row amount, fallback to qty * basic_rate
+        amount = abs(flt(row.get("basic_amount") or row.get("amount")))
+        if amount <= 0 and qty > 0:
+            amount = qty * abs(flt(row.get("basic_rate")))
+        raw_material_cost += amount
+
+    finished_qty = sum(
+        abs(flt(r.get("transfer_qty")) or flt(r.get("qty"))) for r in finished_rows
+    )
+    if finished_qty <= 0:
+        return
+
+    wo_qty = max(flt(getattr(wo_doc, "qty", 0)), 0.0)
+    wo_produced_before = max(flt(getattr(wo_doc, "produced_qty", 0)), 0.0)
+    wo_produced_after = max(wo_produced_before + finished_qty, finished_qty)
+
+    total_op_cost = _get_work_order_operating_cost_from_job_cards(wo_doc.name)
+
+    # Allocate operation cost to this finish quantity.
+    op_basis_qty = wo_produced_after if wo_produced_after > 0 else wo_qty
+    op_share = (finished_qty / op_basis_qty) if op_basis_qty > 0 else 0.0
+    allocated_op_cost = total_op_cost * op_share
+
+    total_fg_amount = raw_material_cost + allocated_op_cost
+    fg_rate = (total_fg_amount / finished_qty) if finished_qty > 0 else 0.0
+
+    for row in finished_rows:
+        row_qty = abs(flt(row.get("transfer_qty")) or flt(row.get("qty")))
+        if row_qty <= 0:
+            continue
+        row.qty = row_qty
+        row.basic_rate = fg_rate
+        if hasattr(row, "valuation_rate"):
+            row.valuation_rate = fg_rate
+
+
+def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float:
+    """Return actual operating cost from Job Cards linked to the Work Order."""
+    if not work_order_name:
+        return 0.0
+
+    try:
+        jc_meta = frappe.get_meta("Job Card")
+    except Exception:
+        return 0.0
+
+    has_total_operating_cost = jc_meta.has_field("total_operating_cost")
+    has_total_time_in_mins = jc_meta.has_field("total_time_in_mins")
+    has_hour_rate = jc_meta.has_field("hour_rate")
+
+    fields = ["name", "status"]
+    if has_total_operating_cost:
+        fields.append("total_operating_cost")
+    if has_total_time_in_mins:
+        fields.append("total_time_in_mins")
+    if has_hour_rate:
+        fields.append("hour_rate")
+
+    jc_rows = frappe.get_all(
+        "Job Card",
+        filters={
+            "work_order": work_order_name,
+            "docstatus": ["<", 2],
+        },
+        fields=fields,
+    )
+
+    total = 0.0
+    for jc in jc_rows:
+        status = (jc.get("status") or "").strip()
+        if status == "Cancelled":
+            continue
+
+        cost = flt(jc.get("total_operating_cost"))
+        if cost > 0:
+            total += cost
+            continue
+
+        mins = flt(jc.get("total_time_in_mins"))
+        rate = flt(jc.get("hour_rate"))
+        if mins > 0 and rate > 0:
+            total += (mins / 60.0) * rate
+
+    return total
+
 
 # ============================================================
 # 2) Work Order costing from submitted Stock Entries
@@ -141,8 +260,8 @@ def recompute_work_order_costing(work_order_name: str) -> None:
 
 def _recalculate_work_order_costs(work_order_name: str) -> None:
     """
-    Aggregate actual material cost for the given Work Order from all
-    submitted Stock Entries.
+    Aggregate actual material/scrap cost for the given Work Order from all
+    submitted Stock Entries and combine with actual Job Card operating cost.
 
     Logic:
       - Look at all submitted Stock Entries with se.work_order = WO
@@ -151,7 +270,8 @@ def _recalculate_work_order_costs(work_order_name: str) -> None:
           * if is_scrap_item = 1 → goes to Scrap Material Cost
           * else → goes to Raw Material Cost
       - Use transfer_qty * basic_rate as the amount
-      - Total Cost = Raw + Scrap + Operating Cost (entered manually on WO)
+    - Operating Cost = sum of actual Job Card operating cost
+    - Total Cost = Raw + Operating - Scrap
     """
     wo = frappe.get_doc("Work Order", work_order_name)
 
@@ -179,8 +299,8 @@ def _recalculate_work_order_costs(work_order_name: str) -> None:
     scrap_material_cost = 0.0
 
     for r in rows:
-        qty = flt(r.transfer_qty)
-        rate = flt(r.basic_rate)
+        qty = abs(flt(r.transfer_qty))
+        rate = abs(flt(r.basic_rate))
         amount = qty * rate
 
         # finished item cost is not counted here (it is the result)
@@ -189,13 +309,14 @@ def _recalculate_work_order_costs(work_order_name: str) -> None:
         elif not r.is_finished_item:
             raw_material_cost += amount
 
-    # Operating cost is entered on the Work Order manually
-    operating_cost = flt(wo.c4_operating_cost)
+    # Operating cost from actual Job Cards linked to the Work Order
+    operating_cost = _get_work_order_operating_cost_from_job_cards(work_order_name)
 
     # Write back to Work Order custom fields
     wo.db_set("c4_raw_material_cost", raw_material_cost)
     wo.db_set("c4_scrap_material_cost", scrap_material_cost)
+    wo.db_set("c4_operating_cost", operating_cost)
     wo.db_set(
         "c4_total_cost",
-        raw_material_cost + scrap_material_cost + operating_cost,
+        raw_material_cost + operating_cost - scrap_material_cost,
     )
