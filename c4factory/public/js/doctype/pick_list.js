@@ -7,8 +7,6 @@
 
 frappe.ui.form.on("Pick List", {
   refresh(frm) {
-    set_item_group_default_warehouses(frm);
-
     // نشتغل فقط لما تكون الوثيقة Submitted
     if (frm.doc.docstatus !== 1) return;
 
@@ -18,45 +16,7 @@ frappe.ui.form.on("Pick List", {
       __("Factory")
     );
   },
-  company(frm) {
-    set_item_group_default_warehouses(frm);
-  },
 });
-
-frappe.ui.form.on("Pick List Item", {
-  item_code(frm, cdt, cdn) {
-    set_location_warehouse_from_item_group(frm, cdt, cdn);
-  },
-});
-
-async function set_item_group_default_warehouses(frm) {
-  if (frm.doc.docstatus !== 0) return;
-
-  const rows = frm.doc.locations || [];
-  for (const row of rows) {
-    if (row.item_code) {
-      await set_location_warehouse_from_item_group(frm, row.doctype, row.name);
-    }
-  }
-}
-
-async function set_location_warehouse_from_item_group(frm, cdt, cdn) {
-  const row = locals[cdt] && locals[cdt][cdn];
-  if (!row || !row.item_code) return;
-
-  const { message: warehouse } = await frappe.call({
-    method: "c4factory.c4_manufacturing.work_order_hooks.get_default_source_warehouse",
-    args: {
-      item_code: row.item_code,
-      item_group: row.item_group,
-      company: frm.doc.company,
-    },
-  });
-
-  if (warehouse && locals[cdt] && locals[cdt][cdn].warehouse !== warehouse) {
-    await frappe.model.set_value(cdt, cdn, "warehouse", warehouse);
-  }
-}
 
 // ----------------------------------------------
 // Dialog logic
