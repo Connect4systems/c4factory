@@ -109,7 +109,7 @@ def _get_pick_list_balances_map(pl_doc_or_name):
         }
 
     # Sum transferred qty from submitted Stock Entry Detail
-    # using custom_pick_list_item field
+    # using custom_pick_list_item field.
     transferred_rows = frappe.db.sql(
         """
         SELECT sed.custom_pick_list_item, COALESCE(SUM(sed.qty), 0) AS total_qty
@@ -129,9 +129,56 @@ def _get_pick_list_balances_map(pl_doc_or_name):
         if pl_item_name in result:
             transferred = flt(row.total_qty)
             result[pl_item_name]["transferred"] = transferred
-            result[pl_item_name]["balance"] = max(
-                result[pl_item_name]["pl_qty"] - transferred, 0.0
-            )
+
+    # Backward compatibility path:
+    # some Stock Entries are linked to Pick List only at header level
+    # (se.pick_list) without row-level custom_pick_list_item.
+    # In that case, distribute unlinked transferred qty by item_code
+    # across matching Pick List rows in row order.
+    unlinked_rows = frappe.db.sql(
+        """
+        SELECT sed.item_code, COALESCE(SUM(sed.qty), 0) AS total_qty
+        FROM `tabStock Entry Detail` sed
+        INNER JOIN `tabStock Entry` se ON se.name = sed.parent
+        WHERE se.docstatus = 1
+          AND se.pick_list = %(pick_list)s
+          AND (sed.custom_pick_list_item IS NULL OR sed.custom_pick_list_item = '')
+        GROUP BY sed.item_code
+        """,
+        {"pick_list": pl.name},
+        as_dict=True,
+    )
+
+    rows_by_item_code = {}
+    for row in locations:
+        if row.name not in result:
+            continue
+        rows_by_item_code.setdefault(row.item_code, []).append(row.name)
+
+    for row in unlinked_rows:
+        item_code = row.item_code
+        remaining = flt(row.total_qty)
+        if remaining <= 0:
+            continue
+
+        for pl_item_name in rows_by_item_code.get(item_code, []):
+            info = result.get(pl_item_name)
+            if not info:
+                continue
+
+            free_qty = max(flt(info["pl_qty"]) - flt(info["transferred"]), 0.0)
+            if free_qty <= 0:
+                continue
+
+            alloc = min(remaining, free_qty)
+            info["transferred"] = flt(info["transferred"]) + alloc
+            remaining -= alloc
+
+            if remaining <= 0.000001:
+                break
+
+    for info in result.values():
+        info["balance"] = max(flt(info["pl_qty"]) - flt(info["transferred"]), 0.0)
 
     return result
 

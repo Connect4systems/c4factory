@@ -43,6 +43,11 @@ doc_events = {
         ],
         "on_cancel": "c4factory.api.work_order_flow.on_stock_entry_cancel",
     },
+
+    # Job Card – keep partial completion from becoming process loss
+    "Job Card": {
+        "before_submit": "c4factory.c4_manufacturing.job_card_hooks.normalize_partial_completion",
+    },
 }
 
 # ---------------------------------------------------------
