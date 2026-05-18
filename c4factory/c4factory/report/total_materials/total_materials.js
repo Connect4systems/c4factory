@@ -1,8 +1,16 @@
-// Copyright (c) 2026, Connect 4 Systems and contributors
-// For license information, please see license.txt
-
 frappe.query_reports["Total Materials"] = {
-	"filters": [
-
-	]
+	filters: [
+		{
+			fieldname: "rows",
+			label: __("Rows"),
+			fieldtype: "Long Text",
+			hidden: 1,
+		},
+	],
+	onload(report) {
+		if (frappe.route_options && frappe.route_options.rows) {
+			report.set_filter_value("rows", frappe.route_options.rows);
+			frappe.route_options = null;
+		}
+	},
 };

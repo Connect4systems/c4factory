@@ -80,7 +80,7 @@ frappe.query_reports["Operation Status"] = {
 			}
 
 			frappe.call({
-				method: "contractor.api.create_plan_bom_request",
+				method: "c4factory.api.planning_reports.create_plan_bom_request",
 				args: {
 					rows: rows,
 				},
@@ -107,7 +107,7 @@ frappe.query_reports["Operation Status"] = {
 			}
 
 			frappe.call({
-				method: "contractor.api.create_production_plan_from_operation_status",
+				method: "c4factory.api.planning_reports.create_production_plan_from_operation_status",
 				args: {
 					rows: rows,
 				},
