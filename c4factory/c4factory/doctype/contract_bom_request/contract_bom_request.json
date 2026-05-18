@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "sales_order",
+  "customer",
   "column_break_szwg",
   "date",
   "section_break_qwki",
@@ -61,6 +62,13 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fetch_from": "sales_order.customer",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
   }
  ],
  "grid_page_length": 50,
@@ -68,15 +76,12 @@
  "is_submittable": 1,
  "links": [
   {
-   "group": "Manufacturing",
-   "is_child_table": 1,
    "link_doctype": "Contract BOM Item",
    "link_fieldname": "bom",
-   "parent_doctype": "BOM",
    "table_fieldname": "items"
   }
  ],
- "modified": "2025-10-01 11:13:27.312941",
+ "modified": "2026-04-06 11:02:10.429765",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Contract BOM Request",
