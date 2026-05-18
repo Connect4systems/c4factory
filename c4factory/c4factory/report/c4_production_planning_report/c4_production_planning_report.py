@@ -264,7 +264,7 @@ class ProductionPlanReport:
 			"Purchase Order Item",
 			fields=[
 				"item_code",
-				{"MIN": "schedule_date", "as": "arrival_date"},
+				"min(schedule_date) as arrival_date",
 				"qty as arrival_qty",
 				"warehouse",
 			],
