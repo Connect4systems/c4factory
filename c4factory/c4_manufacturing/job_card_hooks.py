@@ -1,3 +1,4 @@
+import frappe
 from frappe.utils import flt
 
 
@@ -47,4 +48,4 @@ def sync_work_order_costing_from_job_card(doc, method=None):
         recompute_work_order_costing(wo_name)
     except Exception:
         # Do not block Job Card save/submit due to costing sync issues.
-        pass
+        frappe.log_error(frappe.get_traceback(), "C4Factory: Job Card costing sync failed")

@@ -56,6 +56,7 @@ doc_events = {
     "Job Card": {
         "before_submit": "c4factory.c4_manufacturing.job_card_hooks.normalize_partial_completion",
         "on_update": "c4factory.c4_manufacturing.job_card_hooks.sync_work_order_costing_from_job_card",
+        "on_update_after_submit": "c4factory.c4_manufacturing.job_card_hooks.sync_work_order_costing_from_job_card",
         "on_submit": "c4factory.c4_manufacturing.job_card_hooks.sync_work_order_costing_from_job_card",
         "on_cancel": "c4factory.c4_manufacturing.job_card_hooks.sync_work_order_costing_from_job_card",
     },

@@ -208,6 +208,9 @@ def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float
         fields.append("workstation")
     if has_operation:
         fields.append("operation")
+    for fieldname in ("total_completed_qty", "completed_qty", "for_quantity"):
+        if jc_meta.has_field(fieldname):
+            fields.append(fieldname)
 
     jc_rows = frappe.get_all(
         "Job Card",
@@ -234,12 +237,120 @@ def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float
             total += cost
             continue
 
+        cost = _get_job_card_cost_from_work_order_operation(work_order_name, jc)
+        if cost > 0:
+            total += cost
+            continue
+
         mins = flt(jc.get("total_time_in_mins"))
         rate = _get_job_card_hour_rate(jc)
         if mins > 0 and rate > 0:
             total += (mins / 60.0) * rate
 
     return total
+
+
+def _get_job_card_cost_from_work_order_operation(work_order_name: str, jc_row) -> float:
+    """
+    Price a completed Job Card from the matching Work Order operation.
+
+    Some C4 flows complete Job Cards by quantity without recording a time log.
+    In that case, the Job Card is still the real operation signal, and the
+    Work Order operation row provides the rate/time basis.
+    """
+    if not work_order_name or not jc_row:
+        return 0.0
+
+    completed_qty = _get_job_card_completed_qty(jc_row)
+    if completed_qty <= 0:
+        return 0.0
+
+    operation = jc_row.get("operation")
+    workstation = jc_row.get("workstation")
+
+    wo_op_meta = frappe.get_meta("Work Order Operation")
+    wo_op_fields = _get_existing_fields(
+        wo_op_meta,
+        [
+            "name",
+            "operation",
+            "workstation",
+            "time_in_mins",
+            "hour_rate",
+            "planned_operating_cost",
+            "actual_operating_cost",
+            "completed_qty",
+        ],
+    )
+
+    filters = {"parent": work_order_name, "parenttype": "Work Order"}
+    if operation and wo_op_meta.has_field("operation"):
+        filters["operation"] = operation
+    if workstation and wo_op_meta.has_field("workstation"):
+        filters["workstation"] = workstation
+
+    rows = frappe.get_all(
+        "Work Order Operation",
+        filters=filters,
+        fields=wo_op_fields,
+        order_by="idx asc",
+    )
+
+    if not rows and operation and wo_op_meta.has_field("operation"):
+        rows = frappe.get_all(
+            "Work Order Operation",
+            filters={
+                "parent": work_order_name,
+                "parenttype": "Work Order",
+                "operation": operation,
+            },
+            fields=wo_op_fields,
+            order_by="idx asc",
+        )
+
+    if not rows:
+        return 0.0
+
+    op = rows[0]
+    cost = flt(op.get("actual_operating_cost")) or flt(op.get("planned_operating_cost"))
+    op_completed_qty = flt(op.get("completed_qty"))
+
+    if cost > 0 and op_completed_qty > 0:
+        return cost * min(completed_qty / op_completed_qty, 1.0)
+
+    mins = flt(op.get("time_in_mins"))
+    rate = flt(op.get("hour_rate")) or _get_job_card_hour_rate(jc_row)
+    if mins <= 0 or rate <= 0:
+        return 0.0
+
+    wo_qty = flt(frappe.db.get_value("Work Order", work_order_name, "qty"))
+    qty_basis = op_completed_qty or wo_qty or completed_qty
+    qty_share = (completed_qty / qty_basis) if qty_basis > 0 else 1.0
+
+    return (mins / 60.0) * rate * qty_share
+
+
+def _get_existing_fields(meta, fieldnames: list[str]) -> list[str]:
+    """Return only field names available on a DocType, keeping `name`."""
+    fields = []
+    for fieldname in fieldnames:
+        if fieldname == "name" or meta.has_field(fieldname):
+            fields.append(fieldname)
+
+    return fields
+
+
+def _get_job_card_completed_qty(job_card) -> float:
+    """Return the quantity that this Job Card actually completed."""
+    for fieldname in ("total_completed_qty", "completed_qty"):
+        qty = flt(job_card.get(fieldname))
+        if qty > 0:
+            return qty
+
+    if (job_card.get("status") or "").strip() == "Completed":
+        return flt(job_card.get("for_quantity"))
+
+    return 0.0
 
 
 def _get_job_card_cost_from_time_logs(job_card_name: str) -> float:
@@ -336,6 +447,7 @@ def on_submit_update_work_order_costing(doc, method: str | None = None) -> None:
     _recalculate_work_order_costs(doc.work_order)
 
 
+@frappe.whitelist()
 def recompute_work_order_costing(work_order_name: str) -> None:
     """
     Public helper for other modules (e.g. on Stock Entry cancel)
