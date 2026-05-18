@@ -162,6 +162,59 @@ def create_production_plan_from_plan_bom_request(plan_bom_request):
 	return pp.name
 
 
+@frappe.whitelist()
+def create_material_request_from_total_materials(rows, company=None, material_request_type="Purchase"):
+	rows = frappe.parse_json(rows) or []
+
+	if not rows:
+		frappe.throw(_("No rows found to create Material Request."))
+
+	items = []
+	for row in rows:
+		item_code = row.get("item_code")
+		qty = row.get("to_request") or row.get("request_qty") or 0
+
+		if not item_code or qty <= 0:
+			continue
+
+		items.append(
+			{
+				"item_code": item_code,
+				"qty": qty,
+				"warehouse": row.get("warehouse"),
+				"schedule_date": frappe.utils.nowdate(),
+				"description": frappe.db.get_value("Item", item_code, "description") or row.get("item_name"),
+				"uom": row.get("uom"),
+			}
+		)
+
+	if not items:
+		frappe.throw(_("No To Request quantities found."))
+
+	doc = frappe.new_doc("Material Request")
+	if doc.meta.has_field("company"):
+		doc.company = company or frappe.defaults.get_user_default("Company") or frappe.db.get_default("company")
+	if doc.meta.has_field("transaction_date"):
+		doc.transaction_date = frappe.utils.nowdate()
+	if doc.meta.has_field("schedule_date"):
+		doc.schedule_date = frappe.utils.nowdate()
+	if doc.meta.has_field("material_request_type"):
+		doc.material_request_type = material_request_type or "Purchase"
+
+	item_meta = frappe.get_meta("Material Request Item")
+	for item in items:
+		row = doc.append("items", {})
+		_set_if_present(row, item_meta, "item_code", item["item_code"])
+		_set_if_present(row, item_meta, "qty", item["qty"])
+		_set_if_present(row, item_meta, "warehouse", item["warehouse"])
+		_set_if_present(row, item_meta, "schedule_date", item["schedule_date"])
+		_set_if_present(row, item_meta, "description", item["description"])
+		_set_if_present(row, item_meta, "uom", item["uom"])
+
+	doc.insert()
+	return doc.name
+
+
 def _get_production_plan_items_table(pp):
 	if pp.meta.has_field("assembly_items"):
 		return "assembly_items"
