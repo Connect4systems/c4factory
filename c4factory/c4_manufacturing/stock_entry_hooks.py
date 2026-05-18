@@ -47,25 +47,46 @@ def set_wip_target_warehouse(doc, method: str | None = None) -> None:
 
         return
 
-    # Manufacture only: ensure manufactured quantity fields are always set.
-    finished_qty = 0.0
+    # Manufacture only: determine finished quantity robustly.
+    # In some flows (e.g. Job Card), header fields may carry the actual qty
+    # while row qty is still empty during early validate.
+    row_finished_qty = 0.0
+    finished_rows = []
     for row in doc.items:
         if flt(row.get("is_finished_item")) == 1 and flt(row.get("is_scrap_item")) != 1:
-            finished_qty += flt(row.get("qty"))
+            finished_rows.append(row)
+            row_finished_qty += flt(row.get("qty")) or flt(row.get("transfer_qty"))
 
-    if finished_qty > 0:
-        doc.fg_completed_qty = finished_qty
-        if hasattr(doc, "for_quantity"):
-            doc.for_quantity = finished_qty
-        if hasattr(doc, "manufactured_qty"):
-            doc.manufactured_qty = finished_qty
-    else:
-        frappe.throw(
-            _(
-                "Manufacture Stock Entry only: Finished item quantity is missing. "
-                "Please add a finished item row with Qty greater than 0."
+    header_finished_qty = (
+        flt(getattr(doc, "fg_completed_qty", 0))
+        or flt(getattr(doc, "manufactured_qty", 0))
+        or flt(getattr(doc, "for_quantity", 0))
+    )
+
+    finished_qty = row_finished_qty or header_finished_qty
+
+    # If we have a finished qty at header but row qty is empty, sync first row.
+    if row_finished_qty <= 0 and header_finished_qty > 0 and finished_rows:
+        finished_rows[0].qty = header_finished_qty
+        row_finished_qty = header_finished_qty
+        finished_qty = header_finished_qty
+
+    # Hard-fail only before submit when quantity is still truly missing.
+    if finished_qty <= 0:
+        if method == "before_submit":
+            frappe.throw(
+                _(
+                    "Manufacture Stock Entry only: Finished item quantity is missing. "
+                    "Please add a finished item row with Qty greater than 0."
+                )
             )
-        )
+        return
+
+    doc.fg_completed_qty = finished_qty
+    if hasattr(doc, "for_quantity"):
+        doc.for_quantity = finished_qty
+    if hasattr(doc, "manufactured_qty"):
+        doc.manufactured_qty = finished_qty
 
     # Manufacture only: normalize warehouses and provide clear message
     # before ERPNext raises the generic same source/target alert.
