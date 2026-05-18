@@ -195,6 +195,7 @@ def set_source_warehouse_from_item_group(doc, method=None):
         return
 
     item_group_cache = {}
+    company = doc.get("company")
     warehouse_cache = {}
 
     for row in rows:
@@ -214,42 +215,92 @@ def set_source_warehouse_from_item_group(doc, method=None):
         if not item_group:
             continue
 
-        warehouse = warehouse_cache.get(item_group)
+        cache_key = (item_group, company)
+        warehouse = warehouse_cache.get(cache_key)
         if warehouse is None:
-            warehouse = _get_default_warehouse_from_item_group(item_group)
-            warehouse_cache[item_group] = warehouse
+            warehouse = _get_default_warehouse_from_item_group(item_group, company)
+            warehouse_cache[cache_key] = warehouse
 
         if warehouse:
             row.source_warehouse = warehouse
 
 
-def _get_default_warehouse_from_item_group(item_group: str) -> str | None:
+@frappe.whitelist()
+def get_default_source_warehouse(item_code: str, company: str | None = None) -> str | None:
+    """Return the source warehouse for an item from its Item Group Defaults."""
+    if not item_code:
+        return None
+
+    item_group = frappe.db.get_value("Item", item_code, "item_group")
+    if not item_group:
+        return None
+
+    return _get_default_warehouse_from_item_group(item_group, company)
+
+
+def _get_default_warehouse_from_item_group(item_group: str, company: str | None = None) -> str | None:
     """
-    Return Item Group default warehouse, traversing parent_item_group upward
-    until a default warehouse is found.
+    Return Item Group Defaults -> default_warehouse, traversing parent_item_group
+    upward until a default warehouse is found.
+
+    ERPNext stores Item/Item Group defaults in the child DocType "Item Default".
+    Prefer a row for the Work Order company, then a company-less/global row.
     """
     seen = set()
     current = item_group
 
     while current and current not in seen:
         seen.add(current)
-        row = frappe.db.get_value(
+        group = frappe.db.get_value(
             "Item Group",
             current,
-            ["default_warehouse", "parent_item_group"],
+            ["parent_item_group"],
             as_dict=True,
         )
-        if not row:
+        if not group:
             return None
 
-        default_wh = row.get("default_warehouse")
+        default_wh = _get_default_warehouse_from_item_group_defaults(current, company)
         if default_wh:
             return default_wh
 
-        parent = row.get("parent_item_group")
+        parent = group.get("parent_item_group")
         if not parent or parent == current:
             return None
 
         current = parent
+
+    return None
+
+
+def _get_default_warehouse_from_item_group_defaults(
+    item_group: str,
+    company: str | None = None,
+) -> str | None:
+    defaults = frappe.get_all(
+        "Item Default",
+        filters={
+            "parent": item_group,
+            "parenttype": "Item Group",
+        },
+        fields=["company", "default_warehouse"],
+        order_by="idx asc",
+    )
+
+    if not defaults:
+        return None
+
+    if company:
+        for row in defaults:
+            if row.get("company") == company and row.get("default_warehouse"):
+                return row.get("default_warehouse")
+
+    for row in defaults:
+        if not row.get("company") and row.get("default_warehouse"):
+            return row.get("default_warehouse")
+
+    for row in defaults:
+        if row.get("default_warehouse"):
+            return row.get("default_warehouse")
 
     return None
