@@ -155,6 +155,23 @@ def sync_work_order_costing_from_job_card(doc, method=None):
         # Do not block Job Card save/submit due to costing sync issues.
         frappe.log_error(frappe.get_traceback(), "C4Factory: Job Card costing sync failed")
 
+    sync_pick_list_operation_cost_from_job_card(doc)
+
+
+def sync_pick_list_operation_cost_from_job_card(doc, method=None):
+    pick_list = doc.get("custom_pick_list")
+    if not pick_list:
+        return
+
+    try:
+        from c4factory.api.work_order_flow import update_pick_list_operation_cost
+
+        update_pick_list_operation_cost(pick_list)
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(), "C4Factory: Pick List operation cost sync failed"
+        )
+
 
 def _set_if_field(doc, fieldname: str, value) -> None:
     if value is not None and doc.meta.has_field(fieldname):

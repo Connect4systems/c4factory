@@ -790,6 +790,7 @@ def on_pick_list_submit(doc, method: str | None = None):
     """
     try:
         _ensure_job_cards_for_pick_list(doc)
+        update_pick_list_operation_cost(doc.name)
     except Exception:
         frappe.log_error(
             title="C4Factory: auto Job Card from Pick List failed",
@@ -913,6 +914,35 @@ def _ensure_job_card_pick_list_meta():
         )
 
     return meta
+
+
+def update_pick_list_operation_cost(pick_list_name: str | None) -> None:
+    if not pick_list_name:
+        return
+
+    pl_meta = frappe.get_meta("Pick List")
+    if not pl_meta.has_field("custom_operation_cost"):
+        return
+
+    wo_name = frappe.db.get_value("Pick List", pick_list_name, "work_order")
+    if not wo_name:
+        return
+
+    from c4factory.c4_manufacturing.stock_entry_hooks import (
+        _get_work_order_operating_cost_from_job_cards,
+    )
+
+    operation_cost = _get_work_order_operating_cost_from_job_cards(
+        wo_name, pick_lists={pick_list_name}
+    )
+
+    frappe.db.set_value(
+        "Pick List",
+        pick_list_name,
+        "custom_operation_cost",
+        operation_cost,
+        update_modified=False,
+    )
 
 
 def on_pick_list_cancel(doc, method: str | None = None):

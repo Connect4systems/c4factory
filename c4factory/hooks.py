@@ -89,7 +89,13 @@ patches = [
     "c4factory.patches.v1_0.setup_work_order_custom_fields",
     # WO / Pick List / Stock Entry extra fields (includes custom_pl_qty)
     "c4factory.patches.v1_0.setup_wo_pl_se_custom_fields",
+    # Pick List real operation cost from linked Job Cards
+    "c4factory.patches.v1_0.setup_pick_list_operation_cost_fields",
 ]
+
+override_doctype_dashboards = {
+    "Pick List": "c4factory.api.pick_list_dashboard.get_data",
+}
 
 # ---------------------------------------------------------
 # Whitelisted method overrides
