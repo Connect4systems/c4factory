@@ -90,6 +90,70 @@ frappe.query_reports["C4 Production Planning Report"] = {
 			default: 0,
 		},
 	],
+	get_datatable_options(options) {
+		return Object.assign(options, {
+			checkboxColumn: true,
+		});
+	},
+	onload(report) {
+		const get_selected_rows = () => {
+			if (typeof report.get_checked_items === "function") {
+				return report.get_checked_items();
+			}
+			if (typeof report.get_checked_rows === "function") {
+				return report.get_checked_rows();
+			}
+			if (report.datatable && report.datatable.rowmanager) {
+				return report.datatable.rowmanager.getCheckedRows();
+			}
+			return [];
+		};
+
+		const get_planning_rows = () => {
+			const selected_rows = get_selected_rows();
+
+			return (selected_rows || [])
+				.map((row) => {
+					if (typeof row === "number" && report.data) {
+						row = report.data[row];
+					}
+
+					if (!row || !row.production_item || !row.qty_to_manufacture) {
+						return null;
+					}
+
+					return {
+						name: row.name,
+						item_code: row.production_item,
+						item_name: row.production_item_name,
+						qty: row.qty_to_manufacture,
+						bom_no: row.bom_no,
+					};
+				})
+				.filter(Boolean);
+		};
+
+		const open_total_report = (report_name) => {
+			const rows = get_planning_rows();
+
+			if (!rows.length) {
+				frappe.msgprint(__("Please select at least one production row."));
+				return;
+			}
+
+			frappe.set_route("query-report", report_name, {
+				rows: JSON.stringify(rows),
+			});
+		};
+
+		report.page.add_inner_button(__("Total Materials"), () => {
+			open_total_report("Total Materials");
+		});
+
+		report.page.add_inner_button(__("Total Operations"), () => {
+			open_total_report("Total Operations");
+		});
+	},
 	formatter: function (value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 
