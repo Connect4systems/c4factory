@@ -261,7 +261,8 @@ def on_pick_list_validate(doc, method=None):
     Keep Pick List source warehouses aligned with the same Item Group
     Defaults lookup used by Work Order required items.
     """
-    if doc.docstatus != 0:
+    action = getattr(doc, "_action", None)
+    if doc.docstatus != 0 or action in {"submit", "update_after_submit", "cancel"}:
         return
 
     set_pick_list_warehouses_from_item_group(doc)
