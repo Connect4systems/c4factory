@@ -39,6 +39,7 @@ doc_events = {
         "validate": "c4factory.api.work_order_flow.on_pick_list_validate",
         "on_submit": "c4factory.api.work_order_flow.on_pick_list_submit",
         "on_cancel": "c4factory.api.work_order_flow.on_pick_list_cancel",
+        "on_trash": "c4factory.api.work_order_flow.on_pick_list_trash",
     },
 
     # Stock Entry – costing + WO update
@@ -50,6 +51,7 @@ doc_events = {
             "c4factory.api.work_order_flow.on_stock_entry_submit",
         ],
         "on_cancel": "c4factory.api.work_order_flow.on_stock_entry_cancel",
+        "on_trash": "c4factory.api.work_order_flow.on_stock_entry_trash",
     },
 
     # Job Card – keep partial completion from becoming process loss
@@ -88,6 +90,9 @@ patches = [
 # ---------------------------------------------------------
 
 override_whitelisted_methods = {
+    "erpnext.manufacturing.doctype.work_order.work_order.create_pick_list": (
+        "c4factory.api.work_order_pick_list.create_pick_list"
+    ),
     "erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry": (
         "c4factory.api.work_order_stock.make_stock_entry"
     ),

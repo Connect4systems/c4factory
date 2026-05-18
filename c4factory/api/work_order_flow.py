@@ -261,8 +261,7 @@ def on_pick_list_validate(doc, method=None):
     Keep Pick List source warehouses aligned with the same Item Group
     Defaults lookup used by Work Order required items.
     """
-    action = getattr(doc, "_action", None)
-    if doc.docstatus != 0 or (action and action != "save"):
+    if doc.docstatus != 0:
         return
 
     set_pick_list_warehouses_from_item_group(doc)
@@ -455,25 +454,14 @@ from c4factory.c4_manufacturing.stock_entry_hooks import recompute_work_order_co
 
 def _recompute_wo_material_transfer_from_pls(wo_name: str):
     """
-    Recompute Work Order.material_transferred_for_manufacturing from all
-    submitted Pick Lists linked to this Work Order (sum of for_qty).
+    Recompute Work Order.material_transferred_for_manufacturing from Pick Lists
+    that are actually completed by submitted material-transfer Stock Entries.
     """
     if not wo_name:
         return
 
     wo = frappe.get_doc("Work Order", wo_name)
-
-    total_for_qty = frappe.db.sql(
-        """
-        SELECT COALESCE(SUM(for_qty), 0)
-        FROM `tabPick List`
-        WHERE docstatus = 1
-          AND work_order = %(wo)s
-        """,
-        {"wo": wo_name},
-    )[0][0]
-
-    total_for_qty = min(flt(total_for_qty), flt(wo.qty))
+    total_for_qty = _get_completed_pick_list_for_qty(wo_name)
 
     # Persist transferred qty without updating the document `modified` timestamp
     try:
@@ -498,6 +486,55 @@ def _recompute_wo_material_transfer_from_pls(wo_name: str):
     # timestamp which causes the client-side "Document has been modified" alert
     # when users have the Work Order open while Stock Entry is submitted.
 
+
+def _get_completed_pick_list_for_qty(wo_name: str) -> float:
+    pick_lists = frappe.db.sql(
+        """
+        SELECT DISTINCT se.pick_list
+        FROM `tabStock Entry` se
+        WHERE
+            se.docstatus = 1
+            AND se.work_order = %(wo)s
+            AND se.pick_list IS NOT NULL
+            AND se.pick_list != ''
+            AND se.stock_entry_type = 'Material Transfer for Manufacture'
+        """,
+        {"wo": wo_name},
+        as_dict=True,
+    )
+
+    total = 0.0
+    for row in pick_lists:
+        pl_name = row.pick_list
+        if not frappe.db.exists("Pick List", pl_name):
+            continue
+
+        try:
+            _update_pick_list_status_from_db(pl_name)
+            pl = frappe.get_doc("Pick List", pl_name)
+            balances = _get_pick_list_balances_map(pl)
+            has_balance = any(
+                flt(info.get("balance")) > 0.000001
+                for info in balances.values()
+            )
+            if has_balance:
+                continue
+
+            total += (
+                flt(pl.get("for_qty"))
+                or flt(pl.get("custom_for_qty"))
+                or flt(pl.get("qty"))
+                or 0.0
+            )
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"C4Factory: completed PL qty failed ({pl_name})",
+            )
+
+    wo_qty = flt(frappe.db.get_value("Work Order", wo_name, "qty"))
+    return min(total, wo_qty) if wo_qty > 0 else total
+
 # ================================================================
 # Stock Entry hooks: keep Pick List + Work Order in sync on cancel
 # ================================================================
@@ -520,17 +557,74 @@ def on_stock_entry_cancel(doc, method=None):
                 frappe.get_traceback(), "C4Factory: on_stock_entry_cancel costing"
             )
 
-    # Recompute balances/status after cancel is committed
+    _recompute_links_for_stock_entry_doc(doc)
+
+
+def on_stock_entry_trash(doc, method=None):
+    """Keep Pick List and Work Order state correct when canceled SE is deleted."""
+    _recompute_links_for_stock_entry_doc(doc)
+
+
+def _recompute_links_for_stock_entry_doc(doc) -> None:
+    pick_lists, work_orders = _get_stock_entry_related_links(doc)
+
+    for pl in pick_lists:
+        try:
+            _update_pick_list_status_from_db(pl)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"C4Factory: recompute Stock Entry links (Pick List {pl})",
+            )
+
+    for wo in work_orders:
+        try:
+            _recompute_wo_material_transfer_from_pls(wo)
+            recompute_work_order_costing(wo)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"C4Factory: recompute Stock Entry links (WO {wo})",
+            )
+
     try:
         frappe.enqueue(
-            "c4factory.api.work_order_flow.recompute_after_stock_entry",
-            se_name=doc.name,
+            "c4factory.api.work_order_flow.recompute_after_stock_entry_links",
+            pick_lists=list(pick_lists),
+            work_orders=list(work_orders),
             queue="short",
+            enqueue_after_commit=True,
         )
     except Exception:
         frappe.log_error(
-            frappe.get_traceback(), "C4Factory: on_stock_entry_cancel enqueue failed"
+            frappe.get_traceback(), "C4Factory: Stock Entry link enqueue failed"
         )
+
+
+def _get_stock_entry_related_links(doc) -> tuple[set[str], set[str]]:
+    pick_lists = set()
+    work_orders = set()
+
+    if doc.get("pick_list"):
+        pick_lists.add(doc.get("pick_list"))
+    if doc.get("work_order"):
+        work_orders.add(doc.get("work_order"))
+
+    for row in doc.get("items") or []:
+        pl_item_name = row.get("custom_pick_list_item")
+        if not pl_item_name:
+            continue
+
+        pl_name = frappe.db.get_value("Pick List Item", pl_item_name, "parent")
+        if not pl_name:
+            continue
+
+        pick_lists.add(pl_name)
+        wo_name = frappe.db.get_value("Pick List", pl_name, "work_order")
+        if wo_name:
+            work_orders.add(wo_name)
+
+    return pick_lists, work_orders
 
 
 def recompute_after_stock_entry(se_name: str):
@@ -589,6 +683,31 @@ def recompute_after_stock_entry(se_name: str):
             frappe.log_error(
                 frappe.get_traceback(),
                 f"C4Factory: recompute_after_stock_entry (WO {wo})",
+            )
+
+
+def recompute_after_stock_entry_links(pick_lists=None, work_orders=None):
+    for pl in pick_lists or []:
+        if not frappe.db.exists("Pick List", pl):
+            continue
+        try:
+            _update_pick_list_status_from_db(pl)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"C4Factory: recompute_after_stock_entry_links (PL {pl})",
+            )
+
+    for wo in work_orders or []:
+        if not frappe.db.exists("Work Order", wo):
+            continue
+        try:
+            _recompute_wo_material_transfer_from_pls(wo)
+            recompute_work_order_costing(wo)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"C4Factory: recompute_after_stock_entry_links (WO {wo})",
             )
 
 # ---------------------------------------------------------
@@ -733,10 +852,37 @@ def on_pick_list_cancel(doc, method: str | None = None):
     Same logic as submit: recompute the status based on linked
     Stock Entries (if any).
     """
+    wo_name = doc.get("work_order")
     try:
         _update_pick_list_status_from_db(doc.name)
     except Exception:
         frappe.log_error(
             title="C4Factory: on_pick_list_cancel failed",
+            message=frappe.get_traceback(),
+        )
+
+    if wo_name:
+        try:
+            _recompute_wo_material_transfer_from_pls(wo_name)
+            recompute_work_order_costing(wo_name)
+        except Exception:
+            frappe.log_error(
+                title="C4Factory: on_pick_list_cancel WO recompute failed",
+                message=frappe.get_traceback(),
+            )
+
+
+def on_pick_list_trash(doc, method: str | None = None):
+    """Refresh Work Order transfer/costing when a canceled Pick List is deleted."""
+    wo_name = doc.get("work_order")
+    if not wo_name:
+        return
+
+    try:
+        _recompute_wo_material_transfer_from_pls(wo_name)
+        recompute_work_order_costing(wo_name)
+    except Exception:
+        frappe.log_error(
+            title="C4Factory: on_pick_list_trash WO recompute failed",
             message=frappe.get_traceback(),
         )
