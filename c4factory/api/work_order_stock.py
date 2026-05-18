@@ -95,6 +95,7 @@ def make_stock_entry(work_order_id, purpose, qty=None):
             "is_scrap_item": 0,
         })
         row._c4_role = "raw"
+        row._c4_expected_qty = item["qty"]
 
     # 2) SCRAP ITEMS ROWS – created in Scrap Warehouse
     if wo.scrap_warehouse:
@@ -113,6 +114,7 @@ def make_stock_entry(work_order_id, purpose, qty=None):
                 "is_finished_item": 0,
             })
             scrap_row._c4_role = "scrap"
+            scrap_row._c4_expected_qty = qty
 
     # 3) FINISHED GOOD ROW – into FG warehouse
     fg_row = se.append("items", {
@@ -125,6 +127,7 @@ def make_stock_entry(work_order_id, purpose, qty=None):
         "is_scrap_item": 0,
     })
     fg_row._c4_role = "fg"
+    fg_row._c4_expected_qty = fg_qty
 
     # Let ERPNext fill valuation etc.
     se.set_missing_values()
@@ -132,23 +135,32 @@ def make_stock_entry(work_order_id, purpose, qty=None):
     # ENFORCE WAREHOUSES AFTER set_missing_values
     for row in se.items:
         role = getattr(row, "_c4_role", None)
+        expected_qty = float(getattr(row, "_c4_expected_qty", 0) or 0)
 
         if role == "raw":
             # raw materials: consumed from WIP
             row.s_warehouse = wo.wip_warehouse
             row.t_warehouse = None
+            if expected_qty > 0:
+                row.qty = expected_qty
 
         elif role == "scrap":
             # scrap: created in scrap warehouse, no source
             row.s_warehouse = None
             row.t_warehouse = wo.scrap_warehouse
+            if expected_qty > 0:
+                row.qty = expected_qty
 
         elif role == "fg":
             # finished good: created in FG warehouse, no source
             row.s_warehouse = None
             row.t_warehouse = wo.fg_warehouse
+            if fg_qty > 0:
+                row.qty = fg_qty
 
-        # remove temporary attribute if present
+        # remove temporary attributes if present
+        if hasattr(row, "_c4_expected_qty"):
+            delattr(row, "_c4_expected_qty")
         if hasattr(row, "_c4_role"):
             delattr(row, "_c4_role")
 

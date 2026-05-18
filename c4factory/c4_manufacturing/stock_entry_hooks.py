@@ -55,7 +55,11 @@ def set_wip_target_warehouse(doc, method: str | None = None) -> None:
     for row in doc.items:
         if flt(row.get("is_finished_item")) == 1 and flt(row.get("is_scrap_item")) != 1:
             finished_rows.append(row)
-            row_finished_qty += flt(row.get("qty")) or flt(row.get("transfer_qty"))
+            row_qty = flt(row.get("qty")) or flt(row.get("transfer_qty"))
+            if row_qty < 0:
+                row_qty = abs(row_qty)
+                row.qty = row_qty
+            row_finished_qty += row_qty
 
     header_finished_qty = (
         flt(getattr(doc, "fg_completed_qty", 0))
