@@ -75,7 +75,7 @@ def update_scrap_and_costing(doc, method=None):
     - Compute:
         c4_scrap_material_cost  = sum(scrap.amount)
         c4_raw_material_cost    = value of Material Transfers to WIP (actual SE)
-        c4_operating_cost       = from WO operations
+        c4_operating_cost       = actual Job Card operating cost
         c4_total_cost           = raw + operating - scrap
     """
 
@@ -99,12 +99,10 @@ def update_scrap_and_costing(doc, method=None):
     raw_material_cost = _get_raw_material_cost_from_material_transfers(doc.name, doc.wip_warehouse)
     doc.c4_raw_material_cost = raw_material_cost
 
-    # --- 3) Operating Cost from WO fields ---
-    operating_cost = 0.0
-    if doc.actual_operating_cost:
-        operating_cost = float(doc.actual_operating_cost)
-    elif doc.total_operating_cost:
-        operating_cost = float(doc.total_operating_cost)
+    # --- 3) Operating Cost from actual Job Cards ---
+    from c4factory.c4_manufacturing.stock_entry_hooks import _get_work_order_operating_cost_from_job_cards
+
+    operating_cost = _get_work_order_operating_cost_from_job_cards(doc.name)
 
     doc.c4_operating_cost = operating_cost
 

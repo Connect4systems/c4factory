@@ -194,6 +194,8 @@ def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float
     has_total_operating_cost = jc_meta.has_field("total_operating_cost")
     has_total_time_in_mins = jc_meta.has_field("total_time_in_mins")
     has_hour_rate = jc_meta.has_field("hour_rate")
+    has_workstation = jc_meta.has_field("workstation")
+    has_operation = jc_meta.has_field("operation")
 
     fields = ["name", "status"]
     if has_total_operating_cost:
@@ -202,6 +204,10 @@ def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float
         fields.append("total_time_in_mins")
     if has_hour_rate:
         fields.append("hour_rate")
+    if has_workstation:
+        fields.append("workstation")
+    if has_operation:
+        fields.append("operation")
 
     jc_rows = frappe.get_all(
         "Job Card",
@@ -223,12 +229,95 @@ def _get_work_order_operating_cost_from_job_cards(work_order_name: str) -> float
             total += cost
             continue
 
+        cost = _get_job_card_cost_from_time_logs(jc.get("name"))
+        if cost > 0:
+            total += cost
+            continue
+
         mins = flt(jc.get("total_time_in_mins"))
-        rate = flt(jc.get("hour_rate"))
+        rate = _get_job_card_hour_rate(jc)
         if mins > 0 and rate > 0:
             total += (mins / 60.0) * rate
 
     return total
+
+
+def _get_job_card_cost_from_time_logs(job_card_name: str) -> float:
+    """Calculate actual Job Card cost from its recorded time logs."""
+    if not job_card_name:
+        return 0.0
+
+    try:
+        job_card = frappe.get_doc("Job Card", job_card_name)
+    except Exception:
+        return 0.0
+
+    parent_rate = _get_job_card_hour_rate(job_card)
+    total = 0.0
+
+    for row in job_card.get("time_logs") or []:
+        direct_cost = (
+            flt(row.get("operating_cost"))
+            or flt(row.get("operation_cost"))
+            or flt(row.get("cost"))
+            or flt(row.get("amount"))
+        )
+        if direct_cost > 0:
+            total += direct_cost
+            continue
+
+        mins = flt(row.get("time_in_mins")) or flt(row.get("total_time_in_mins"))
+        rate = flt(row.get("hour_rate")) or flt(row.get("hourly_rate")) or parent_rate
+
+        if mins > 0 and rate > 0:
+            total += (mins / 60.0) * rate
+
+    return total
+
+
+def _get_job_card_hour_rate(job_card) -> float:
+    """Resolve an hourly operation rate from Job Card, Workstation, or Operation."""
+    if not job_card:
+        return 0.0
+
+    rate = flt(job_card.get("hour_rate")) or flt(job_card.get("hourly_rate"))
+    if rate > 0:
+        return rate
+
+    workstation = job_card.get("workstation")
+    if workstation:
+        rate = _get_hour_rate_from_doctype("Workstation", workstation)
+        if rate > 0:
+            return rate
+
+    operation = job_card.get("operation")
+    if operation:
+        rate = _get_hour_rate_from_doctype("Operation", operation)
+        if rate > 0:
+            return rate
+
+    return 0.0
+
+
+def _get_hour_rate_from_doctype(doctype: str, name: str) -> float:
+    """Read a rate field only when the target DocType has it."""
+    if not doctype or not name:
+        return 0.0
+
+    try:
+        meta = frappe.get_meta(doctype)
+    except Exception:
+        return 0.0
+
+    for fieldname in ("hour_rate", "hourly_rate"):
+        if not meta.has_field(fieldname):
+            continue
+
+        rate = flt(frappe.db.get_value(doctype, name, fieldname))
+        if rate > 0:
+            return rate
+
+    return 0.0
 
 
 # ============================================================

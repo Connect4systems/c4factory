@@ -67,7 +67,7 @@ def execute():
                 "label": "Operating Cost (EGP)",
                 "fieldtype": "Currency",
                 "insert_after": "c4_raw_material_cost",
-                "read_only": 0,
+                "read_only": 1,
                 "allow_on_submit": 1,
             },
             {

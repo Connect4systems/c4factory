@@ -28,7 +28,10 @@ doctype_js = {
 doc_events = {
     # Work Order – source warehouse autofill from Item Group
     "Work Order": {
-        "validate": "c4factory.c4_manufacturing.work_order_hooks.set_source_warehouse_from_item_group",
+        "validate": [
+            "c4factory.c4_manufacturing.work_order_hooks.set_source_warehouse_from_item_group",
+            "c4factory.c4_manufacturing.work_order_hooks.update_scrap_and_costing",
+        ],
     },
 
     # Pick List custom flow

@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 
 c4factory.patches.v1_0.setup_work_order_custom_fields
+c4factory.patches.v1_0.set_c4_operating_cost_read_only
