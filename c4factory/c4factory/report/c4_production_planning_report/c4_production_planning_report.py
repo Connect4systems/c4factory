@@ -399,7 +399,7 @@ class ProductionPlanReport:
 		based_on = self.filters.based_on
 
 		self.columns = [
-			{"label": _("ID"), "options": based_on, "fieldname": "name", "fieldtype": "Link", "width": 100},
+			{"label": _(based_on), "options": based_on, "fieldname": "name", "fieldtype": "Link", "width": 100},
 			{
 				"label": _("Item Code"),
 				"fieldname": "production_item",
@@ -470,7 +470,7 @@ class ProductionPlanReport:
 					"fieldtype": "Float",
 					"width": 110,
 				},
-				{"label": _("Request Qty"), "fieldname": "request_qty", "fieldtype": "Float", "width": 100},
+				{"label": _("To Request"), "fieldname": "request_qty", "fieldtype": "Float", "width": 100},
 				{"label": _("Allotted Qty"), "fieldname": "allotted_qty", "fieldtype": "Float", "width": 100},
 				{
 					"label": _("Expected Arrival Date"),
