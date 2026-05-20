@@ -785,18 +785,9 @@ def on_pick_list_submit(doc, method: str | None = None):
     """
     Called from hooks on Pick List submit.
 
-    Create operation Job Cards for this Pick List and refresh its status.
-    Material transfer is still driven by Stock Entries.
+    Refresh Pick List status only. Material transfer is driven by Stock Entries,
+    and Job Cards are not auto-created from Pick Lists.
     """
-    try:
-        _ensure_job_cards_for_pick_list(doc)
-        update_pick_list_operation_cost(doc.name)
-    except Exception:
-        frappe.log_error(
-            title="C4Factory: auto Job Card from Pick List failed",
-            message=frappe.get_traceback(),
-        )
-
     try:
         _update_pick_list_status_from_db(doc.name)
     except Exception:
