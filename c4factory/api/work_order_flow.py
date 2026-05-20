@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, nowdate
 
 from c4factory.c4_manufacturing.work_order_hooks import get_default_source_warehouse
 
@@ -415,6 +415,31 @@ def make_partial_stock_entry_from_pick_list(pick_list: str, items_json: str) -> 
     return se.name
 
 
+@frappe.whitelist()
+def create_job_cards_from_pick_list(pick_list: str) -> list[str]:
+    """
+    Create draft Job Cards for a submitted Pick List using the Pick List's
+    finished-goods quantity as the Job Card quantity to manufacture.
+    """
+    if not pick_list:
+        frappe.throw(_("Pick List is required"))
+
+    pl = frappe.get_doc("Pick List", pick_list)
+    if pl.docstatus != 1:
+        frappe.throw(_("Pick List {0} must be submitted").format(pl.name))
+
+    if not pl.get("work_order"):
+        frappe.throw(_("Pick List {0} is not linked to a Work Order").format(pl.name))
+
+    job_cards = _ensure_job_cards_for_pick_list(pl)
+    if not job_cards:
+        frappe.msgprint(_("No new Job Cards were created for Pick List {0}.").format(pl.name))
+
+    update_pick_list_operation_cost(pl.name)
+    frappe.db.commit()
+    return job_cards
+
+
 # ================================================================
 # Stock Entry hooks (do NOT modify Stock Entry itself)
 # ================================================================
@@ -799,29 +824,25 @@ def on_pick_list_submit(doc, method: str | None = None):
 
 def _ensure_job_cards_for_pick_list(pl_doc) -> None:
     """
-    Create one Job Card per Work Order operation for this Pick List.
+    Create one draft Job Card per Work Order operation for this Pick List.
 
-    The auto Job Cards are tied to the Pick List through custom_pick_list when
-    that custom field exists. They carry the Pick List's production quantity so
+    The Job Cards are tied to the Pick List through custom_pick_list when that
+    custom field exists. They carry the Pick List's production quantity so
     operation cost can be allocated to the same material lot that was picked.
     """
     wo_name = pl_doc.get("work_order")
     if not wo_name:
-        return
+        return []
 
     wo = frappe.get_doc("Work Order", wo_name)
     operations = wo.get("operations") or []
     if not operations:
-        return
+        return []
 
     jc_meta = _ensure_job_card_pick_list_meta()
     has_custom_pick_list = jc_meta.has_field("custom_pick_list")
-    pick_qty = (
-        flt(pl_doc.get("for_qty"))
-        or flt(pl_doc.get("custom_for_qty"))
-        or flt(pl_doc.get("qty"))
-        or 1.0
-    )
+    pick_qty = _get_pick_list_finished_goods_qty(pl_doc)
+    created = []
 
     for op in operations:
         operation = op.get("operation")
@@ -842,15 +863,17 @@ def _ensure_job_cards_for_pick_list(pl_doc) -> None:
         _set_if_field(jc, jc_meta, "work_order", wo.name)
         _set_if_field(jc, jc_meta, "company", wo.get("company"))
         _set_if_field(jc, jc_meta, "bom_no", wo.get("bom_no"))
+        _set_if_field(jc, jc_meta, "posting_date", nowdate())
+        _set_if_field(jc, jc_meta, "project", wo.get("project"))
         _set_if_field(jc, jc_meta, "production_item", wo.get("production_item"))
         _set_if_field(jc, jc_meta, "item_name", wo.get("item_name"))
         _set_if_field(jc, jc_meta, "operation", operation)
         _set_if_field(jc, jc_meta, "workstation", workstation)
+        _set_if_field(jc, jc_meta, "workstation_type", op.get("workstation_type"))
+        _set_if_field(jc, jc_meta, "wip_warehouse", _get_job_card_wip_warehouse(wo, op))
+        _set_if_field(jc, jc_meta, "serial_no", op.get("serial_no"))
         _set_if_field(jc, jc_meta, "for_quantity", pick_qty)
-        _set_if_field(jc, jc_meta, "total_completed_qty", pick_qty)
-        _set_if_field(jc, jc_meta, "completed_qty", pick_qty)
         _set_if_field(jc, jc_meta, "process_loss_qty", 0)
-        _set_if_field(jc, jc_meta, "status", "Completed")
         _set_if_field(jc, jc_meta, "custom_pick_list", pl_doc.name)
 
         for op_field, jc_field in (
@@ -861,11 +884,42 @@ def _ensure_job_cards_for_pick_list(pl_doc) -> None:
             ("time_in_mins", "time_required"),
             ("time_in_mins", "for_time"),
             ("hour_rate", "hour_rate"),
+            ("bom", "bom_no"),
         ):
             _set_if_field(jc, jc_meta, jc_field, op.get(op_field))
         _set_if_field(jc, jc_meta, "operation_row_number", op.name)
 
+        if wo.get("transfer_material_against") == "Job Card" and not wo.get("skip_transfer"):
+            try:
+                jc.get_required_items()
+            except Exception:
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"C4Factory: Job Card required items failed ({pl_doc.name})",
+                )
+
         jc.insert(ignore_permissions=True, ignore_mandatory=True)
+        created.append(jc.name)
+
+    return created
+
+
+def _get_job_card_wip_warehouse(wo, op) -> str | None:
+    if not wo.get("skip_transfer") or wo.get("from_wip_warehouse"):
+        return wo.get("wip_warehouse") or op.get("wip_warehouse")
+
+    return wo.get("source_warehouse") or op.get("source_warehouse")
+
+
+def _get_pick_list_finished_goods_qty(pl_doc) -> float:
+    return (
+        flt(pl_doc.get("qty_of_finished_goods_item"))
+        or flt(pl_doc.get("qty_of_finished_goods"))
+        or flt(pl_doc.get("for_qty"))
+        or flt(pl_doc.get("custom_for_qty"))
+        or flt(pl_doc.get("qty"))
+        or 1.0
+    )
 
 
 def _set_if_field(doc, meta, fieldname: str, value) -> None:

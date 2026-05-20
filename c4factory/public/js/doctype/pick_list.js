@@ -15,6 +15,14 @@ frappe.ui.form.on("Pick List", {
       () => open_partial_se_dialog(frm),
       __("Factory")
     );
+
+    if (frm.doc.work_order) {
+      frm.add_custom_button(
+        __("Create Job Card"),
+        () => create_job_cards_from_pick_list(frm),
+        __("Factory")
+      );
+    }
   },
 });
 
@@ -165,5 +173,39 @@ async function submit_partial_se(frm, dialog, rows) {
     console.error(e);
     // Frappe عادةً يعرض رسالة الخطأ تلقائياً، بس نضيف رسالة عامة
     frappe.msgprint(__("Failed to create Stock Entry. Check server error log."));
+  }
+}
+
+async function create_job_cards_from_pick_list(frm) {
+  try {
+    const { message } = await frappe.call({
+      method: "c4factory.api.work_order_flow.create_job_cards_from_pick_list",
+      args: {
+        pick_list: frm.doc.name,
+      },
+      freeze: true,
+      freeze_message: __("Creating Job Cards..."),
+    });
+
+    const job_cards = message || [];
+    if (!job_cards.length) {
+      return;
+    }
+
+    frappe.show_alert({
+      message: __("Created {0} Job Card(s)", [job_cards.length]),
+      indicator: "green",
+    });
+
+    if (job_cards.length === 1) {
+      frappe.set_route("Form", "Job Card", job_cards[0]);
+    } else {
+      frappe.set_route("List", "Job Card", {
+        custom_pick_list: frm.doc.name,
+      });
+    }
+  } catch (e) {
+    console.error(e);
+    frappe.msgprint(__("Failed to create Job Cards. Check server error log."));
   }
 }

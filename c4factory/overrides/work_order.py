@@ -1,5 +1,6 @@
 from erpnext.manufacturing.doctype.work_order.work_order import WorkOrder as ERPNextWorkOrder
 import frappe
+from frappe import _
 from frappe.utils import flt
 from c4factory.c4_manufacturing.work_order_hooks import set_source_warehouse_from_item_group
 
@@ -35,6 +36,30 @@ class WorkOrder(ERPNextWorkOrder):
     # - we skip this to keep the user edits.
     set_source_warehouse_from_item_group(self)
     return
+
+  def on_submit(self):
+    """
+    Keep ERPNext's standard Work Order submit bookkeeping, but do not create
+    Job Cards automatically. Users can still create Job Cards manually from
+    the Work Order or from a Pick List.
+    """
+    if not self.wip_warehouse and not self.skip_transfer:
+      frappe.throw(_("Work-in-Progress Warehouse is required before Submit"))
+
+    if not self.fg_warehouse:
+      frappe.throw(_("For Warehouse is required before Submit"))
+
+    if self.production_plan and frappe.db.exists(
+      "Production Plan Item Reference", {"parent": self.production_plan}
+    ):
+      self.update_work_order_qty_in_combined_so()
+    else:
+      self.update_work_order_qty_in_so()
+
+    self.update_ordered_qty()
+    self.update_reserved_qty_for_production()
+    self.update_completed_qty_in_material_request()
+    self.update_planned_qty()
 
   def set_status(self):
     """
