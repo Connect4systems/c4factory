@@ -12,9 +12,5 @@ def get_data(*args, **kwargs):
                 "label": _("Manufacturing"),
                 "items": ["Job Card", "Stock Entry"],
             },
-            {
-                "label": _("Stock"),
-                "items": ["Stock Reservation Entry"],
-            },
         ],
     }
