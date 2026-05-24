@@ -79,6 +79,7 @@ doc_events = {
 # We keep the original finished-goods costing logic from c4pricing.
 override_doctype_class = {
     "Work Order": "c4factory.overrides.work_order.WorkOrder",
+    "Stock Entry": "c4factory.overrides.stock_entry.StockEntry",
 }
 
 # ---------------------------------------------------------
