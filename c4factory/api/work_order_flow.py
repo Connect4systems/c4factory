@@ -431,6 +431,12 @@ def create_job_cards_from_pick_list(pick_list: str) -> list[str]:
     if not pl.get("work_order"):
         frappe.throw(_("Pick List {0} is not linked to a Work Order").format(pl.name))
 
+    if _is_work_order_operation_disabled(pl.get("work_order")):
+        frappe.msgprint(_("Operation is disabled for Work Order {0}.").format(pl.get("work_order")))
+        update_pick_list_operation_cost(pl.name)
+        frappe.db.commit()
+        return []
+
     job_cards = _ensure_job_cards_for_pick_list(pl)
     if not job_cards:
         frappe.msgprint(_("No new Job Cards were created for Pick List {0}.").format(pl.name))
@@ -835,6 +841,9 @@ def _ensure_job_cards_for_pick_list(pl_doc) -> None:
         return []
 
     wo = frappe.get_doc("Work Order", wo_name)
+    if wo.get("custom_disable_operation"):
+        return []
+
     operations = wo.get("operations") or []
     if not operations:
         return []
@@ -973,6 +982,16 @@ def update_pick_list_operation_cost(pick_list_name: str | None) -> None:
     if not wo_name:
         return
 
+    if _is_work_order_operation_disabled(wo_name):
+        frappe.db.set_value(
+            "Pick List",
+            pick_list_name,
+            "custom_operation_cost",
+            0,
+            update_modified=False,
+        )
+        return
+
     from c4factory.c4_manufacturing.stock_entry_hooks import (
         _get_work_order_operating_cost_from_job_cards,
     )
@@ -988,6 +1007,16 @@ def update_pick_list_operation_cost(pick_list_name: str | None) -> None:
         operation_cost,
         update_modified=False,
     )
+
+
+def _is_work_order_operation_disabled(work_order_name: str | None) -> bool:
+    if not work_order_name:
+        return False
+
+    try:
+        return bool(flt(frappe.db.get_value("Work Order", work_order_name, "custom_disable_operation")))
+    except Exception:
+        return False
 
 
 def on_pick_list_cancel(doc, method: str | None = None):

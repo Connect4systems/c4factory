@@ -314,6 +314,9 @@ def _get_work_order_operating_cost_from_job_cards(
     if not work_order_name:
         return 0.0
 
+    if flt(frappe.db.get_value("Work Order", work_order_name, "custom_disable_operation")):
+        return 0.0
+
     try:
         jc_meta = frappe.get_meta("Job Card")
     except Exception:

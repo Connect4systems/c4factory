@@ -4,15 +4,20 @@ frappe.ui.form.on("Work Order", {
   refresh(frm) {
     make_required_qty_editable(frm);
     set_missing_source_warehouses(frm);
+    hide_create_job_card_button(frm);
   },
   onload_post_render(frm) {
     make_required_qty_editable(frm);
+    hide_create_job_card_button(frm);
   },
   bom_no(frm) {
     setTimeout(() => set_missing_source_warehouses(frm), 800);
   },
   company(frm) {
     set_missing_source_warehouses(frm);
+  },
+  custom_disable_operation(frm) {
+    hide_create_job_card_button(frm);
   }
 });
 
@@ -71,4 +76,18 @@ async function set_source_warehouse_from_item_group(frm, cdt, cdn) {
   if (warehouse && !locals[cdt][cdn].source_warehouse) {
     await frappe.model.set_value(cdt, cdn, "source_warehouse", warehouse);
   }
+}
+
+function hide_create_job_card_button(frm) {
+  if (!frm.doc.custom_disable_operation) return;
+
+  const remove_buttons = () => {
+    frm.remove_custom_button(__("Job Card"), __("Create"));
+    frm.remove_custom_button(__("Create Job Card"), __("Create"));
+    frm.remove_custom_button(__("Create Job Card"));
+  };
+
+  remove_buttons();
+  setTimeout(remove_buttons, 300);
+  setTimeout(remove_buttons, 1000);
 }

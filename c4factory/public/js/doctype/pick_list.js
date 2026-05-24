@@ -6,7 +6,7 @@
 // balance الفعلي لكل صف، بدون ما نلمس منطق ERPNext الأصلي للـ Pick List.
 
 frappe.ui.form.on("Pick List", {
-  refresh(frm) {
+  async refresh(frm) {
     // نشتغل فقط لما تكون الوثيقة Submitted
     if (frm.doc.docstatus !== 1) return;
 
@@ -16,7 +16,7 @@ frappe.ui.form.on("Pick List", {
       __("Factory")
     );
 
-    if (frm.doc.work_order) {
+    if (frm.doc.work_order && !(await is_work_order_operation_disabled(frm.doc.work_order))) {
       frm.add_custom_button(
         __("Create Job Card"),
         () => create_job_cards_from_pick_list(frm),
@@ -25,6 +25,18 @@ frappe.ui.form.on("Pick List", {
     }
   },
 });
+
+async function is_work_order_operation_disabled(work_order) {
+  if (!work_order) return false;
+
+  const { message } = await frappe.db.get_value(
+    "Work Order",
+    work_order,
+    "custom_disable_operation"
+  );
+
+  return !!(message && cint(message.custom_disable_operation));
+}
 
 // ----------------------------------------------
 // Dialog logic
