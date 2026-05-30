@@ -31,6 +31,7 @@ class ProductionPlanReport:
 		self.get_purchase_details()
 		self.get_material_request_details()
 		self.prepare_data()
+		self.add_total_row()
 		self.get_columns()
 
 		return self.columns, self.data
@@ -441,6 +442,27 @@ class ProductionPlanReport:
 			return 0
 
 		return flt(getattr(self, "material_request_details", {}).get((item_code, warehouse)))
+
+	def add_total_row(self):
+		if not self.data:
+			return
+
+		qty_fields = [
+			"qty_to_manufacture",
+			"available_qty",
+			"required_qty",
+			"raw_available_qty",
+			"requested_qty",
+			"request_qty",
+			"allotted_qty",
+			"arrival_qty",
+		]
+
+		total_row = frappe._dict({"name": _("Total")})
+		for fieldname in qty_fields:
+			total_row[fieldname] = sum(flt(row.get(fieldname)) for row in self.data)
+
+		self.data.append(total_row)
 
 	def get_args(self):
 		return frappe._dict(
