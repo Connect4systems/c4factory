@@ -315,7 +315,7 @@ class ProductionPlanReport:
 
 		requested_items = frappe.get_all(
 			"Material Request Item",
-			fields=fields,
+			fields=["parent"] + fields,
 			filters={
 				"parent": ("in", material_requests),
 				"item_code": ("in", self.item_codes),
@@ -330,7 +330,12 @@ class ProductionPlanReport:
 				continue
 
 			key = (d.item_code, d.warehouse)
-			self.material_request_details[key] = flt(self.material_request_details.get(key)) + pending_qty
+			if key not in self.material_request_details:
+				self.material_request_details[key] = frappe._dict({"requested_qty": 0, "material_requests": []})
+
+			self.material_request_details[key].requested_qty += pending_qty
+			if d.parent not in self.material_request_details[key].material_requests:
+				self.material_request_details[key].material_requests.append(d.parent)
 
 	def prepare_data(self):
 		if not self.orders:
@@ -391,6 +396,7 @@ class ProductionPlanReport:
 				d.allotted_qty = 0
 				d.raw_available_qty = 0
 				d.requested_qty = self.get_requested_qty(d.item_code, d.warehouse)
+				d.material_request_reference = self.get_material_request_reference(d.item_code, d.warehouse)
 				d.request_qty = flt(d.required_qty)
 				row.update(d)
 				self.data.append(row)
@@ -411,6 +417,7 @@ class ProductionPlanReport:
 			args.allotted_qty = 0
 			args.raw_available_qty = flt(bin_data.get("actual_qty")) if bin_data else 0
 			args.requested_qty = self.get_requested_qty(args.item_code, warehouse)
+			args.material_request_reference = self.get_material_request_reference(args.item_code, warehouse)
 			args.request_qty = max(flt(args.required_qty) - flt(args.raw_available_qty), 0)
 
 			if bin_data and bin_data.get("actual_qty") > 0:
@@ -441,7 +448,15 @@ class ProductionPlanReport:
 		if not item_code or not warehouse:
 			return 0
 
-		return flt(getattr(self, "material_request_details", {}).get((item_code, warehouse)))
+		details = getattr(self, "material_request_details", {}).get((item_code, warehouse)) or {}
+		return flt(details.get("requested_qty"))
+
+	def get_material_request_reference(self, item_code, warehouse):
+		if not item_code or not warehouse:
+			return ""
+
+		details = getattr(self, "material_request_details", {}).get((item_code, warehouse)) or {}
+		return ", ".join(details.get("material_requests") or [])
 
 	def add_total_row(self):
 		if not self.data:
@@ -552,6 +567,12 @@ class ProductionPlanReport:
 					"width": 110,
 				},
 				{"label": _("Requested Qty"), "fieldname": "requested_qty", "fieldtype": "Float", "width": 110},
+				{
+					"label": _("Material Request Reference"),
+					"fieldname": "material_request_reference",
+					"fieldtype": "Data",
+					"width": 180,
+				},
 				{"label": _("To Request"), "fieldname": "request_qty", "fieldtype": "Float", "width": 100},
 				{"label": _("Allotted Qty"), "fieldname": "allotted_qty", "fieldtype": "Float", "width": 100},
 				{
