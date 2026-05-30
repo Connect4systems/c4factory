@@ -29,6 +29,7 @@ class ProductionPlanReport:
 		self.set_item_group_warehouses()
 		self.get_bin_details()
 		self.get_purchase_details()
+		self.get_material_request_details()
 		self.prepare_data()
 		self.get_columns()
 
@@ -140,6 +141,8 @@ class ProductionPlanReport:
 				)
 				or []
 			)
+			if self.filters.raw_material_item:
+				raw_materials = [d for d in raw_materials if d.item_code == self.filters.raw_material_item]
 			self.warehouses.extend([d.warehouse for d in raw_materials if d.warehouse])
 
 		else:
@@ -176,7 +179,12 @@ class ProductionPlanReport:
 					qty_field.as_("required_qty_per_unit"),
 				)
 				.where((bom_item.parent.isin(bom_nos)) & (bom_item.parent == bom.name) & (bom.docstatus == 1))
-			).run(as_dict=True)
+			)
+
+			if self.filters.raw_material_item:
+				raw_materials = raw_materials.where(bom_item.item_code == self.filters.raw_material_item)
+
+			raw_materials = raw_materials.run(as_dict=True)
 
 		if not raw_materials:
 			return
@@ -280,6 +288,49 @@ class ProductionPlanReport:
 			if key not in self.purchase_details:
 				self.purchase_details.setdefault(key, d)
 
+	def get_material_request_details(self):
+		if not (self.orders and self.raw_materials_dict):
+			return
+
+		self.material_request_details = {}
+
+		material_requests = frappe.get_all(
+			"Material Request",
+			fields=["name"],
+			filters={
+				"docstatus": 1,
+				"company": self.filters.company,
+				"status": ("not in", ["Stopped", "Closed"]),
+			},
+			pluck="name",
+		)
+		if not material_requests:
+			return
+
+		child_meta = frappe.get_meta("Material Request Item")
+		fields = ["item_code", "warehouse", "qty"]
+		if child_meta.has_field("received_qty"):
+			fields.append("received_qty")
+
+		requested_items = frappe.get_all(
+			"Material Request Item",
+			fields=fields,
+			filters={
+				"parent": ("in", material_requests),
+				"item_code": ("in", self.item_codes),
+				"warehouse": ("in", self.warehouses),
+				"docstatus": 1,
+			},
+		)
+
+		for d in requested_items:
+			pending_qty = max(flt(d.qty) - flt(d.get("received_qty")), 0)
+			if not pending_qty:
+				continue
+
+			key = (d.item_code, d.warehouse)
+			self.material_request_details[key] = flt(self.material_request_details.get(key)) + pending_qty
+
 	def prepare_data(self):
 		if not self.orders:
 			return
@@ -338,6 +389,7 @@ class ProductionPlanReport:
 				d.required_qty = d.remaining_qty
 				d.allotted_qty = 0
 				d.raw_available_qty = 0
+				d.requested_qty = self.get_requested_qty(d.item_code, d.warehouse)
 				d.request_qty = flt(d.required_qty)
 				row.update(d)
 				self.data.append(row)
@@ -357,6 +409,7 @@ class ProductionPlanReport:
 
 			args.allotted_qty = 0
 			args.raw_available_qty = flt(bin_data.get("actual_qty")) if bin_data else 0
+			args.requested_qty = self.get_requested_qty(args.item_code, warehouse)
 			args.request_qty = max(flt(args.required_qty) - flt(args.raw_available_qty), 0)
 
 			if bin_data and bin_data.get("actual_qty") > 0:
@@ -382,6 +435,12 @@ class ProductionPlanReport:
 					row.update(self.purchase_details.get(key))
 
 				self.data.append(row)
+
+	def get_requested_qty(self, item_code, warehouse):
+		if not item_code or not warehouse:
+			return 0
+
+		return flt(getattr(self, "material_request_details", {}).get((item_code, warehouse)))
 
 	def get_args(self):
 		return frappe._dict(
@@ -470,6 +529,7 @@ class ProductionPlanReport:
 					"fieldtype": "Float",
 					"width": 110,
 				},
+				{"label": _("Requested Qty"), "fieldname": "requested_qty", "fieldtype": "Float", "width": 110},
 				{"label": _("To Request"), "fieldname": "request_qty", "fieldtype": "Float", "width": 100},
 				{"label": _("Allotted Qty"), "fieldname": "allotted_qty", "fieldtype": "Float", "width": 100},
 				{

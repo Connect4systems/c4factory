@@ -76,6 +76,12 @@ frappe.query_reports["C4 Production Planning Report"] = {
 			},
 		},
 		{
+			fieldname: "raw_material_item",
+			label: __("Raw Material Item"),
+			fieldtype: "Link",
+			options: "Item",
+		},
+		{
 			fieldname: "order_by",
 			label: __("Order By"),
 			fieldtype: "Select",
