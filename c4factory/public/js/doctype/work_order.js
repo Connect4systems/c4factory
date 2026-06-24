@@ -22,6 +22,9 @@ frappe.ui.form.on("Work Order", {
 });
 
 frappe.ui.form.on("Work Order Item", {
+  form_render(frm) {
+    make_required_qty_editable(frm);
+  },
   item_code(frm, cdt, cdn) {
     set_source_warehouse_from_item_group(frm, cdt, cdn);
   }
@@ -29,16 +32,17 @@ frappe.ui.form.on("Work Order Item", {
 
 // helper: remove read_only from required_qty in child grid
 function make_required_qty_editable(frm) {
-  // for all rows already in the grid
-  if (frm.fields_dict.required_items && frm.fields_dict.required_items.grid) {
-    frm.fields_dict.required_items.grid.update_docfield_property(
-      "required_qty",
-      "read_only",
-      0
-    );
+  // ERPNext v15 uses required_items; keep items as a compatibility fallback.
+  const table_field =
+    frm.fields_dict.required_items || frm.fields_dict.items;
+  const grid = table_field && table_field.grid;
+
+  if (grid) {
+    grid.update_docfield_property("required_qty", "read_only", 0);
+    grid.toggle_enable("required_qty", true);
   }
 
-  // also fix the meta definition so new rows are editable
+  // Also fix the child DocType meta so newly rendered rows stay editable.
   const df = frappe.meta.get_docfield(
     "Work Order Item",
     "required_qty",
