@@ -36,9 +36,9 @@ def get_remaining_pick_list_qty(wo, exclude_pick_list: str | None = None) -> flo
     qty_fields = [
         fieldname
         for fieldname in (
-            "for_qty",
-            "qty_of_finished_goods",
             "qty_of_finished_goods_item",
+            "qty_of_finished_goods",
+            "for_qty",
         )
         if meta.has_field(fieldname)
     ]
@@ -113,7 +113,11 @@ def create_pick_list(
         # Preserve every required row even when no stock is currently available.
         pl.pick_manually = 1
 
-    for fieldname in ("for_qty", "qty_of_finished_goods", "qty_of_finished_goods_item"):
+    for fieldname in (
+        "qty_of_finished_goods_item",
+        "qty_of_finished_goods",
+        "for_qty",
+    ):
         if hasattr(pl, fieldname):
             pl.set(fieldname, fg_qty)
 

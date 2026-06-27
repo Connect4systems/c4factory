@@ -71,7 +71,14 @@ function configure_work_order_pick_list_grid(frm) {
       "conversion_factor",
       "custom_work_order_item",
     ].forEach((fieldname) => {
-      grid.update_docfield_property(fieldname, "read_only", 1);
+      const df = frappe.meta.get_docfield(
+        "Pick List Item",
+        fieldname,
+        frm.doc.name
+      );
+      if (df) {
+        grid.update_docfield_property(fieldname, "read_only", 1);
+      }
     });
     grid.refresh();
   };

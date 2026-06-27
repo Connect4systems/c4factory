@@ -444,9 +444,9 @@ def sync_pick_list_items_from_work_order(doc) -> None:
 
     wo = frappe.get_doc("Work Order", work_order)
     pick_qty = (
-        flt(doc.get("for_qty"))
+        flt(doc.get("qty_of_finished_goods_item"))
         or flt(doc.get("qty_of_finished_goods"))
-        or flt(doc.get("qty_of_finished_goods_item"))
+        or flt(doc.get("for_qty"))
         or max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
     )
     remaining_qty = get_remaining_pick_list_qty(wo, exclude_pick_list=doc.name)
@@ -547,9 +547,9 @@ def validate_pick_list_matches_work_order(doc) -> None:
         frappe.throw(_("Work Order {0} has no required items").format(wo.name))
 
     pick_qty = (
-        flt(doc.get("for_qty"))
+        flt(doc.get("qty_of_finished_goods_item"))
         or flt(doc.get("qty_of_finished_goods"))
-        or flt(doc.get("qty_of_finished_goods_item"))
+        or flt(doc.get("for_qty"))
     )
     if pick_qty <= 0:
         pick_qty = max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
@@ -928,7 +928,9 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
                 continue
 
             pl_for_qty = (
-                flt(pl.get("for_qty"))
+                flt(pl.get("qty_of_finished_goods_item"))
+                or flt(pl.get("qty_of_finished_goods"))
+                or flt(pl.get("for_qty"))
                 or flt(pl.get("custom_for_qty"))
                 or flt(pl.get("qty"))
                 or 0.0
