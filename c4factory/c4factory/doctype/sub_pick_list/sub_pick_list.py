@@ -110,7 +110,12 @@ class SubPickList(Document):
 
 
 @frappe.whitelist()
-def make_sub_pick_list(main_pick_list: str) -> dict:
+def make_sub_pick_list(
+    main_pick_list: str | None = None,
+    pick_list: str | None = None,
+) -> dict:
+    # Accept the old client argument during asset-cache transitions.
+    main_pick_list = (main_pick_list or pick_list or "").strip()
     if not main_pick_list:
         frappe.throw(_("Main Pick List is required"))
     main = frappe.get_doc("Pick List", main_pick_list)

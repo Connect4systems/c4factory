@@ -135,7 +135,7 @@ async function open_additional_material_stock_entry(frm) {
       method:
         "c4factory.c4factory.doctype.sub_pick_list.sub_pick_list.make_sub_pick_list",
       args: {
-        pick_list: frm.doc.name,
+        main_pick_list: frm.doc.name,
       },
       freeze: true,
       freeze_message: __("Preparing Sub Pick List..."),
