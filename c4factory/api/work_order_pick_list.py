@@ -25,6 +25,47 @@ def _get_component_rows(wo):
     return wo.get("required_items") or wo.get("items") or []
 
 
+def get_remaining_pick_list_qty(wo, exclude_pick_list: str | None = None) -> float:
+    """
+    Return finished-goods quantity not already allocated to a submitted PL.
+
+    Open and Completed Pick Lists are both submitted documents and reserve their
+    production quantity. Cancelled and draft Pick Lists do not reserve quantity.
+    """
+    meta = frappe.get_meta("Pick List")
+    qty_fields = [
+        fieldname
+        for fieldname in (
+            "for_qty",
+            "qty_of_finished_goods",
+            "qty_of_finished_goods_item",
+        )
+        if meta.has_field(fieldname)
+    ]
+    fields = ["name", *qty_fields]
+    filters = {
+        "work_order": wo.name,
+        "docstatus": 1,
+    }
+    pick_lists = frappe.get_all("Pick List", filters=filters, fields=fields)
+
+    allocated_qty = 0.0
+    for pick_list in pick_lists:
+        if exclude_pick_list and pick_list.name == exclude_pick_list:
+            continue
+        allocated_qty += next(
+            (
+                flt(pick_list.get(fieldname))
+                for fieldname in qty_fields
+                if flt(pick_list.get(fieldname)) > 0
+            ),
+            0.0,
+        )
+
+    already_covered = max(allocated_qty, flt(wo.produced_qty))
+    return max(flt(wo.qty) - already_covered, 0.0)
+
+
 @frappe.whitelist()
 def create_pick_list(
     work_order: str | None = None,
@@ -51,9 +92,16 @@ def create_pick_list(
     if not rows:
         frappe.throw(_("Work Order has no required items."))
 
-    fg_qty = flt(for_qty) or max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
+    remaining_qty = get_remaining_pick_list_qty(wo)
+    requested_qty = flt(for_qty)
+    # ERPNext's dialog defaults to the production remainder and does not know
+    # about quantities already reserved by Pick Lists. Cap that default to the
+    # actual unallocated balance while still honoring any smaller user quantity.
+    fg_qty = min(requested_qty, remaining_qty) if requested_qty else remaining_qty
     if fg_qty <= 0:
-        frappe.throw(_("No remaining quantity to pick for Work Order {0}.").format(wo.name))
+        frappe.throw(
+            _("No unallocated quantity remains for Work Order {0}.").format(wo.name)
+        )
 
     qty_scale = fg_qty / (flt(wo.qty) or 1.0)
 

@@ -439,6 +439,7 @@ def sync_pick_list_items_from_work_order(doc) -> None:
 
     from c4factory.api.work_order_pick_list import (
         _get_pick_list_source_warehouse,
+        get_remaining_pick_list_qty,
     )
 
     wo = frappe.get_doc("Work Order", work_order)
@@ -448,6 +449,14 @@ def sync_pick_list_items_from_work_order(doc) -> None:
         or flt(doc.get("qty_of_finished_goods_item"))
         or max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
     )
+    remaining_qty = get_remaining_pick_list_qty(wo, exclude_pick_list=doc.name)
+    if pick_qty > remaining_qty + 0.000001:
+        frappe.throw(
+            _(
+                "Pick List quantity {0} exceeds the unallocated Work Order "
+                "quantity {1}. Open and Completed Pick Lists are already reserved."
+            ).format(pick_qty, remaining_qty)
+        )
     qty_scale = pick_qty / (flt(wo.qty) or 1.0)
 
     expected = {}
@@ -485,19 +494,39 @@ def sync_pick_list_items_from_work_order(doc) -> None:
         }
 
     current_by_wo_item = {}
+    unused_expected = set(expected)
     for row in list(doc.get("locations") or []):
         wo_item = row.get("custom_work_order_item")
-        if not wo_item or wo_item not in expected or wo_item in current_by_wo_item:
+        if not wo_item or wo_item not in unused_expected:
+            candidates = [
+                name
+                for name in unused_expected
+                if expected[name]["item_code"] == row.get("item_code")
+                and (expected[name].get("warehouse") or "")
+                == (row.get("warehouse") or "")
+            ]
+            if not candidates:
+                candidates = [
+                    name
+                    for name in unused_expected
+                    if expected[name]["item_code"] == row.get("item_code")
+                ]
+            wo_item = candidates[0] if len(candidates) == 1 else None
+
+        if not wo_item:
             doc.remove(row)
             continue
+
+        row.custom_work_order_item = wo_item
         current_by_wo_item[wo_item] = row
+        unused_expected.discard(wo_item)
 
     for wo_item, values in expected.items():
         row = current_by_wo_item.get(wo_item)
         if not row:
             row = doc.append("locations", {})
         for fieldname, value in values.items():
-            if row.meta.has_field(fieldname):
+            if row.meta.has_field(fieldname) or fieldname == "custom_work_order_item":
                 row.set(fieldname, value)
 
 
