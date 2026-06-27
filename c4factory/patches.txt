@@ -7,3 +7,6 @@
 
 c4factory.patches.v1_0.setup_work_order_custom_fields
 c4factory.patches.v1_0.set_c4_operating_cost_read_only
+c4factory.patches.v1_0.setup_manual_pick_list_completion
+c4factory.patches.v1_0.setup_additional_material_flow
+c4factory.patches.v1_0.setup_sub_pick_list_stock_fields

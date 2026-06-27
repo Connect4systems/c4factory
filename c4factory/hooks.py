@@ -13,6 +13,7 @@ app_license = "mit"
 
 doctype_js = {
     "Pick List": "public/js/doctype/pick_list.js",
+    "Stock Entry": "public/js/doctype/stock_entry.js",
     "BOM": "public/js/doctype/bom/bom_measurement_qty.js",
     "Work Order": "public/js/doctype/work_order.js",
     "Job Card": "public/js/doctype/job_card.js",
@@ -37,22 +38,35 @@ doc_events = {
 
     # Pick List custom flow
     "Pick List": {
-        "before_insert": "c4factory.api.work_order_flow.on_pick_list_validate",
-        "before_save": "c4factory.api.work_order_flow.on_pick_list_validate",
+        "before_validate": "c4factory.api.work_order_flow.on_pick_list_validate",
+        "validate": "c4factory.api.work_order_flow.on_pick_list_validate",
         "on_submit": "c4factory.api.work_order_flow.on_pick_list_submit",
+        "before_cancel": "c4factory.c4factory.doctype.sub_pick_list.sub_pick_list.prevent_main_pick_list_cancel",
         "on_cancel": "c4factory.api.work_order_flow.on_pick_list_cancel",
         "on_trash": "c4factory.api.work_order_flow.on_pick_list_trash",
     },
 
     # Stock Entry – costing + WO update
     "Stock Entry": {
-        "validate": "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
-        "before_submit": "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
+        "validate": [
+            "c4factory.c4_manufacturing.stock_entry_hooks.validate_additional_material_transfer",
+            "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
+        ],
+        "before_submit": [
+            "c4factory.c4_manufacturing.stock_entry_hooks.validate_additional_material_transfer",
+            "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
+        ],
         "on_submit": [
+            "c4factory.c4_manufacturing.stock_entry_hooks.apply_additional_material_to_work_order",
             "c4factory.c4_manufacturing.stock_entry_hooks.on_submit_update_work_order_costing",
             "c4factory.api.work_order_flow.on_stock_entry_submit",
+            "c4factory.c4factory.doctype.sub_pick_list.sub_pick_list.update_from_stock_entry",
         ],
-        "on_cancel": "c4factory.api.work_order_flow.on_stock_entry_cancel",
+        "on_cancel": [
+            "c4factory.c4_manufacturing.stock_entry_hooks.reverse_additional_material_from_work_order",
+            "c4factory.api.work_order_flow.on_stock_entry_cancel",
+            "c4factory.c4factory.doctype.sub_pick_list.sub_pick_list.update_from_stock_entry",
+        ],
         "on_trash": "c4factory.api.work_order_flow.on_stock_entry_trash",
     },
 
@@ -93,10 +107,17 @@ patches = [
     "c4factory.patches.v1_0.setup_wo_pl_se_custom_fields",
     # Pick List real operation cost from linked Job Cards
     "c4factory.patches.v1_0.setup_pick_list_operation_cost_fields",
+    # Allow users to close a partial Pick List and waive its remainder
+    "c4factory.patches.v1_0.setup_manual_pick_list_completion",
+    # Additional material transfers linked to a Pick List and Work Order
+    "c4factory.patches.v1_0.setup_additional_material_flow",
+    "c4factory.patches.v1_0.setup_sub_pick_list_stock_fields",
 ]
 
 override_doctype_dashboards = {
     "Pick List": "c4factory.api.pick_list_dashboard.get_data",
+    "Sub Pick List": "c4factory.api.sub_pick_list_dashboard.get_data",
+    "Work Order": "c4factory.api.work_order_dashboard.get_data",
 }
 
 # ---------------------------------------------------------

@@ -7,14 +7,31 @@
 
 frappe.ui.form.on("Pick List", {
   async refresh(frm) {
+    configure_work_order_pick_list_grid(frm);
     // نشتغل فقط لما تكون الوثيقة Submitted
     if (frm.doc.docstatus !== 1) return;
 
-    frm.add_custom_button(
-      __("Create Partial Stock Entry"),
-      () => open_partial_se_dialog(frm),
-      __("Factory")
-    );
+    if (frm.doc.status !== "Completed") {
+      frm.add_custom_button(
+        __("Create Partial Stock Entry"),
+        () => open_partial_se_dialog(frm),
+        __("Factory")
+      );
+
+      frm.add_custom_button(
+        __("Completed"),
+        () => complete_pick_list(frm),
+        __("Factory")
+      );
+    }
+
+    if (frm.doc.work_order) {
+      frm.add_custom_button(
+        __("Additional Material"),
+        () => open_additional_material_stock_entry(frm),
+        __("Factory")
+      );
+    }
 
     if (frm.doc.work_order && !(await is_work_order_operation_disabled(frm.doc.work_order))) {
       frm.add_custom_button(
@@ -26,6 +43,44 @@ frappe.ui.form.on("Pick List", {
   },
 });
 
+function configure_work_order_pick_list_grid(frm) {
+  if (!frm.doc.work_order) return;
+
+  const table_field = frm.fields_dict.locations;
+  const grid = table_field && table_field.grid;
+  if (!grid) return;
+
+  const lock_grid = () => {
+    table_field.df.cannot_add_rows = 1;
+    table_field.df.cannot_delete_rows = 1;
+    grid.df.cannot_add_rows = 1;
+    grid.df.cannot_delete_rows = 1;
+    grid.cannot_add_rows = true;
+    grid.cannot_delete_rows = true;
+
+    [
+      "item_code",
+      "item",
+      "qty",
+      "custom_pl_qty",
+      "stock_qty",
+      "qty_in_stock_uom",
+      "warehouse",
+      "uom",
+      "stock_uom",
+      "conversion_factor",
+      "custom_work_order_item",
+    ].forEach((fieldname) => {
+      grid.update_docfield_property(fieldname, "read_only", 1);
+    });
+    grid.refresh();
+  };
+
+  lock_grid();
+  clearTimeout(frm.__c4_lock_pick_list_grid);
+  frm.__c4_lock_pick_list_grid = setTimeout(lock_grid, 0);
+}
+
 async function is_work_order_operation_disabled(work_order) {
   if (!work_order) return false;
 
@@ -36,6 +91,65 @@ async function is_work_order_operation_disabled(work_order) {
   );
 
   return !!(message && cint(message.custom_disable_operation));
+}
+
+function complete_pick_list(frm) {
+  frappe.confirm(
+    __(
+      "Complete this Pick List and waive all remaining balances? You will not be able to create another partial Stock Entry from this Pick List."
+    ),
+    async () => {
+      try {
+        await frappe.call({
+          method: "c4factory.api.work_order_flow.complete_pick_list",
+          args: {
+            pick_list: frm.doc.name,
+          },
+          freeze: true,
+          freeze_message: __("Completing Pick List..."),
+        });
+
+        frappe.show_alert({
+          message: __("Pick List completed. Remaining balances were waived."),
+          indicator: "green",
+        });
+        await frm.reload_doc();
+      } catch (e) {
+        console.error(e);
+        frappe.msgprint(__("Failed to complete Pick List."));
+      }
+    }
+  );
+}
+
+async function open_additional_material_stock_entry(frm) {
+  try {
+    const { message } = await frappe.call({
+      method:
+        "c4factory.c4factory.doctype.sub_pick_list.sub_pick_list.make_sub_pick_list",
+      args: {
+        pick_list: frm.doc.name,
+      },
+      freeze: true,
+      freeze_message: __("Preparing Sub Pick List..."),
+    });
+
+    if (!message) {
+      frappe.msgprint(__("Server did not return a Sub Pick List."));
+      return;
+    }
+
+    const docs = frappe.model.sync(message);
+    if (!docs.length) {
+      frappe.msgprint(__("Could not open the Sub Pick List."));
+      return;
+    }
+
+    frappe.set_route("Form", docs[0].doctype, docs[0].name);
+  } catch (e) {
+    console.error(e);
+    frappe.msgprint(__("Failed to prepare Sub Pick List."));
+  }
 }
 
 // ----------------------------------------------

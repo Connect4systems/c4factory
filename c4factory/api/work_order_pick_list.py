@@ -61,6 +61,9 @@ def create_pick_list(
     pl.company = wo.company
     pl.purpose = "Material Transfer for Manufacture"
     pl.work_order = wo.name
+    if hasattr(pl, "pick_manually"):
+        # Preserve every required row even when no stock is currently available.
+        pl.pick_manually = 1
 
     for fieldname in ("for_qty", "qty_of_finished_goods", "qty_of_finished_goods_item"):
         if hasattr(pl, fieldname):
@@ -126,13 +129,13 @@ def _get_pick_list_source_warehouse(wo, wo_item) -> str | None:
         item_group = frappe.db.get_value("Item", item_code, "item_group")
 
     return (
-        get_default_source_warehouse(
+        wo_item.get("source_warehouse")
+        or wo_item.get("from_warehouse")
+        or get_default_source_warehouse(
             item_code=item_code,
             item_group=item_group,
             company=wo.get("company"),
         )
-        or wo_item.get("source_warehouse")
-        or wo_item.get("from_warehouse")
         or wo.get("source_warehouse")
     )
 

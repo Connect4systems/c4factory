@@ -31,6 +31,384 @@ def _is_manufacture_like_entry(doc) -> bool:
     )
 
 
+def validate_additional_material_transfer(doc, method: str | None = None) -> None:
+    """Keep an Additional Material transfer tied to its originating Pick List."""
+    if not flt(doc.get("custom_is_additional_material")):
+        return
+
+    origin_pick_list = doc.get("custom_additional_material_pick_list")
+    if not origin_pick_list:
+        frappe.throw(
+            _("Additional Material Stock Entry requires an originating Pick List")
+        )
+
+    pl = frappe.get_doc("Pick List", origin_pick_list)
+    if pl.docstatus != 1:
+        frappe.throw(_("Pick List {0} must be submitted").format(pl.name))
+
+    if not pl.get("work_order"):
+        frappe.throw(_("Pick List {0} is not linked to a Work Order").format(pl.name))
+
+    from c4factory.api.work_order_flow import (
+        _validate_work_order_for_additional_material,
+    )
+
+    wo = frappe.get_doc("Work Order", pl.work_order)
+    _validate_work_order_for_additional_material(wo)
+
+    sub_pick_list = doc.get("custom_sub_pick_list")
+    sub_rows = {}
+    sub_balances = {}
+    if sub_pick_list:
+        sub = frappe.get_doc("Sub Pick List", sub_pick_list)
+        if (
+            sub.docstatus != 1
+            or sub.main_pick_list != pl.name
+            or sub.work_order != wo.name
+        ):
+            frappe.throw(_("Invalid Sub Pick List relationship"))
+        sub_rows = {row.name: row for row in sub.items}
+        from c4factory.c4factory.doctype.sub_pick_list.sub_pick_list import (
+            _get_balances,
+        )
+
+        sub_balances = _get_balances(sub)
+
+    doc.stock_entry_type = "Material Transfer for Manufacture"
+    doc.purpose = "Material Transfer for Manufacture"
+    doc.company = wo.company
+    doc.work_order = wo.name
+    doc.pick_list = pl.name
+
+    if doc.meta.has_field("custom_work_order"):
+        doc.custom_work_order = wo.name
+    if doc.meta.has_field("custom_pick_list"):
+        doc.custom_pick_list = pl.name
+    if doc.meta.has_field("to_warehouse"):
+        doc.to_warehouse = wo.wip_warehouse
+
+    requested_by_sub_item = {}
+    for row in doc.get("items") or []:
+        row.t_warehouse = wo.wip_warehouse
+        row.custom_pick_list_item = None
+        if sub_pick_list:
+            source = sub_rows.get(row.get("custom_sub_pick_list_item"))
+            if not source:
+                frappe.throw(
+                    _("Every Stock Entry row must reference a Sub Pick List Item")
+                )
+            if (
+                row.item_code != source.item_code
+                or (row.get("s_warehouse") or "")
+                != (source.source_warehouse or "")
+            ):
+                frappe.throw(
+                    _("Stock Entry row must match Sub Pick List item {0}").format(
+                        source.item_code
+                    )
+                )
+            row.custom_work_order_item = source.work_order_item
+            row_qty = abs(flt(row.get("transfer_qty")) or flt(row.get("qty")))
+            requested_by_sub_item[source.name] = (
+                flt(requested_by_sub_item.get(source.name)) + row_qty
+            )
+        if doc.docstatus == 0:
+            if (
+                row.meta.has_field("custom_work_order_item")
+                and not doc.get("custom_sub_pick_list")
+            ):
+                row.custom_work_order_item = None
+            if row.meta.has_field("custom_additional_required_qty"):
+                row.custom_additional_required_qty = 0
+            if row.meta.has_field("custom_additional_transferred_qty_applied"):
+                row.custom_additional_transferred_qty_applied = 0
+
+    for source_name, requested_qty in requested_by_sub_item.items():
+        source = sub_rows[source_name]
+        balance = flt((sub_balances.get(source_name) or {}).get("balance"))
+        if requested_qty > balance + 0.000001:
+            frappe.throw(
+                _("Item {0}: transfer quantity exceeds balance {1}").format(
+                    source.item_code, balance
+                )
+            )
+
+
+def apply_additional_material_to_work_order(doc, method: str | None = None) -> None:
+    """Add submitted Additional Material quantities to Work Order requirements."""
+    if (
+        not flt(doc.get("custom_is_additional_material"))
+        or doc.get("custom_sub_pick_list")
+    ):
+        return
+
+    wo = frappe.get_doc("Work Order", doc.work_order)
+    table_field = "required_items" if wo.meta.has_field("required_items") else "items"
+    mappings = []
+
+    for stock_row in doc.get("items") or []:
+        if flt(stock_row.get("custom_additional_required_qty")) > 0:
+            continue
+        contribution = _get_stock_row_qty_in_stock_uom(stock_row)
+        if contribution <= 0 or not stock_row.get("item_code"):
+            continue
+
+        required_row = _find_work_order_required_row(
+            wo,
+            stock_row.item_code,
+            stock_row.get("s_warehouse"),
+        )
+        if not required_row:
+            required_row = _append_work_order_required_row(
+                wo,
+                table_field,
+                stock_row,
+            )
+
+        required_row.required_qty = flt(required_row.get("required_qty")) + contribution
+        required_row.custom_additional_material_qty = (
+            flt(required_row.get("custom_additional_material_qty")) + contribution
+        )
+        mappings.append((stock_row, required_row, contribution))
+
+    if not mappings:
+        return
+
+    _save_submitted_work_order(wo)
+
+    # Persist an exact audit link from each Stock Entry row to the affected
+    # Work Order Item. This makes repeated hooks idempotent and cancellation
+    # capable of reversing only this Stock Entry's contribution.
+    for stock_row, required_row, contribution in mappings:
+        frappe.db.set_value(
+            "Stock Entry Detail",
+            stock_row.name,
+            {
+                "custom_work_order_item": required_row.name,
+                "custom_additional_required_qty": contribution,
+            },
+            update_modified=False,
+        )
+        stock_row.custom_work_order_item = required_row.name
+        stock_row.custom_additional_required_qty = contribution
+
+    affected_rows = {}
+    for stock_row, required_row, _contribution in mappings:
+        affected_rows[required_row.name] = (required_row, stock_row)
+
+    for required_row, stock_row in affected_rows.values():
+        actual_transferred = _get_actual_transferred_qty(
+            wo.name,
+            stock_row.item_code,
+            stock_row.get("s_warehouse"),
+            wo.wip_warehouse,
+        )
+        current_transferred = flt(required_row.get("transferred_qty"))
+        applied_qty = max(actual_transferred - current_transferred, 0.0)
+        if applied_qty > 0:
+            frappe.db.set_value(
+                "Work Order Item",
+                required_row.name,
+                "transferred_qty",
+                current_transferred + applied_qty,
+                update_modified=False,
+            )
+
+        # Store the adjustment on one source row for exact cancellation.
+        source_row = next(
+            row
+            for row, target, _qty in mappings
+            if target.name == required_row.name
+        )
+        frappe.db.set_value(
+            "Stock Entry Detail",
+            source_row.name,
+            "custom_additional_transferred_qty_applied",
+            applied_qty,
+            update_modified=False,
+        )
+        source_row.custom_additional_transferred_qty_applied = applied_qty
+        _set_work_order_item_balances(
+            required_row.name,
+            flt(required_row.get("required_qty")),
+            current_transferred + applied_qty,
+            flt(required_row.get("consumed_qty")),
+        )
+
+
+def reverse_additional_material_from_work_order(
+    doc, method: str | None = None
+) -> None:
+    """Reverse only the Work Order requirement contributed by this Stock Entry."""
+    if (
+        not flt(doc.get("custom_is_additional_material"))
+        or doc.get("custom_sub_pick_list")
+        or not doc.get("work_order")
+    ):
+        return
+
+    contributions = {}
+    source_rows = {}
+    applied_transfers = {}
+    for stock_row in doc.get("items") or []:
+        work_order_item = stock_row.get("custom_work_order_item")
+        contribution = flt(stock_row.get("custom_additional_required_qty"))
+        if not work_order_item or contribution <= 0:
+            continue
+
+        contributions[work_order_item] = (
+            flt(contributions.get(work_order_item)) + contribution
+        )
+        applied_transfers[work_order_item] = (
+            flt(applied_transfers.get(work_order_item))
+            + flt(stock_row.get("custom_additional_transferred_qty_applied"))
+        )
+        source_rows.setdefault(work_order_item, stock_row)
+
+    if not contributions:
+        return
+
+    wo = frappe.get_doc("Work Order", doc.work_order)
+    rows_by_name = {row.name: row for row in _get_wo_items(wo)}
+
+    for row_name, contribution in contributions.items():
+        required_row = rows_by_name.get(row_name)
+        if not required_row:
+            continue
+
+        required_qty = max(flt(required_row.get("required_qty")) - contribution, 0.0)
+        additional_qty = max(
+            flt(required_row.get("custom_additional_material_qty")) - contribution,
+            0.0,
+        )
+        required_row.required_qty = required_qty
+        required_row.custom_additional_material_qty = additional_qty
+
+        stock_row = source_rows[row_name]
+        actual_transferred = _get_actual_transferred_qty(
+            wo.name,
+            stock_row.item_code,
+            stock_row.get("s_warehouse"),
+            wo.wip_warehouse,
+        )
+        required_row.transferred_qty = max(
+            flt(required_row.get("transferred_qty"))
+            - flt(applied_transfers.get(row_name)),
+            actual_transferred,
+        )
+
+        if required_qty <= 0.000001 and additional_qty <= 0.000001:
+            wo.remove(required_row)
+        else:
+            if hasattr(required_row, "custom_balance_to_transfer"):
+                required_row.custom_balance_to_transfer = max(
+                    required_qty - flt(required_row.get("transferred_qty")), 0.0
+                )
+            if hasattr(required_row, "custom_balance_to_consume"):
+                required_row.custom_balance_to_consume = max(
+                    required_qty - flt(required_row.get("consumed_qty")), 0.0
+                )
+
+    _save_submitted_work_order(wo)
+
+
+def _get_stock_row_qty_in_stock_uom(row) -> float:
+    transfer_qty = abs(flt(row.get("transfer_qty")))
+    if transfer_qty > 0:
+        return transfer_qty
+    return abs(flt(row.get("qty")) * (flt(row.get("conversion_factor")) or 1.0))
+
+
+def _find_work_order_required_row(wo, item_code: str, source_warehouse: str | None):
+    for row in _get_wo_items(wo):
+        if (
+            row.get("item_code") == item_code
+            and (row.get("source_warehouse") or "") == (source_warehouse or "")
+        ):
+            return row
+    return None
+
+
+def _append_work_order_required_row(wo, table_field: str, stock_row):
+    item = frappe.get_cached_doc("Item", stock_row.item_code)
+    return wo.append(
+        table_field,
+        {
+            "item_code": stock_row.item_code,
+            "item_name": stock_row.get("item_name") or item.item_name,
+            "description": stock_row.get("description") or item.description,
+            "stock_uom": stock_row.get("stock_uom") or item.stock_uom,
+            "source_warehouse": stock_row.get("s_warehouse"),
+            "required_qty": 0,
+            "transferred_qty": 0,
+        },
+    )
+
+
+def _save_submitted_work_order(wo) -> None:
+    wo.flags.ignore_validate_update_after_submit = True
+    wo.flags.ignore_permissions = True
+    wo.save(ignore_permissions=True)
+
+
+def _get_actual_transferred_qty(
+    work_order: str,
+    item_code: str,
+    source_warehouse: str | None,
+    wip_warehouse: str | None,
+) -> float:
+    return flt(
+        frappe.db.sql(
+            """
+            SELECT COALESCE(SUM(
+                ABS(CASE
+                    WHEN COALESCE(sed.transfer_qty, 0) != 0
+                    THEN sed.transfer_qty
+                    ELSE sed.qty * COALESCE(NULLIF(sed.conversion_factor, 0), 1)
+                END)
+            ), 0)
+            FROM `tabStock Entry Detail` sed
+            INNER JOIN `tabStock Entry` se ON se.name = sed.parent
+            WHERE se.docstatus = 1
+              AND se.work_order = %(work_order)s
+              AND se.stock_entry_type = 'Material Transfer for Manufacture'
+              AND sed.item_code = %(item_code)s
+              AND COALESCE(sed.s_warehouse, '') = %(source_warehouse)s
+              AND COALESCE(sed.t_warehouse, '') = %(wip_warehouse)s
+            """,
+            {
+                "work_order": work_order,
+                "item_code": item_code,
+                "source_warehouse": source_warehouse or "",
+                "wip_warehouse": wip_warehouse or "",
+            },
+        )[0][0]
+    )
+
+
+def _set_work_order_item_balances(
+    row_name: str,
+    required_qty: float,
+    transferred_qty: float,
+    consumed_qty: float,
+) -> None:
+    values = {}
+    meta = frappe.get_meta("Work Order Item")
+    if meta.has_field("custom_balance_to_transfer"):
+        values["custom_balance_to_transfer"] = max(
+            required_qty - transferred_qty, 0.0
+        )
+    if meta.has_field("custom_balance_to_consume"):
+        values["custom_balance_to_consume"] = max(required_qty - consumed_qty, 0.0)
+    if values:
+        frappe.db.set_value(
+            "Work Order Item",
+            row_name,
+            values,
+            update_modified=False,
+        )
+
+
 # ============================================================
 # 1) Stock Entry.validate – default WIP target warehouse
 # ============================================================
@@ -605,7 +983,8 @@ def _recalculate_work_order_costs(work_order_name: str) -> None:
       - For each Stock Entry Detail row:
           * ignore finished items (is_finished_item = 1)
           * if is_scrap_item = 1 → goes to Scrap Material Cost
-          * else → goes to Raw Material Cost
+          * raw cost is counted only on Material Transfer for Manufacture
+            so later WIP consumption is not counted a second time
       - Use transfer_qty * basic_rate as the amount
     - Operating Cost = sum of actual Job Card operating cost
     - Total Cost = Raw + Operating - Scrap
@@ -643,7 +1022,10 @@ def _recalculate_work_order_costs(work_order_name: str) -> None:
         # finished item cost is not counted here (it is the result)
         if r.is_scrap_item:
             scrap_material_cost += amount
-        elif not r.is_finished_item:
+        elif (
+            not r.is_finished_item
+            and r.stock_entry_type == "Material Transfer for Manufacture"
+        ):
             raw_material_cost += amount
 
     # Operating cost from actual Job Cards linked to the Work Order

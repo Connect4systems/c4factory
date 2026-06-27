@@ -42,7 +42,7 @@ function configure_required_items_grid(frm) {
 
   // Also fix the child DocType meta so newly added/rendered rows can select an
   // item and set its quantity.
-  for (const fieldname of ["item_code", "required_qty"]) {
+  for (const fieldname of ["item_code", "required_qty", "source_warehouse"]) {
     const df = frappe.meta.get_docfield(
       "Work Order Item",
       fieldname,
@@ -78,7 +78,7 @@ function apply_required_items_grid_permissions(table_field) {
   grid.cannot_add_rows = false;
   grid.cannot_delete_rows = false;
 
-  for (const fieldname of ["item_code", "required_qty"]) {
+  for (const fieldname of ["item_code", "required_qty", "source_warehouse"]) {
     grid.update_docfield_property(fieldname, "read_only", 0);
     grid.toggle_enable(fieldname, true);
   }

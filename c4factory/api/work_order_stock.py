@@ -206,21 +206,30 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
         ...
     ]
     """
-    se_names = frappe.get_all(
+    transfer_entries = frappe.get_all(
         "Stock Entry",
         filters={
             "work_order": work_order_name,
             "docstatus": 1,
             "stock_entry_type": "Material Transfer for Manufacture",
         },
-        pluck="name",
+        fields=["name", "custom_is_additional_material"],
     )
 
-    if not se_names:
+    if not transfer_entries:
         return []
+
+    se_names = [entry.name for entry in transfer_entries]
+    additional_se_names = {
+        entry.name
+        for entry in transfer_entries
+        if flt(entry.get("custom_is_additional_material"))
+    }
 
     sed_meta = frappe.get_meta("Stock Entry Detail")
     fields = [
+        "name",
+        "parent",
         "item_code",
         "stock_uom",
         "qty",
@@ -250,10 +259,14 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     transferred_by_pl_item = {}
     for r in rows:
         pl_item = r.get("custom_pick_list_item")
-        if not pl_item:
+        is_additional = r.get("parent") in additional_se_names
+        if not pl_item and not is_additional:
             continue
 
-        key = (pl_item, r["item_code"], r["stock_uom"])
+        # Additional material has no Pick List Item row by design. Aggregate it
+        # separately so it is consumed and costed without satisfying PL balance.
+        material_key = pl_item or "__additional_material__"
+        key = (material_key, r["item_code"], r["stock_uom"])
         transferred_by_pl_item.setdefault(key, {"qty": 0.0, "amount": 0.0})
 
         row_qty = flt(r.get("transfer_qty")) or flt(r.get("qty"))
@@ -275,10 +288,18 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     consumed_qty_map = _get_consumed_pick_list_material_qty(work_order_name)
     legacy_consumed_by_item = _get_legacy_consumed_material_qty(work_order_name)
     aggregated = {}
-    for key, values in transferred_by_pl_item.items():
+    ordered_transfers = sorted(
+        transferred_by_pl_item.items(),
+        key=lambda entry: entry[0][0] != "__additional_material__",
+    )
+    for key, values in ordered_transfers:
         pl_item, item_code, _stock_uom = key
         total_qty = flt(values["qty"])
-        consumed_qty = flt(consumed_qty_map.get((pl_item, item_code)))
+        consumed_qty = (
+            0.0
+            if pl_item == "__additional_material__"
+            else flt(consumed_qty_map.get((pl_item, item_code)))
+        )
         remaining_qty = max(total_qty - consumed_qty, 0.0)
         legacy_consumed_qty = min(
             flt(legacy_consumed_by_item.get(item_code)), remaining_qty

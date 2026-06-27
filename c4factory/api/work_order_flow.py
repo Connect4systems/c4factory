@@ -119,6 +119,7 @@ def _get_pick_list_balances_map(pl_doc_or_name):
         INNER JOIN `tabStock Entry` se ON se.name = sed.parent
         WHERE se.docstatus = 1
           AND se.pick_list = %(pick_list)s
+          AND COALESCE(se.custom_is_additional_material, 0) = 0
           AND sed.custom_pick_list_item IS NOT NULL
         GROUP BY sed.custom_pick_list_item
         """,
@@ -144,6 +145,7 @@ def _get_pick_list_balances_map(pl_doc_or_name):
         INNER JOIN `tabStock Entry` se ON se.name = sed.parent
         WHERE se.docstatus = 1
           AND se.pick_list = %(pick_list)s
+          AND COALESCE(se.custom_is_additional_material, 0) = 0
           AND (sed.custom_pick_list_item IS NULL OR sed.custom_pick_list_item = '')
         GROUP BY sed.item_code
         """,
@@ -182,6 +184,13 @@ def _get_pick_list_balances_map(pl_doc_or_name):
     for info in result.values():
         info["balance"] = max(flt(info["pl_qty"]) - flt(info["transferred"]), 0.0)
 
+    # A manually completed Pick List intentionally waives any quantity that was
+    # not transferred. Keep the planned and transferred quantities intact for
+    # audit/reporting, but expose no actionable balance.
+    if flt(pl.get("custom_manually_completed")):
+        for info in result.values():
+            info["balance"] = 0.0
+
     return result
 
 
@@ -195,10 +204,16 @@ def _update_pick_list_status_from_db(pick_list_name: str):
         return
 
     pl = frappe.get_doc("Pick List", pick_list_name)
-    balances = _get_pick_list_balances_map(pl)
-
-    has_balance = any(flt(info["balance"]) > 0.000001 for info in balances.values())
-    new_status = "Open" if has_balance else "Completed"
+    if pl.docstatus == 2:
+        new_status = "Cancelled"
+    elif flt(pl.get("custom_manually_completed")):
+        new_status = "Completed"
+    else:
+        balances = _get_pick_list_balances_map(pl)
+        has_balance = any(
+            flt(info["balance"]) > 0.000001 for info in balances.values()
+        )
+        new_status = "Open" if has_balance else "Completed"
 
     try:
         frappe.db.set_value("Pick List", pl.name, "status", new_status)
@@ -252,6 +267,149 @@ def get_pick_list_balance_rows(pick_list: str):
         )
 
     return rows
+
+
+@frappe.whitelist()
+def complete_pick_list(pick_list: str) -> dict:
+    """
+    Manually complete a submitted Pick List and waive its remaining balance.
+
+    Actual Stock Entry quantities are not changed. This only closes the
+    untransferred remainder so manufacturing can continue with the material
+    that was actually transferred to WIP.
+    """
+    if not pick_list:
+        frappe.throw(_("Pick List is required"))
+
+    pl = frappe.get_doc("Pick List", pick_list)
+    pl.check_permission("write")
+
+    if pl.docstatus != 1:
+        frappe.throw(_("Pick List {0} must be submitted").format(pl.name))
+
+    if not pl.get("work_order"):
+        frappe.throw(
+            _("Pick List {0} is not linked to a Work Order").format(pl.name)
+        )
+
+    if not pl.meta.has_field("custom_manually_completed"):
+        frappe.throw(
+            _(
+                "Manual Pick List completion is not installed. "
+                "Please run bench migrate and try again."
+            )
+        )
+
+    frappe.db.set_value(
+        "Pick List",
+        pl.name,
+        {
+            "custom_manually_completed": 1,
+            "status": "Completed",
+        },
+    )
+
+    return {
+        "pick_list": pl.name,
+        "status": "Completed",
+        "work_order": pl.work_order,
+    }
+
+
+@frappe.whitelist()
+def make_additional_material_stock_entry(pick_list: str) -> dict:
+    """
+    Return an unsaved Additional Material transfer for this Pick List's Work Order.
+
+    Validation keeps the originating Pick List, Work Order, transfer type, and
+    WIP target fixed when the user saves or submits the Stock Entry.
+    """
+    if not pick_list:
+        frappe.throw(_("Pick List is required"))
+
+    pl = frappe.get_doc("Pick List", pick_list)
+    pl.check_permission("read")
+
+    if pl.docstatus != 1:
+        frappe.throw(_("Pick List {0} must be submitted").format(pl.name))
+
+    if not pl.get("work_order"):
+        frappe.throw(
+            _("Pick List {0} is not linked to a Work Order").format(pl.name)
+        )
+
+    if not frappe.has_permission("Stock Entry", "create"):
+        frappe.throw(
+            _("You do not have permission to create a Stock Entry"),
+            frappe.PermissionError,
+        )
+
+    wo = frappe.get_doc("Work Order", pl.work_order)
+    _validate_work_order_for_additional_material(wo)
+
+    required_custom_fields = {
+        "Stock Entry": {
+            "custom_is_additional_material",
+            "custom_additional_material_pick_list",
+        },
+        "Stock Entry Detail": {
+            "custom_work_order_item",
+            "custom_additional_required_qty",
+            "custom_additional_transferred_qty_applied",
+        },
+        "Work Order Item": {"custom_additional_material_qty"},
+    }
+    fields_missing = any(
+        not frappe.get_meta(doctype).has_field(fieldname)
+        for doctype, fieldnames in required_custom_fields.items()
+        for fieldname in fieldnames
+    )
+    if fields_missing:
+        frappe.throw(
+            _(
+                "Additional Material is not installed. "
+                "Please run bench migrate and try again."
+            )
+        )
+
+    se = frappe.new_doc("Stock Entry")
+    se.stock_entry_type = "Material Transfer for Manufacture"
+    se.purpose = "Material Transfer for Manufacture"
+    se.company = wo.company
+    se.work_order = wo.name
+    se.pick_list = pl.name
+    se.custom_is_additional_material = 1
+    se.custom_additional_material_pick_list = pl.name
+
+    if se.meta.has_field("custom_work_order"):
+        se.custom_work_order = wo.name
+    if se.meta.has_field("custom_pick_list"):
+        se.custom_pick_list = pl.name
+    if se.meta.has_field("to_warehouse"):
+        se.to_warehouse = wo.wip_warehouse
+
+    return se.as_dict()
+
+
+def _validate_work_order_for_additional_material(wo) -> None:
+    if wo.docstatus != 1:
+        frappe.throw(_("Work Order {0} must be submitted").format(wo.name))
+
+    if (wo.get("status") or "").strip() in {
+        "Stopped",
+        "Closed",
+        "Completed",
+        "Cancelled",
+    }:
+        frappe.throw(
+            _(
+                "Additional material cannot be added to Work Order {0} "
+                "with status {1}"
+            ).format(wo.name, wo.status)
+        )
+
+    if not wo.get("wip_warehouse"):
+        frappe.throw(_("Work Order {0} has no WIP Warehouse set").format(wo.name))
 # ---------------------------------------------------------
 # Pick List – validate hook (called from hooks.py)
 # ---------------------------------------------------------
@@ -262,10 +420,170 @@ def on_pick_list_validate(doc, method=None):
     Defaults lookup used by Work Order required items.
     """
     action = getattr(doc, "_action", None)
-    if doc.docstatus != 0 or action in {"submit", "update_after_submit", "cancel"}:
+    if doc.docstatus != 0 or action in {"update_after_submit", "cancel"}:
         return
 
     set_pick_list_warehouses_from_item_group(doc)
+    sync_pick_list_items_from_work_order(doc)
+    validate_pick_list_matches_work_order(doc)
+
+
+def sync_pick_list_items_from_work_order(doc) -> None:
+    """Restore immutable Work Order material rows without checking availability."""
+    work_order = doc.get("work_order")
+    if not work_order:
+        return
+
+    if doc.meta.has_field("pick_manually"):
+        doc.pick_manually = 1
+
+    from c4factory.api.work_order_pick_list import (
+        _get_pick_list_source_warehouse,
+    )
+
+    wo = frappe.get_doc("Work Order", work_order)
+    pick_qty = (
+        flt(doc.get("for_qty"))
+        or flt(doc.get("qty_of_finished_goods"))
+        or flt(doc.get("qty_of_finished_goods_item"))
+        or max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
+    )
+    qty_scale = pick_qty / (flt(wo.qty) or 1.0)
+
+    expected = {}
+    for wo_row in _get_wo_items(wo):
+        item_code = wo_row.get("item_code")
+        required_qty = flt(wo_row.get("required_qty") or wo_row.get("qty"))
+        row_qty = required_qty * qty_scale
+        if not item_code or row_qty <= 0:
+            continue
+
+        stock_uom = (
+            wo_row.get("stock_uom")
+            or wo_row.get("uom")
+            or frappe.db.get_value("Item", item_code, "stock_uom")
+        )
+        expected[wo_row.name] = {
+            "item_code": item_code,
+            "item": item_code,
+            "item_name": (
+                wo_row.get("item_name")
+                or frappe.db.get_value("Item", item_code, "item_name")
+                or item_code
+            ),
+            "uom": stock_uom,
+            "stock_uom": stock_uom,
+            "conversion_factor": 1,
+            "qty": row_qty,
+            "stock_qty": row_qty,
+            "qty_in_stock_uom": row_qty,
+            "warehouse": _get_pick_list_source_warehouse(wo, wo_row),
+            "work_order": wo.name,
+            "custom_pl_qty": row_qty,
+            "custom_work_order_item": wo_row.name,
+            "custom_wip_warehouse": wo.get("wip_warehouse"),
+        }
+
+    current_by_wo_item = {}
+    for row in list(doc.get("locations") or []):
+        wo_item = row.get("custom_work_order_item")
+        if not wo_item or wo_item not in expected or wo_item in current_by_wo_item:
+            doc.remove(row)
+            continue
+        current_by_wo_item[wo_item] = row
+
+    for wo_item, values in expected.items():
+        row = current_by_wo_item.get(wo_item)
+        if not row:
+            row = doc.append("locations", {})
+        for fieldname, value in values.items():
+            if row.meta.has_field(fieldname):
+                row.set(fieldname, value)
+
+
+def validate_pick_list_matches_work_order(doc) -> None:
+    """
+    Keep a manufacturing Pick List identical to its Work Order required rows.
+
+    Availability is deliberately not considered: zero-stock materials remain
+    on the Pick List so shortages stay visible and can be transferred later.
+    """
+    work_order = doc.get("work_order")
+    if not work_order:
+        return
+
+    wo = frappe.get_doc("Work Order", work_order)
+    wo_rows = _get_wo_items(wo)
+    if not wo_rows:
+        frappe.throw(_("Work Order {0} has no required items").format(wo.name))
+
+    pick_qty = (
+        flt(doc.get("for_qty"))
+        or flt(doc.get("qty_of_finished_goods"))
+        or flt(doc.get("qty_of_finished_goods_item"))
+    )
+    if pick_qty <= 0:
+        pick_qty = max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
+
+    qty_scale = pick_qty / (flt(wo.qty) or 1.0)
+    expected = {}
+    for wo_row in wo_rows:
+        item_code = wo_row.get("item_code")
+        required_qty = flt(wo_row.get("required_qty") or wo_row.get("qty"))
+        row_qty = required_qty * qty_scale
+        if not item_code or row_qty <= 0:
+            continue
+
+        expected[wo_row.name] = {
+            "item_code": item_code,
+            "qty": row_qty,
+        }
+
+    actual = {}
+    for row in doc.get("locations") or []:
+        wo_item = row.get("custom_work_order_item")
+        if not wo_item or wo_item not in expected:
+            frappe.throw(
+                _(
+                    "Pick List items are fetched from Work Order {0} and "
+                    "cannot be added or replaced manually"
+                ).format(wo.name)
+            )
+        if wo_item in actual:
+            frappe.throw(
+                _("Work Order Item {0} appears more than once in the Pick List").format(
+                    wo_item
+                )
+            )
+
+        expected_row = expected[wo_item]
+        actual_qty = flt(row.get("custom_pl_qty")) or flt(row.get("qty"))
+        if row.get("item_code") != expected_row["item_code"] or abs(
+            actual_qty - expected_row["qty"]
+        ) > 0.000001:
+            frappe.throw(
+                _(
+                    "Item and quantity for {0} must match Work Order {1}. "
+                    "Edit the Work Order Required Items instead."
+                ).format(expected_row["item_code"], wo.name)
+            )
+
+        if abs(flt(row.get("qty")) - expected_row["qty"]) > 0.000001:
+            frappe.throw(
+                _("Pick List quantity for {0} cannot be changed").format(
+                    expected_row["item_code"]
+                )
+            )
+        actual[wo_item] = row
+
+    missing = [row for row in expected if row not in actual]
+    if missing:
+        frappe.throw(
+            _(
+                "Required materials cannot be removed from this Pick List. "
+                "All Work Order items must remain, including unavailable items."
+            )
+        )
 
 
 def set_pick_list_warehouses_from_item_group(doc):
@@ -552,6 +870,7 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
             AND se.work_order = %(wo)s
             AND se.pick_list IS NOT NULL
             AND se.pick_list != ''
+            AND COALESCE(se.custom_is_additional_material, 0) = 0
             AND se.stock_entry_type = 'Material Transfer for Manufacture'
             AND COALESCE(sed.is_finished_item, 0) = 0
             AND COALESCE(sed.is_scrap_item, 0) = 0
