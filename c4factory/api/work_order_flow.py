@@ -308,6 +308,7 @@ def complete_pick_list(pick_list: str) -> dict:
             "status": "Completed",
         },
     )
+    _recompute_wo_material_transfer_from_pls(pl.work_order)
 
     return {
         "pick_list": pl.name,
@@ -879,10 +880,13 @@ def sync_work_order_material_transfer(wo_name: str) -> float:
 
 def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
     """
-    Convert submitted PL material-transfer rows back to production quantity.
+    Convert submitted Pick Lists and transfers back to production quantity.
 
     Example: a Pick List is for 2 finished units, but only half of every row was
     moved by submitted Stock Entries. This returns 1, not the full PL for_qty.
+
+    A manually Completed Pick List intentionally waives its remaining material
+    balance, so it credits its full for_qty and allows the Work Order to finish.
     """
     rows = frappe.db.sql(
         """
@@ -910,32 +914,45 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
         as_dict=True,
     )
 
-    if not rows:
-        return 0.0
-
     by_pick_list = {}
     for row in rows:
         by_pick_list.setdefault(row.pick_list, []).append(row)
 
-    total = 0.0
-    for pl_name, transfer_rows in by_pick_list.items():
-        if not frappe.db.exists("Pick List", pl_name):
-            continue
+    pl_meta = frappe.get_meta("Pick List")
+    pl_fields = ["name", "for_qty"]
+    has_manual_completion = pl_meta.has_field("custom_manually_completed")
+    if has_manual_completion:
+        pl_fields.append("custom_manually_completed")
 
+    submitted_pick_lists = frappe.get_all(
+        "Pick List",
+        filters={
+            "work_order": wo_name,
+            "docstatus": 1,
+        },
+        fields=pl_fields,
+    )
+
+    total = 0.0
+    for pick_list in submitted_pick_lists:
+        pl_name = pick_list.name
         try:
             pl = frappe.get_doc("Pick List", pl_name)
+            pl_for_qty = _get_pick_list_finished_goods_qty(pl)
+
+            if has_manual_completion and flt(
+                pick_list.get("custom_manually_completed")
+            ):
+                total += pl_for_qty
+                continue
+
+            transfer_rows = by_pick_list.get(pl_name) or []
+            if not transfer_rows:
+                continue
             row_ratios = _get_pick_list_transfer_ratios(pl, transfer_rows)
             if not row_ratios:
                 continue
 
-            pl_for_qty = (
-                flt(pl.get("qty_of_finished_goods_item"))
-                or flt(pl.get("qty_of_finished_goods"))
-                or flt(pl.get("for_qty"))
-                or flt(pl.get("custom_for_qty"))
-                or flt(pl.get("qty"))
-                or 0.0
-            )
             total += min(row_ratios) * pl_for_qty
             _update_pick_list_status_from_db(pl_name)
         except Exception:
