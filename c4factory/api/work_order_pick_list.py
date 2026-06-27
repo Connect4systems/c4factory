@@ -32,35 +32,21 @@ def get_remaining_pick_list_qty(wo, exclude_pick_list: str | None = None) -> flo
     Open and Completed Pick Lists are both submitted documents and reserve their
     production quantity. Cancelled and draft Pick Lists do not reserve quantity.
     """
-    meta = frappe.get_meta("Pick List")
-    qty_fields = [
-        fieldname
-        for fieldname in (
-            "qty_of_finished_goods_item",
-            "qty_of_finished_goods",
-            "for_qty",
-        )
-        if meta.has_field(fieldname)
-    ]
-    fields = ["name", *qty_fields]
-    filters = {
-        "work_order": wo.name,
-        "docstatus": 1,
-    }
-    pick_lists = frappe.get_all("Pick List", filters=filters, fields=fields)
-
-    allocated_qty = 0.0
-    for pick_list in pick_lists:
-        if exclude_pick_list and pick_list.name == exclude_pick_list:
-            continue
-        allocated_qty += next(
-            (
-                flt(pick_list.get(fieldname))
-                for fieldname in qty_fields
-                if flt(pick_list.get(fieldname)) > 0
-            ),
-            0.0,
-        )
+    allocated_qty = flt(
+        frappe.db.sql(
+            """
+            SELECT COALESCE(SUM(for_qty), 0)
+            FROM `tabPick List`
+            WHERE work_order = %(work_order)s
+              AND docstatus = 1
+              AND name != %(exclude_pick_list)s
+            """,
+            {
+                "work_order": wo.name,
+                "exclude_pick_list": exclude_pick_list or "",
+            },
+        )[0][0]
+    )
 
     already_covered = max(allocated_qty, flt(wo.produced_qty))
     return max(flt(wo.qty) - already_covered, 0.0)
@@ -87,6 +73,15 @@ def create_pick_list(
     wo = frappe.get_doc("Work Order", wo_name)
     if wo.docstatus != 1:
         frappe.throw(_("Work Order must be submitted before creating a Pick List."))
+
+    # Reconcile legacy/custom partial transfers before ERPNext's next Pick List
+    # is built. Existing entries may predate fg_completed_qty population.
+    from c4factory.api.work_order_flow import (
+        _recompute_wo_material_transfer_from_pls,
+    )
+
+    _recompute_wo_material_transfer_from_pls(wo.name)
+    wo.reload()
 
     rows = _get_component_rows(wo)
     if not rows:

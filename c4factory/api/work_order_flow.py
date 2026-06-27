@@ -900,7 +900,8 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
             AND se.pick_list IS NOT NULL
             AND se.pick_list != ''
             AND COALESCE(se.custom_is_additional_material, 0) = 0
-            AND se.stock_entry_type = 'Material Transfer for Manufacture'
+            AND (se.stock_entry_type = 'Material Transfer for Manufacture'
+                 OR se.purpose = 'Material Transfer for Manufacture')
             AND COALESCE(sed.is_finished_item, 0) = 0
             AND COALESCE(sed.is_scrap_item, 0) = 0
         GROUP BY se.pick_list, sed.custom_pick_list_item, sed.item_code

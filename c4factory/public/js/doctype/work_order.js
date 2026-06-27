@@ -5,6 +5,7 @@ frappe.ui.form.on("Work Order", {
     configure_required_items_grid(frm);
     set_missing_source_warehouses(frm);
     hide_create_job_card_button(frm);
+    refresh_material_transferred_qty(frm);
   },
   onload_post_render(frm) {
     configure_required_items_grid(frm);
@@ -62,6 +63,30 @@ function configure_required_items_grid(frm) {
     if (frm.doc.docstatus !== 0) return;
     apply_required_items_grid_permissions(current_field);
   }, 0);
+}
+
+async function refresh_material_transferred_qty(frm) {
+  if (frm.doc.docstatus !== 1 || frm.__c4_syncing_transferred_qty) return;
+
+  frm.__c4_syncing_transferred_qty = true;
+  try {
+    const { message } = await frappe.call({
+      method: "c4factory.api.work_order_flow.sync_work_order_material_transfer",
+      args: { wo_name: frm.doc.name },
+    });
+    const transferred = flt(message);
+    if (
+      Math.abs(
+        transferred - flt(frm.doc.material_transferred_for_manufacturing)
+      ) > 0.000001
+    ) {
+      frm.doc.material_transferred_for_manufacturing = transferred;
+      frm.refresh_field("material_transferred_for_manufacturing");
+      await frm.reload_doc();
+    }
+  } finally {
+    frm.__c4_syncing_transferred_qty = false;
+  }
 }
 
 function apply_required_items_grid_permissions(table_field) {

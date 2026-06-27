@@ -55,6 +55,7 @@ doc_events = {
         "before_submit": [
             "c4factory.c4_manufacturing.stock_entry_hooks.validate_additional_material_transfer",
             "c4factory.c4_manufacturing.stock_entry_hooks.set_wip_target_warehouse",
+            "c4factory.c4_manufacturing.stock_entry_hooks.set_pick_list_transferred_production_qty",
         ],
         "on_submit": [
             "c4factory.c4_manufacturing.stock_entry_hooks.apply_additional_material_to_work_order",

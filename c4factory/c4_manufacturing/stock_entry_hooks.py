@@ -134,6 +134,76 @@ def validate_additional_material_transfer(doc, method: str | None = None) -> Non
             )
 
 
+def set_pick_list_transferred_production_qty(doc, method: str | None = None) -> None:
+    """
+    Set the production-equivalent quantity for a main Pick List transfer.
+
+    ERPNext updates Work Order.material_transferred_for_manufacturing by summing
+    Stock Entry.fg_completed_qty. A partial transfer contributes only the new
+    fully covered production quantity across all required PL rows.
+    """
+    if (
+        not _is_material_transfer_for_manufacture(doc)
+        or not doc.get("work_order")
+        or not doc.get("pick_list")
+        or flt(doc.get("custom_is_additional_material"))
+    ):
+        return
+
+    from c4factory.api.work_order_flow import (
+        _get_pick_list_finished_goods_qty,
+        _get_pick_list_transfer_ratios,
+    )
+
+    pl = frappe.get_doc("Pick List", doc.pick_list)
+    submitted_rows = frappe.db.sql(
+        """
+        SELECT sed.custom_pick_list_item, sed.item_code,
+               COALESCE(SUM(ABS(CASE
+                   WHEN COALESCE(sed.transfer_qty, 0) != 0
+                   THEN sed.transfer_qty ELSE sed.qty
+               END)), 0) AS transferred_qty
+        FROM `tabStock Entry Detail` sed
+        INNER JOIN `tabStock Entry` se ON se.name = sed.parent
+        WHERE se.docstatus = 1
+          AND se.pick_list = %(pick_list)s
+          AND COALESCE(se.custom_is_additional_material, 0) = 0
+          AND (se.stock_entry_type = 'Material Transfer for Manufacture'
+               OR se.purpose = 'Material Transfer for Manufacture')
+        GROUP BY sed.custom_pick_list_item, sed.item_code
+        """,
+        {"pick_list": pl.name},
+        as_dict=True,
+    )
+    before_ratios = _get_pick_list_transfer_ratios(pl, submitted_rows)
+
+    combined = {}
+    for row in submitted_rows:
+        key = (row.get("custom_pick_list_item") or "", row.item_code)
+        combined[key] = flt(row.transferred_qty)
+    for row in doc.get("items") or []:
+        key = (row.get("custom_pick_list_item") or "", row.item_code)
+        combined[key] = flt(combined.get(key)) + abs(
+            flt(row.get("transfer_qty")) or flt(row.get("qty"))
+        )
+
+    after_rows = [
+        frappe._dict(
+            {
+                "custom_pick_list_item": key[0],
+                "item_code": key[1],
+                "transferred_qty": qty,
+            }
+        )
+        for key, qty in combined.items()
+    ]
+    after_ratios = _get_pick_list_transfer_ratios(pl, after_rows)
+    production_qty = _get_pick_list_finished_goods_qty(pl)
+    before_qty = min(before_ratios) * production_qty if before_ratios else 0.0
+    after_qty = min(after_ratios) * production_qty if after_ratios else 0.0
+    doc.fg_completed_qty = max(after_qty - before_qty, 0.0)
+
+
 def apply_additional_material_to_work_order(doc, method: str | None = None) -> None:
     """Add submitted Additional Material quantities to Work Order requirements."""
     if (
