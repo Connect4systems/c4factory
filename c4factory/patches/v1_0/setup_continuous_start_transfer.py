@@ -42,6 +42,17 @@ def execute():
                     "unique": 1,
                 },
             ],
+            "Pick List": [
+                {
+                    "fieldname": "custom_continuous_start_request_id",
+                    "label": "Continuous Start Request ID",
+                    "fieldtype": "Data",
+                    "hidden": 1,
+                    "read_only": 1,
+                    "no_copy": 1,
+                    "unique": 1,
+                },
+            ],
         },
         update=True,
     )

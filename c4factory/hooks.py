@@ -115,6 +115,7 @@ patches = [
     "c4factory.patches.v1_0.setup_sub_pick_list_stock_fields",
     "c4factory.patches.v1_0.setup_work_order_additional_material_table",
     "c4factory.patches.v1_0.setup_continuous_start_transfer",
+    "c4factory.patches.v1_0.setup_continuous_start_pick_list_field",
 ]
 
 override_doctype_dashboards = {

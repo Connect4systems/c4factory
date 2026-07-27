@@ -202,7 +202,7 @@ async function start_continuous_material_transfer(frm) {
       frappe.show_alert(
         {
           message: __(
-            "No continuous-manufacture items were found. No Stock Entry was created."
+            "No eligible required items were found. No Stock Entry or Pick List was created."
           ),
           indicator: "orange"
         },
@@ -215,7 +215,7 @@ async function start_continuous_material_transfer(frm) {
       frappe.show_alert(
         {
           message: __(
-            "A continuous-material Stock Entry is already being created for this Work Order."
+            "Start documents are already being created for this Work Order."
           ),
           indicator: "orange"
         },
@@ -311,11 +311,34 @@ function register_continuous_start_listener() {
       active_form.doc.name === result.work_order;
 
     let message = result.message;
-    if (result.status === "success" && result.stock_entry) {
-      const route = `/app/stock-entry/${encodeURIComponent(result.stock_entry)}`;
-      message = `${__("Stock Entry")} <a href="${route}"><b>${
-        result.stock_entry
-      }</b></a> ${__("was created and submitted successfully.")}`;
+    if (result.status === "success") {
+      let stock_entry_link = "";
+      let pick_list_link = "";
+      if (result.stock_entry) {
+        const route = `/app/stock-entry/${encodeURIComponent(
+          result.stock_entry
+        )}`;
+        stock_entry_link = `${__("Stock Entry")} <a href="${route}"><b>${
+          result.stock_entry
+        }</b></a>`;
+      }
+      if (result.pick_list) {
+        const route = `/app/pick-list/${encodeURIComponent(result.pick_list)}`;
+        pick_list_link = `${__("Pick List")} <a href="${route}"><b>${
+          result.pick_list
+        }</b></a>`;
+      }
+      if (stock_entry_link && pick_list_link) {
+        message = `${stock_entry_link} ${__("was submitted and")} ${pick_list_link} ${__(
+          "was created successfully."
+        )}`;
+      } else if (stock_entry_link) {
+        message = `${stock_entry_link} ${__(
+          "was created and submitted successfully."
+        )}`;
+      } else if (pick_list_link) {
+        message = `${pick_list_link} ${__("was created successfully.")}`;
+      }
     }
 
     frappe.show_alert(

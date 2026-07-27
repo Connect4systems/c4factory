@@ -4,7 +4,11 @@ import frappe
 from frappe import _
 from frappe.utils import cstr, flt
 
-from c4factory.api.work_order_pick_list import is_continuous_manufacture_item
+from c4factory.api.work_order_pick_list import (
+    create_pick_list,
+    get_remaining_pick_list_qty,
+    is_continuous_manufacture_item,
+)
 
 
 REALTIME_EVENT = "c4factory_continuous_start"
@@ -12,15 +16,20 @@ REALTIME_EVENT = "c4factory_continuous_start"
 
 @frappe.whitelist()
 def get_continuous_start_context(work_order: str) -> dict:
-    """Return whether a continuous transfer can be started and its maximum qty."""
+    """Return the eligible Start channels and their shared maximum quantity."""
     wo = frappe.get_doc("Work Order", work_order)
     wo.check_permission("read")
 
-    eligible_rows = _get_eligible_rows(wo)
-    transferred_qty = _get_continuous_transferred_qty(wo.name)
+    continuous_rows, pick_list_rows = _get_start_rows(wo)
     return {
-        "has_eligible_items": bool(eligible_rows),
-        "remaining_qty": max(flt(wo.qty) - transferred_qty, 0.0),
+        "has_eligible_items": bool(continuous_rows or pick_list_rows),
+        "has_continuous_items": bool(continuous_rows),
+        "has_pick_list_items": bool(pick_list_rows),
+        "remaining_qty": _get_remaining_start_qty(
+            wo,
+            has_continuous_items=bool(continuous_rows),
+            has_pick_list_items=bool(pick_list_rows),
+        ),
         "pending": bool(wo.get("custom_continuous_start_pending")),
     }
 
@@ -34,19 +43,23 @@ def enqueue_continuous_start_transfer(work_order: str, qty: float) -> dict:
 
     wo = frappe.get_doc("Work Order", work_order)
     wo.check_permission("read")
-    if not frappe.has_permission("Stock Entry", "create"):
-        frappe.throw(_("You do not have permission to create Stock Entries."))
-    if not frappe.has_permission("Stock Entry", "submit"):
-        frappe.throw(_("You do not have permission to submit Stock Entries."))
     _validate_work_order(wo)
 
-    if not _get_eligible_rows(wo):
+    continuous_rows, pick_list_rows = _get_start_rows(wo)
+    if not continuous_rows and not pick_list_rows:
         return {
             "status": "no_items",
             "message": _(
-                "No continuous-manufacture items were found. No Stock Entry was created."
+                "No eligible required items were found. No Stock Entry or Pick List was created."
             ),
         }
+    if continuous_rows:
+        if not frappe.has_permission("Stock Entry", "create"):
+            frappe.throw(_("You do not have permission to create Stock Entries."))
+        if not frappe.has_permission("Stock Entry", "submit"):
+            frappe.throw(_("You do not have permission to submit Stock Entries."))
+    if pick_list_rows and not frappe.has_permission("Pick List", "create"):
+        frappe.throw(_("You do not have permission to create Pick Lists."))
 
     # Serialize Start clicks for this Work Order. Reading the flag in the same
     # SELECT ... FOR UPDATE prevents two requests from being queued concurrently.
@@ -67,11 +80,15 @@ def enqueue_continuous_start_transfer(work_order: str, qty: float) -> dict:
         return {
             "status": "already_queued",
             "message": _(
-                "A continuous-material Stock Entry is already being created for this Work Order."
+                "Start documents are already being created for this Work Order."
             ),
         }
 
-    remaining_qty = max(flt(wo.qty) - _get_continuous_transferred_qty(wo.name), 0.0)
+    remaining_qty = _get_remaining_start_qty(
+        wo,
+        has_continuous_items=bool(continuous_rows),
+        has_pick_list_items=bool(pick_list_rows),
+    )
     if qty > remaining_qty + 0.000001:
         frappe.throw(
             _("Start quantity {0} exceeds the remaining quantity {1}.").format(
@@ -106,7 +123,13 @@ def enqueue_continuous_start_transfer(work_order: str, qty: float) -> dict:
     return {
         "status": "queued",
         "request_id": request_id,
-        "message": _("Stock Entry creation started in the background."),
+        "message": (
+            _("Stock Entry and Pick List creation started in the background.")
+            if continuous_rows and pick_list_rows
+            else _("Stock Entry creation started in the background.")
+            if continuous_rows
+            else _("Pick List creation started in the background.")
+        ),
     }
 
 
@@ -116,9 +139,9 @@ def create_continuous_start_stock_entry(
     request_id: str,
     initiated_by: str,
 ) -> None:
-    """Background job: create, submit, and report a continuous-material transfer."""
+    """Background job: submit the continuous transfer and save the standard Pick List."""
     try:
-        existing = frappe.db.get_value(
+        existing_stock_entry = frappe.db.get_value(
             "Stock Entry",
             {
                 "custom_continuous_start_request_id": request_id,
@@ -126,24 +149,34 @@ def create_continuous_start_stock_entry(
             },
             "name",
         )
-        if existing:
+        existing_pick_list = frappe.db.get_value(
+            "Pick List",
+            {
+                "custom_continuous_start_request_id": request_id,
+                "docstatus": ("<", 2),
+            },
+            "name",
+        )
+        if existing_stock_entry or existing_pick_list:
             _clear_pending_request(work_order, request_id)
             frappe.db.commit()
             _publish_result(
                 initiated_by,
                 work_order,
                 "success",
-                _("Stock Entry {0} was created and submitted successfully.").format(
-                    existing
+                _get_success_message(
+                    existing_stock_entry,
+                    existing_pick_list,
                 ),
-                stock_entry=existing,
+                stock_entry=existing_stock_entry,
+                pick_list=existing_pick_list,
             )
             return
 
         wo = frappe.get_doc("Work Order", work_order)
         _validate_work_order(wo)
-        eligible_rows = _get_eligible_rows(wo)
-        if not eligible_rows:
+        continuous_rows, pick_list_rows = _get_start_rows(wo)
+        if not continuous_rows and not pick_list_rows:
             _clear_pending_request(wo.name, request_id)
             frappe.db.commit()
             _publish_result(
@@ -151,15 +184,17 @@ def create_continuous_start_stock_entry(
                 wo.name,
                 "no_items",
                 _(
-                    "No continuous-manufacture items were found. No Stock Entry was created."
+                    "No eligible required items were found. "
+                    "No Stock Entry or Pick List was created."
                 ),
             )
             return
 
         qty = flt(qty)
-        remaining_qty = max(
-            flt(wo.qty) - _get_continuous_transferred_qty(wo.name),
-            0.0,
+        remaining_qty = _get_remaining_start_qty(
+            wo,
+            has_continuous_items=bool(continuous_rows),
+            has_pick_list_items=bool(pick_list_rows),
         )
         if qty <= 0 or qty > remaining_qty + 0.000001:
             frappe.throw(
@@ -169,25 +204,48 @@ def create_continuous_start_stock_entry(
                 )
             )
 
-        stock_entry = _build_stock_entry(wo, eligible_rows, qty, request_id)
-        stock_entry.insert()
-        stock_entry.submit()
-        started_work_order = frappe.get_doc("Work Order", wo.name)
-        started_work_order.set_status()
+        pick_list = None
+        if pick_list_rows:
+            pick_list_data = create_pick_list(
+                work_order=wo.name,
+                for_qty=qty,
+            )
+            pick_list = frappe.get_doc(pick_list_data)
+            pick_list.custom_continuous_start_request_id = request_id
+            pick_list.insert()
+
+        stock_entry = None
+        if continuous_rows:
+            stock_entry = _build_stock_entry(
+                wo,
+                continuous_rows,
+                qty,
+                request_id,
+            )
+            stock_entry.insert()
+            stock_entry.submit()
+            started_work_order = frappe.get_doc("Work Order", wo.name)
+            started_work_order.set_status()
 
         _clear_pending_request(wo.name, request_id)
         frappe.db.commit()
+        stock_entry_name = stock_entry.name if stock_entry else None
+        pick_list_name = pick_list.name if pick_list else None
         _publish_result(
             initiated_by,
             wo.name,
             "success",
-            _("Stock Entry {0} was created and submitted successfully.").format(
-                stock_entry.name
+            _get_success_message(
+                stock_entry_name,
+                pick_list_name,
             ),
-            stock_entry=stock_entry.name,
+            stock_entry=stock_entry_name,
+            pick_list=pick_list_name,
         )
     except Exception as exc:
-        error_message = cstr(exc) or _("Unable to create the Stock Entry.")
+        error_message = cstr(exc) or _(
+            "Unable to create the Stock Entry and Pick List."
+        )
         traceback = frappe.get_traceback()
         frappe.db.rollback()
         _clear_pending_request(work_order, request_id)
@@ -246,6 +304,11 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
             or wo_row.get("uom")
             or frappe.db.get_value("Item", wo_row.item_code, "stock_uom")
         )
+        valuation_rate = _get_latest_valuation_rate(
+            wo_row.item_code,
+            source_warehouse,
+        )
+        amount = row_qty * valuation_rate
         se_row = se.append(
             "items",
             {
@@ -258,12 +321,17 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
                 "t_warehouse": wo.wip_warehouse,
                 "is_finished_item": 0,
                 "is_scrap_item": 0,
+                "valuation_rate": valuation_rate,
+                "basic_rate": valuation_rate,
+                "amount": amount,
+                "basic_amount": amount,
             },
         )
         if se_row.meta.has_field("custom_work_order_item"):
             se_row.custom_work_order_item = wo_row.name
         se_row._c4_source_warehouse = source_warehouse
         se_row._c4_qty = row_qty
+        se_row._c4_valuation_rate = valuation_rate
 
     if not se.get("items"):
         frappe.throw(
@@ -275,34 +343,120 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
         row.s_warehouse = row._c4_source_warehouse
         row.t_warehouse = wo.wip_warehouse
         row.qty = row._c4_qty
+        row.valuation_rate = row._c4_valuation_rate
+        row.basic_rate = row._c4_valuation_rate
+        row.amount = row.qty * row._c4_valuation_rate
+        row.basic_amount = row.amount
         delattr(row, "_c4_source_warehouse")
         delattr(row, "_c4_qty")
+        delattr(row, "_c4_valuation_rate")
 
     return se
 
 
-def _get_eligible_rows(wo) -> list[tuple[object, str]]:
+def _get_start_rows(wo) -> tuple[list[tuple[object, str]], list[object]]:
     item_group_cache = {}
     continuous_group_cache = {}
-    eligible = []
+    continuous_rows = []
+    pick_list_rows = []
 
     for row in wo.get("required_items") or wo.get("items") or []:
         item_code = row.get("item_code")
         if not item_code or flt(row.get("required_qty") or row.get("qty")) <= 0:
             continue
 
-        if not is_continuous_manufacture_item(
+        is_continuous = is_continuous_manufacture_item(
             row,
             item_group_cache=item_group_cache,
             continuous_group_cache=continuous_group_cache,
-        ):
+        )
+        if not is_continuous:
+            pick_list_rows.append(row)
             continue
 
         item_group = row.get("item_group") or item_group_cache.get(item_code)
         if item_group:
-            eligible.append((row, item_group))
+            continuous_rows.append((row, item_group))
 
-    return eligible
+    return continuous_rows, pick_list_rows
+
+
+def _get_remaining_start_qty(
+    wo,
+    has_continuous_items: bool,
+    has_pick_list_items: bool,
+) -> float:
+    remaining = []
+    if has_continuous_items:
+        remaining.append(
+            max(flt(wo.qty) - _get_continuous_transferred_qty(wo.name), 0.0)
+        )
+    if has_pick_list_items:
+        pick_list_remaining = get_remaining_pick_list_qty(wo)
+        pick_list_remaining -= _get_draft_start_pick_list_qty(wo.name)
+        remaining.append(max(pick_list_remaining, 0.0))
+
+    return min(remaining) if remaining else 0.0
+
+
+def _get_draft_start_pick_list_qty(work_order: str) -> float:
+    return flt(
+        frappe.db.sql(
+            """
+            SELECT COALESCE(SUM(for_qty), 0)
+            FROM `tabPick List`
+            WHERE work_order = %s
+              AND docstatus = 0
+              AND COALESCE(custom_continuous_start_request_id, '') != ''
+            """,
+            (work_order,),
+        )[0][0]
+    )
+
+
+def _get_latest_valuation_rate(item_code: str, warehouse: str) -> float:
+    rows = frappe.db.sql(
+        """
+        SELECT valuation_rate
+        FROM `tabStock Ledger Entry`
+        WHERE item_code = %(item_code)s
+          AND warehouse = %(warehouse)s
+          AND COALESCE(is_cancelled, 0) = 0
+        ORDER BY posting_date DESC, posting_time DESC, creation DESC
+        LIMIT 1
+        """,
+        {
+            "item_code": item_code,
+            "warehouse": warehouse,
+        },
+        as_dict=True,
+    )
+    if not rows:
+        frappe.throw(
+            _(
+                "No Stock Ledger valuation rate was found for item {0} in warehouse {1}."
+            ).format(
+                frappe.bold(item_code),
+                frappe.bold(warehouse),
+            )
+        )
+
+    return flt(rows[0].valuation_rate)
+
+
+def _get_success_message(
+    stock_entry: str | None,
+    pick_list: str | None,
+) -> str:
+    if stock_entry and pick_list:
+        return _(
+            "Stock Entry {0} was submitted and Pick List {1} was created successfully."
+        ).format(stock_entry, pick_list)
+    if stock_entry:
+        return _("Stock Entry {0} was created and submitted successfully.").format(
+            stock_entry
+        )
+    return _("Pick List {0} was created successfully.").format(pick_list)
 
 
 def _get_continuous_transferred_qty(work_order: str) -> float:
@@ -366,6 +520,7 @@ def _publish_result(
     status: str,
     message: str,
     stock_entry: str | None = None,
+    pick_list: str | None = None,
 ) -> None:
     try:
         frappe.publish_realtime(
@@ -375,6 +530,7 @@ def _publish_result(
                 "status": status,
                 "message": message,
                 "stock_entry": stock_entry,
+                "pick_list": pick_list,
             },
             user=user,
         )
