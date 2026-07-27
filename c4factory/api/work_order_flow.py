@@ -417,8 +417,8 @@ def _validate_work_order_for_additional_material(wo) -> None:
 
 def on_pick_list_validate(doc, method=None):
     """
-    Keep Pick List source warehouses aligned with the same Item Group
-    Defaults lookup used by Work Order required items.
+    Keep eligible Pick List rows aligned with Work Order required items and
+    their Item Group warehouse rules.
     """
     action = getattr(doc, "_action", None)
     if doc.docstatus != 0 or action in {"update_after_submit", "cancel"}:
@@ -430,7 +430,7 @@ def on_pick_list_validate(doc, method=None):
 
 
 def sync_pick_list_items_from_work_order(doc) -> None:
-    """Restore immutable Work Order material rows without checking availability."""
+    """Restore eligible Work Order material rows without checking availability."""
     work_order = doc.get("work_order")
     if not work_order:
         return
@@ -441,6 +441,7 @@ def sync_pick_list_items_from_work_order(doc) -> None:
     from c4factory.api.work_order_pick_list import (
         _get_pick_list_source_warehouse,
         get_remaining_pick_list_qty,
+        is_continuous_manufacture_item,
     )
 
     wo = frappe.get_doc("Work Order", work_order)
@@ -461,11 +462,20 @@ def sync_pick_list_items_from_work_order(doc) -> None:
     qty_scale = pick_qty / (flt(wo.qty) or 1.0)
 
     expected = {}
+    item_group_cache = {}
+    continuous_group_cache = {}
     for wo_row in _get_wo_items(wo):
         item_code = wo_row.get("item_code")
         required_qty = flt(wo_row.get("required_qty") or wo_row.get("qty"))
         row_qty = required_qty * qty_scale
         if not item_code or row_qty <= 0:
+            continue
+
+        if is_continuous_manufacture_item(
+            wo_row,
+            item_group_cache=item_group_cache,
+            continuous_group_cache=continuous_group_cache,
+        ):
             continue
 
         stock_uom = (
@@ -533,10 +543,11 @@ def sync_pick_list_items_from_work_order(doc) -> None:
 
 def validate_pick_list_matches_work_order(doc) -> None:
     """
-    Keep a manufacturing Pick List identical to its Work Order required rows.
+    Keep a manufacturing Pick List identical to its eligible Work Order rows.
 
     Availability is deliberately not considered: zero-stock materials remain
     on the Pick List so shortages stay visible and can be transferred later.
+    Continuous-manufacture Item Group materials are deliberately excluded.
     """
     work_order = doc.get("work_order")
     if not work_order:
@@ -556,12 +567,23 @@ def validate_pick_list_matches_work_order(doc) -> None:
         pick_qty = max(flt(wo.qty) - flt(wo.produced_qty), 0.0)
 
     qty_scale = pick_qty / (flt(wo.qty) or 1.0)
+    from c4factory.api.work_order_pick_list import is_continuous_manufacture_item
+
     expected = {}
+    item_group_cache = {}
+    continuous_group_cache = {}
     for wo_row in wo_rows:
         item_code = wo_row.get("item_code")
         required_qty = flt(wo_row.get("required_qty") or wo_row.get("qty"))
         row_qty = required_qty * qty_scale
         if not item_code or row_qty <= 0:
+            continue
+
+        if is_continuous_manufacture_item(
+            wo_row,
+            item_group_cache=item_group_cache,
+            continuous_group_cache=continuous_group_cache,
+        ):
             continue
 
         expected[wo_row.name] = {
@@ -611,7 +633,7 @@ def validate_pick_list_matches_work_order(doc) -> None:
         frappe.throw(
             _(
                 "Required materials cannot be removed from this Pick List. "
-                "All Work Order items must remain, including unavailable items."
+                "All eligible Work Order items must remain, including unavailable items."
             )
         )
 
@@ -880,13 +902,15 @@ def sync_work_order_material_transfer(wo_name: str) -> float:
 
 def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
     """
-    Convert submitted Pick Lists and transfers back to production quantity.
+    Convert Pick List and continuous-material transfers to production quantity.
 
     Example: a Pick List is for 2 finished units, but only half of every row was
     moved by submitted Stock Entries. This returns 1, not the full PL for_qty.
 
     A manually Completed Pick List intentionally waives its remaining material
     balance, so it credits its full for_qty and allows the Work Order to finish.
+    When both material channels exist, the lower covered production quantity is
+    authoritative so the same finished quantity is not counted twice.
     """
     rows = frappe.db.sql(
         """
@@ -933,7 +957,7 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
         fields=pl_fields,
     )
 
-    total = 0.0
+    pick_list_total = 0.0
     for pick_list in submitted_pick_lists:
         pl_name = pick_list.name
         try:
@@ -943,7 +967,7 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
             if has_manual_completion and flt(
                 pick_list.get("custom_manually_completed")
             ):
-                total += pl_for_qty
+                pick_list_total += pl_for_qty
                 continue
 
             transfer_rows = by_pick_list.get(pl_name) or []
@@ -953,7 +977,7 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
             if not row_ratios:
                 continue
 
-            total += min(row_ratios) * pl_for_qty
+            pick_list_total += min(row_ratios) * pl_for_qty
             _update_pick_list_status_from_db(pl_name)
         except Exception:
             frappe.log_error(
@@ -961,7 +985,41 @@ def _get_transferred_production_qty_from_stock_entries(wo_name: str) -> float:
                 f"C4Factory: transferred production qty failed ({pl_name})",
             )
 
-    wo_qty = flt(frappe.db.get_value("Work Order", wo_name, "qty"))
+    from c4factory.api.work_order_pick_list import is_continuous_manufacture_item
+    from c4factory.api.work_order_start import _get_continuous_transferred_qty
+
+    wo = frappe.get_doc("Work Order", wo_name)
+    item_group_cache = {}
+    continuous_group_cache = {}
+    has_continuous_items = False
+    has_pick_list_items = False
+    for wo_row in _get_wo_items(wo):
+        if not wo_row.get("item_code") or flt(
+            wo_row.get("required_qty") or wo_row.get("qty")
+        ) <= 0:
+            continue
+
+        if is_continuous_manufacture_item(
+            wo_row,
+            item_group_cache=item_group_cache,
+            continuous_group_cache=continuous_group_cache,
+        ):
+            has_continuous_items = True
+        else:
+            has_pick_list_items = True
+
+    continuous_total = _get_continuous_transferred_qty(wo_name)
+    if has_continuous_items and has_pick_list_items:
+        # A production quantity is fully transferred only after both material
+        # channels cover it. Status is handled separately as soon as either
+        # continuous transfer is submitted.
+        total = min(pick_list_total, continuous_total)
+    elif has_continuous_items:
+        total = continuous_total
+    else:
+        total = pick_list_total
+
+    wo_qty = flt(wo.qty)
     return min(total, wo_qty) if wo_qty > 0 else total
 
 

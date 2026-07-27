@@ -1,4 +1,6 @@
 import frappe
+from frappe import _
+from frappe.utils import cint
 
 
 def copy_scrap_from_bom(doc, method=None):
@@ -181,12 +183,12 @@ def recalculate_costing_for_work_order(work_order_name):
 
 def set_source_warehouse_from_item_group(doc, method=None):
     """
-    On Work Order save/validate, fill each required item's source warehouse
-    from Item Group -> Default Warehouse.
+    Set each Work Order required item's source warehouse from its Item Group.
 
     Rules:
-    - Only fill when row.source_warehouse is empty (do not override manual edits).
-    - Resolve default warehouse from the item's group, with parent-group fallback.
+    - Continuous-manufacture groups always use their custom manufacture warehouse.
+    - Other groups retain an existing source warehouse; when empty, resolve the
+      company/default warehouse with parent-group fallback.
     """
     rows = doc.get("required_items") or doc.get("items") or []
     if not rows:
@@ -200,10 +202,6 @@ def set_source_warehouse_from_item_group(doc, method=None):
         if not row.get("item_code"):
             continue
 
-        # Respect manual value.
-        if row.get("source_warehouse"):
-            continue
-
         item_code = row.get("item_code")
         item_group = row.get("item_group") or item_group_cache.get(item_code)
         if item_group is None:
@@ -214,12 +212,13 @@ def set_source_warehouse_from_item_group(doc, method=None):
             continue
 
         cache_key = (item_group, company)
-        warehouse = warehouse_cache.get(cache_key)
-        if warehouse is None:
-            warehouse = _get_default_warehouse_from_item_group(item_group, company)
-            warehouse_cache[cache_key] = warehouse
+        warehouse_details = warehouse_cache.get(cache_key)
+        if warehouse_details is None:
+            warehouse_details = _resolve_source_warehouse(item_group, company)
+            warehouse_cache[cache_key] = warehouse_details
 
-        if warehouse:
+        warehouse, override_existing = warehouse_details
+        if warehouse and (override_existing or not row.get("source_warehouse")):
             row.source_warehouse = warehouse
 
 
@@ -229,13 +228,58 @@ def get_default_source_warehouse(
     company: str | None = None,
     item_group: str | None = None,
 ) -> str | None:
-    """Return the source warehouse for an item from its Item Group Defaults."""
+    """Return the applicable source warehouse for an item's Item Group."""
     if not item_group and item_code:
         item_group = frappe.db.get_value("Item", item_code, "item_group")
     if not item_group:
         return None
 
-    return _get_default_warehouse_from_item_group(item_group, company)
+    warehouse, _override_existing = _resolve_source_warehouse(item_group, company)
+    return warehouse
+
+
+@frappe.whitelist()
+def get_source_warehouse_details(
+    item_code: str | None = None,
+    company: str | None = None,
+    item_group: str | None = None,
+) -> dict:
+    """Return the warehouse and whether it must replace the current row value."""
+    if not item_group and item_code:
+        item_group = frappe.db.get_value("Item", item_code, "item_group")
+    if not item_group:
+        return {"warehouse": None, "override_existing": False}
+
+    warehouse, override_existing = _resolve_source_warehouse(item_group, company)
+    return {
+        "warehouse": warehouse,
+        "override_existing": override_existing,
+    }
+
+
+def _resolve_source_warehouse(
+    item_group: str,
+    company: str | None = None,
+) -> tuple[str | None, bool]:
+    """
+    Return (warehouse, override_existing).
+
+    A continuous-manufacture Item Group uses its own custom warehouse and takes
+    priority over ERPNext's populated value. All other groups keep the existing
+    company/default warehouse lookup.
+    """
+    group = frappe.get_cached_doc("Item Group", item_group)
+    if cint(group.get("custom_continues_manufacture")):
+        warehouse = group.get("custom_warehouse")
+        if not warehouse:
+            frappe.throw(
+                _("Manufacture Warehouse is required for Item Group {0}.").format(
+                    frappe.bold(item_group)
+                )
+            )
+        return warehouse, True
+
+    return _get_default_warehouse_from_item_group(item_group, company), False
 
 
 def _get_default_warehouse_from_item_group(item_group: str, company: str | None = None) -> str | None:

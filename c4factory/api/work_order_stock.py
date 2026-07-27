@@ -213,7 +213,11 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
             "docstatus": 1,
             "stock_entry_type": "Material Transfer for Manufacture",
         },
-        fields=["name", "custom_is_additional_material"],
+        fields=[
+            "name",
+            "custom_is_additional_material",
+            "custom_continuous_manufacture_transfer",
+        ],
     )
 
     if not transfer_entries:
@@ -224,6 +228,11 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
         entry.name
         for entry in transfer_entries
         if flt(entry.get("custom_is_additional_material"))
+    }
+    continuous_se_names = {
+        entry.name
+        for entry in transfer_entries
+        if flt(entry.get("custom_continuous_manufacture_transfer"))
     }
 
     sed_meta = frappe.get_meta("Stock Entry Detail")
@@ -260,12 +269,20 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     for r in rows:
         pl_item = r.get("custom_pick_list_item")
         is_additional = r.get("parent") in additional_se_names
-        if not pl_item and not is_additional:
+        is_continuous = r.get("parent") in continuous_se_names
+        if not pl_item and not is_additional and not is_continuous:
             continue
 
-        # Additional material has no Pick List Item row by design. Aggregate it
-        # separately so it is consumed and costed without satisfying PL balance.
-        material_key = pl_item or "__additional_material__"
+        # Additional and continuous material have no Pick List Item row by
+        # design. Keep each channel distinct for consumption and costing.
+        if is_additional:
+            material_key = "__additional_material__"
+        elif is_continuous:
+            material_key = (
+                f"__continuous__:{r.get('custom_work_order_item') or r.name}"
+            )
+        else:
+            material_key = pl_item
         key = (material_key, r["item_code"], r["stock_uom"])
         transferred_by_pl_item.setdefault(key, {"qty": 0.0, "amount": 0.0})
 
@@ -290,7 +307,13 @@ def _get_transferred_items_to_wip(work_order_name, wip_warehouse):
     aggregated = {}
     ordered_transfers = sorted(
         transferred_by_pl_item.items(),
-        key=lambda entry: entry[0][0] != "__additional_material__",
+        key=lambda entry: (
+            0
+            if entry[0][0] == "__additional_material__"
+            else 1
+            if entry[0][0].startswith("__continuous__:")
+            else 2
+        ),
     )
     for key, values in ordered_transfers:
         pl_item, item_code, _stock_uom = key

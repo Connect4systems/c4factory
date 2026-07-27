@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 from c4factory.c4_manufacturing.work_order_hooks import get_default_source_warehouse
 
@@ -117,9 +117,18 @@ def create_pick_list(
             pl.set(fieldname, fg_qty)
 
     count = 0
+    item_group_cache = {}
+    continuous_group_cache = {}
     for wo_item in rows:
         item_code = wo_item.get("item_code")
         if not item_code:
+            continue
+
+        if is_continuous_manufacture_item(
+            wo_item,
+            item_group_cache=item_group_cache,
+            continuous_group_cache=continuous_group_cache,
+        ):
             continue
 
         required_qty = flt(wo_item.get("required_qty") or wo_item.get("qty"))
@@ -164,7 +173,11 @@ def create_pick_list(
         count += 1
 
     if count == 0:
-        frappe.throw(_("No valid required items to pick for Work Order {0}.").format(wo.name))
+        frappe.throw(
+            _("No required items are eligible for a Pick List for Work Order {0}.").format(
+                wo.name
+            )
+        )
 
     return pl.as_dict()
 
@@ -185,6 +198,38 @@ def _get_pick_list_source_warehouse(wo, wo_item) -> str | None:
         )
         or wo.get("source_warehouse")
     )
+
+
+def is_continuous_manufacture_item(
+    wo_item,
+    item_group_cache: dict | None = None,
+    continuous_group_cache: dict | None = None,
+) -> bool:
+    """Return whether a Work Order item must be excluded from Pick Lists."""
+    item_group_cache = item_group_cache if item_group_cache is not None else {}
+    continuous_group_cache = (
+        continuous_group_cache if continuous_group_cache is not None else {}
+    )
+
+    item_code = wo_item.get("item_code")
+    item_group = wo_item.get("item_group") or item_group_cache.get(item_code)
+    if item_group is None and item_code:
+        item_group = frappe.db.get_value("Item", item_code, "item_group")
+        item_group_cache[item_code] = item_group
+
+    if not item_group:
+        return False
+
+    if item_group not in continuous_group_cache:
+        continuous_group_cache[item_group] = cint(
+            frappe.db.get_value(
+                "Item Group",
+                item_group,
+                "custom_continues_manufacture",
+            )
+        )
+
+    return bool(continuous_group_cache[item_group])
 
 
 def _set_if_present(doc, fieldname: str, value) -> None:

@@ -3,7 +3,9 @@
 frappe.ui.form.on("Work Order", {
   refresh(frm) {
     configure_required_items_grid(frm);
-    set_missing_source_warehouses(frm);
+    set_source_warehouses(frm);
+    configure_continuous_start_button(frm);
+    register_continuous_start_listener();
     hide_create_job_card_button(frm);
     refresh_material_transferred_qty(frm);
   },
@@ -12,10 +14,10 @@ frappe.ui.form.on("Work Order", {
     hide_create_job_card_button(frm);
   },
   bom_no(frm) {
-    setTimeout(() => set_missing_source_warehouses(frm), 800);
+    setTimeout(() => set_source_warehouses(frm), 800);
   },
   company(frm) {
-    set_missing_source_warehouses(frm);
+    set_source_warehouses(frm);
   },
   custom_disable_operation(frm) {
     hide_create_job_card_button(frm);
@@ -110,12 +112,12 @@ function apply_required_items_grid_permissions(table_field) {
   grid.refresh();
 }
 
-async function set_missing_source_warehouses(frm) {
+async function set_source_warehouses(frm) {
   if (frm.doc.docstatus !== 0) return;
 
   const rows = frm.doc.required_items || frm.doc.items || [];
   for (const row of rows) {
-    if (row.item_code && !row.source_warehouse) {
+    if (row.item_code) {
       await set_source_warehouse_from_item_group(frm, row.doctype, row.name);
     }
   }
@@ -123,10 +125,10 @@ async function set_missing_source_warehouses(frm) {
 
 async function set_source_warehouse_from_item_group(frm, cdt, cdn) {
   const row = locals[cdt] && locals[cdt][cdn];
-  if (!row || !row.item_code || row.source_warehouse) return;
+  if (!row || !row.item_code) return;
 
-  const { message: warehouse } = await frappe.call({
-    method: "c4factory.c4_manufacturing.work_order_hooks.get_default_source_warehouse",
+  const { message: details } = await frappe.call({
+    method: "c4factory.c4_manufacturing.work_order_hooks.get_source_warehouse_details",
     args: {
       item_code: row.item_code,
       item_group: row.item_group,
@@ -134,8 +136,19 @@ async function set_source_warehouse_from_item_group(frm, cdt, cdn) {
     }
   });
 
-  if (warehouse && !locals[cdt][cdn].source_warehouse) {
-    await frappe.model.set_value(cdt, cdn, "source_warehouse", warehouse);
+  const current_row = locals[cdt] && locals[cdt][cdn];
+  if (
+    details?.warehouse &&
+    current_row &&
+    (details.override_existing || !current_row.source_warehouse) &&
+    current_row.source_warehouse !== details.warehouse
+  ) {
+    await frappe.model.set_value(
+      cdt,
+      cdn,
+      "source_warehouse",
+      details.warehouse
+    );
   }
 }
 
@@ -151,4 +164,175 @@ function hide_create_job_card_button(frm) {
   remove_buttons();
   setTimeout(remove_buttons, 300);
   setTimeout(remove_buttons, 1000);
+}
+
+function configure_continuous_start_button(frm) {
+  const replace_start_button = () => {
+    frm.remove_custom_button(__("Start"));
+
+    if (
+      frm.doc.docstatus !== 1 ||
+      ["Stopped", "Closed", "Completed", "Cancelled"].includes(frm.doc.status) ||
+      frm.doc.skip_transfer ||
+      frm.doc.transfer_material_against === "Job Card"
+    ) {
+      return;
+    }
+
+    const start_button = frm.add_custom_button(__("Start"), () => {
+      start_continuous_material_transfer(frm);
+    });
+    start_button.addClass("btn-primary");
+  };
+
+  replace_start_button();
+  setTimeout(replace_start_button, 0);
+  setTimeout(replace_start_button, 300);
+  setTimeout(replace_start_button, 1000);
+}
+
+async function start_continuous_material_transfer(frm) {
+  try {
+    const context = await frappe.xcall(
+      "c4factory.api.work_order_start.get_continuous_start_context",
+      { work_order: frm.doc.name }
+    );
+
+    if (!context?.has_eligible_items) {
+      frappe.show_alert(
+        {
+          message: __(
+            "No continuous-manufacture items were found. No Stock Entry was created."
+          ),
+          indicator: "orange"
+        },
+        10
+      );
+      return;
+    }
+
+    if (context.pending) {
+      frappe.show_alert(
+        {
+          message: __(
+            "A continuous-material Stock Entry is already being created for this Work Order."
+          ),
+          indicator: "orange"
+        },
+        10
+      );
+      return;
+    }
+
+    const max_qty = flt(context.remaining_qty);
+    if (max_qty <= 0) {
+      frappe.show_alert(
+        {
+          message: __("No continuous-material quantity remains to transfer."),
+          indicator: "orange"
+        },
+        10
+      );
+      return;
+    }
+
+    frappe.prompt(
+      {
+        fieldname: "qty",
+        fieldtype: "Float",
+        label: __("Qty for Material Transfer for Manufacture"),
+        description: __("Max: {0}", [max_qty]),
+        default: max_qty,
+        reqd: 1
+      },
+      async ({ qty }) => {
+        try {
+          if (flt(qty) <= 0 || flt(qty) > max_qty) {
+            frappe.show_alert(
+              {
+                message: __(
+                  "Quantity must be greater than zero and not more than {0}.",
+                  [max_qty]
+                ),
+                indicator: "red"
+              },
+              10
+            );
+            return;
+          }
+
+          const result = await frappe.xcall(
+            "c4factory.api.work_order_start.enqueue_continuous_start_transfer",
+            {
+              work_order: frm.doc.name,
+              qty: flt(qty)
+            }
+          );
+          frappe.show_alert(
+            {
+              message: result.message,
+              indicator: result.status === "queued" ? "blue" : "orange"
+            },
+            10
+          );
+        } catch (error) {
+          frappe.show_alert(
+            {
+              message: __("Unable to queue the background Stock Entry."),
+              indicator: "red"
+            },
+            10
+          );
+        }
+      },
+      __("Select Quantity"),
+      __("Start")
+    );
+  } catch (error) {
+    frappe.show_alert(
+      {
+        message: __("Unable to start the background Stock Entry."),
+        indicator: "red"
+      },
+      10
+    );
+  }
+}
+
+function register_continuous_start_listener() {
+  if (frappe.__c4_continuous_start_listener_registered) return;
+
+  frappe.__c4_continuous_start_listener_registered = true;
+  frappe.realtime.on("c4factory_continuous_start", (result) => {
+    const active_form = window.cur_frm;
+    const active_work_order =
+      active_form &&
+      active_form.doctype === "Work Order" &&
+      active_form.doc.name === result.work_order;
+
+    let message = result.message;
+    if (result.status === "success" && result.stock_entry) {
+      const route = `/app/stock-entry/${encodeURIComponent(result.stock_entry)}`;
+      message = `${__("Stock Entry")} <a href="${route}"><b>${
+        result.stock_entry
+      }</b></a> ${__("was created and submitted successfully.")}`;
+    }
+
+    frappe.show_alert(
+      {
+        message,
+        indicator:
+          result.status === "success"
+            ? "green"
+            : result.status === "error"
+              ? "red"
+              : "orange"
+      },
+      15
+    );
+
+    if (active_work_order) {
+      active_form.reload_doc();
+    }
+  });
 }
