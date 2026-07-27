@@ -20,7 +20,7 @@ class SubPickList(Document):
         self.status = "Open"
 
     def on_submit(self):
-        _apply_required_materials(self)
+        _apply_additional_materials(self)
         _update_sub_pick_list_status(self.name)
 
     def before_cancel(self):
@@ -39,7 +39,7 @@ class SubPickList(Document):
                     "Sub Pick List."
                 ).format(", ".join(submitted_entries))
             )
-        _reverse_required_materials(self)
+        _reverse_additional_materials(self)
 
     def on_cancel(self):
         self.db_set("status", "Cancelled", update_modified=False)
@@ -275,7 +275,7 @@ def complete_sub_pick_list(sub_pick_list: str) -> dict:
 
     balances = _get_balances(doc)
     wo = frappe.get_doc("Work Order", doc.work_order)
-    wo_rows = {row.name: row for row in wo.required_items}
+    wo_rows = {row.name: row for row in _get_additional_material_rows(wo)}
     changed = False
     for row in doc.items:
         waived = flt((balances.get(row.name) or {}).get("balance"))
@@ -362,19 +362,13 @@ def _update_sub_pick_list_status(name: str):
 def _sync_work_order_transferred_quantities(sub_pick_list: str):
     sub = frappe.get_doc("Sub Pick List", sub_pick_list)
     from c4factory.c4_manufacturing.stock_entry_hooks import (
-        _get_actual_transferred_qty,
         _set_work_order_item_balances,
     )
 
     for row in sub.items:
         if not row.work_order_item:
             continue
-        transferred = _get_actual_transferred_qty(
-            sub.work_order,
-            row.item_code,
-            row.source_warehouse,
-            sub.wip_warehouse,
-        )
+        transferred = _get_additional_material_transferred_qty(row.work_order_item)
         required, consumed = frappe.db.get_value(
             "Work Order Item",
             row.work_order_item,
@@ -395,14 +389,15 @@ def _sync_work_order_transferred_quantities(sub_pick_list: str):
         )
 
 
-def _apply_required_materials(doc):
+def _apply_additional_materials(doc):
     wo = frappe.get_doc("Work Order", doc.work_order)
+    additional_materials = _get_additional_material_rows(wo)
     mappings = []
     for row in doc.items:
         wo_row = next(
             (
                 candidate
-                for candidate in wo.required_items
+                for candidate in additional_materials
                 if candidate.item_code == row.item_code
                 and (candidate.source_warehouse or "") == (row.source_warehouse or "")
             ),
@@ -411,7 +406,7 @@ def _apply_required_materials(doc):
         if not wo_row:
             item = frappe.get_cached_doc("Item", row.item_code)
             wo_row = wo.append(
-                "required_items",
+                "custom_additional_material",
                 {
                     "item_code": row.item_code,
                     "item_name": item.item_name,
@@ -421,6 +416,7 @@ def _apply_required_materials(doc):
                     "required_qty": 0,
                 },
             )
+            additional_materials = _get_additional_material_rows(wo)
         wo_row.required_qty = flt(wo_row.required_qty) + flt(row.qty)
         wo_row.custom_additional_material_qty = (
             flt(wo_row.custom_additional_material_qty) + flt(row.qty)
@@ -441,9 +437,9 @@ def _apply_required_materials(doc):
         )
 
 
-def _reverse_required_materials(doc):
+def _reverse_additional_materials(doc):
     wo = frappe.get_doc("Work Order", doc.work_order)
-    by_name = {row.name: row for row in wo.required_items}
+    by_name = {row.name: row for row in _get_additional_material_rows(wo)}
     for row in doc.items:
         contribution = flt(row.required_contribution_qty)
         wo_row = by_name.get(row.work_order_item)
@@ -457,6 +453,40 @@ def _reverse_required_materials(doc):
             _clear_work_order_item_links(row, wo_row.name)
             wo.remove(wo_row)
     _save_work_order(wo)
+
+
+def _get_additional_material_rows(wo):
+    if not wo.meta.has_field("custom_additional_material"):
+        frappe.throw(
+            _(
+                "Work Order Additional Material table is not installed. "
+                "Please run bench migrate and try again."
+            )
+        )
+    return wo.get("custom_additional_material") or []
+
+
+def _get_additional_material_transferred_qty(work_order_item: str) -> float:
+    return flt(
+        frappe.db.sql(
+            """
+            SELECT COALESCE(SUM(
+                ABS(CASE
+                    WHEN COALESCE(sed.transfer_qty, 0) != 0
+                    THEN sed.transfer_qty
+                    ELSE sed.qty * COALESCE(NULLIF(sed.conversion_factor, 0), 1)
+                END)
+            ), 0)
+            FROM `tabStock Entry Detail` sed
+            INNER JOIN `tabStock Entry` se ON se.name = sed.parent
+            WHERE se.docstatus = 1
+              AND COALESCE(se.custom_sub_pick_list, '') != ''
+              AND sed.custom_work_order_item = %(work_order_item)s
+              AND COALESCE(sed.custom_sub_pick_list_item, '') != ''
+            """,
+            {"work_order_item": work_order_item},
+        )[0][0]
+    )
 
 
 def _save_work_order(wo):

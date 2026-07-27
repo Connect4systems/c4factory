@@ -113,6 +113,7 @@ patches = [
     # Additional material transfers linked to a Pick List and Work Order
     "c4factory.patches.v1_0.setup_additional_material_flow",
     "c4factory.patches.v1_0.setup_sub_pick_list_stock_fields",
+    "c4factory.patches.v1_0.setup_work_order_additional_material_table",
 ]
 
 override_doctype_dashboards = {
