@@ -41,6 +41,14 @@ def execute():
                     "no_copy": 1,
                     "unique": 1,
                 },
+                {
+                    "fieldname": "custom_continuous_start_qty",
+                    "label": "Continuous Start Quantity",
+                    "fieldtype": "Float",
+                    "hidden": 1,
+                    "read_only": 1,
+                    "no_copy": 1,
+                },
             ],
             "Pick List": [
                 {

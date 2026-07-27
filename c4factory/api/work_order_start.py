@@ -279,6 +279,7 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
     se.fg_completed_qty = qty
     se.custom_continuous_manufacture_transfer = 1
     se.custom_continuous_start_request_id = request_id
+    se.custom_continuous_start_qty = qty
     if se.meta.has_field("custom_work_order"):
         se.custom_work_order = wo.name
     if se.meta.has_field("to_warehouse"):
@@ -307,6 +308,7 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
         valuation_rate = _get_latest_valuation_rate(
             wo_row.item_code,
             source_warehouse,
+            wo.company,
         )
         amount = row_qty * valuation_rate
         se_row = se.append(
@@ -329,6 +331,8 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
         )
         if se_row.meta.has_field("custom_work_order_item"):
             se_row.custom_work_order_item = wo_row.name
+        if se_row.meta.has_field("set_basic_rate_manually"):
+            se_row.set_basic_rate_manually = 1
         se_row._c4_source_warehouse = source_warehouse
         se_row._c4_qty = row_qty
         se_row._c4_valuation_rate = valuation_rate
@@ -347,6 +351,8 @@ def _build_stock_entry(wo, eligible_rows, qty: float, request_id: str):
         row.basic_rate = row._c4_valuation_rate
         row.amount = row.qty * row._c4_valuation_rate
         row.basic_amount = row.amount
+        if row.meta.has_field("set_basic_rate_manually"):
+            row.set_basic_rate_manually = 1
         delattr(row, "_c4_source_warehouse")
         delattr(row, "_c4_qty")
         delattr(row, "_c4_valuation_rate")
@@ -414,30 +420,59 @@ def _get_draft_start_pick_list_qty(work_order: str) -> float:
     )
 
 
-def _get_latest_valuation_rate(item_code: str, warehouse: str) -> float:
+def _get_latest_valuation_rate(
+    item_code: str,
+    warehouse: str,
+    company: str,
+) -> float:
     rows = frappe.db.sql(
         """
-        SELECT valuation_rate
+        SELECT valuation_rate, warehouse
         FROM `tabStock Ledger Entry`
         WHERE item_code = %(item_code)s
           AND warehouse = %(warehouse)s
+          AND company = %(company)s
           AND COALESCE(is_cancelled, 0) = 0
+          AND COALESCE(valuation_rate, 0) > 0
         ORDER BY posting_date DESC, posting_time DESC, creation DESC
         LIMIT 1
         """,
         {
             "item_code": item_code,
             "warehouse": warehouse,
+            "company": company,
         },
         as_dict=True,
     )
     if not rows:
+        # Some manufacture warehouses are newly created or have not received
+        # this item yet. Use the item's latest positive company valuation as the
+        # requested Stock Ledger average-rate fallback.
+        rows = frappe.db.sql(
+            """
+            SELECT valuation_rate, warehouse
+            FROM `tabStock Ledger Entry`
+            WHERE item_code = %(item_code)s
+              AND company = %(company)s
+              AND COALESCE(is_cancelled, 0) = 0
+              AND COALESCE(valuation_rate, 0) > 0
+            ORDER BY posting_date DESC, posting_time DESC, creation DESC
+            LIMIT 1
+            """,
+            {
+                "item_code": item_code,
+                "company": company,
+            },
+            as_dict=True,
+        )
+    if not rows:
         frappe.throw(
             _(
-                "No Stock Ledger valuation rate was found for item {0} in warehouse {1}."
+                "No positive Stock Ledger valuation rate was found for item {0} "
+                "in company {1}."
             ).format(
                 frappe.bold(item_code),
-                frappe.bold(warehouse),
+                frappe.bold(company),
             )
         )
 
@@ -463,7 +498,7 @@ def _get_continuous_transferred_qty(work_order: str) -> float:
     return flt(
         frappe.db.sql(
             """
-            SELECT COALESCE(SUM(fg_completed_qty), 0)
+            SELECT COALESCE(SUM(custom_continuous_start_qty), 0)
             FROM `tabStock Entry`
             WHERE work_order = %s
               AND docstatus = 1

@@ -116,6 +116,7 @@ patches = [
     "c4factory.patches.v1_0.setup_work_order_additional_material_table",
     "c4factory.patches.v1_0.setup_continuous_start_transfer",
     "c4factory.patches.v1_0.setup_continuous_start_pick_list_field",
+    "c4factory.patches.v1_0.setup_continuous_start_qty_field",
 ]
 
 override_doctype_dashboards = {
