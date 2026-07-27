@@ -28,6 +28,7 @@ class WorkOrder(ERPNextWorkOrder):
     # If there are no rows yet, use standard behaviour (populate from BOM)
     if not self.get("required_items"):
       result = super().set_required_items(reset_only_qty=reset_only_qty)
+      self._normalize_required_item_quantities()
       set_source_warehouse_from_item_group(self)
       return result
 
@@ -36,6 +37,52 @@ class WorkOrder(ERPNextWorkOrder):
     # - we skip this to keep the user edits.
     set_source_warehouse_from_item_group(self)
     return
+
+  def _normalize_required_item_quantities(self):
+    """
+    Recalculate quantities from the BOM child table without joining Item Default.
+
+    ERPNext's BOM helper joins Item Default before grouping the BOM rows. If an
+    item has duplicate defaults for the Work Order company, that join multiplies
+    its required quantity. Keep the standard fetch for item metadata, then make
+    the quantity authoritative from the BOM itself:
+
+      required_qty = sum(stock_qty) / BOM quantity * Work Order quantity
+    """
+    if not self.bom_no or not self.qty or not self.get("required_items"):
+      return
+
+    table = "BOM Explosion Item" if self.get("use_multi_level_bom") else "BOM Item"
+    bom_rows = frappe.get_all(
+      table,
+      filters={
+        "parent": self.bom_no,
+        "docstatus": ("<", 2),
+      },
+      fields=["item_code", "stock_qty"],
+    )
+
+    bom_qty = flt(frappe.get_cached_value("BOM", self.bom_no, "quantity")) or 1
+    quantity_scale = flt(self.qty) / bom_qty
+    required_by_item = {}
+
+    for bom_row in bom_rows:
+      item_code = bom_row.get("item_code")
+      if not item_code:
+        continue
+
+      required_by_item[item_code] = (
+        flt(required_by_item.get(item_code))
+        + flt(bom_row.get("stock_qty")) * quantity_scale
+      )
+
+    for required_item in self.get("required_items"):
+      item_code = required_item.get("item_code")
+      if item_code not in required_by_item:
+        continue
+
+      required_item.required_qty = required_by_item[item_code]
+      required_item.amount = flt(required_item.get("rate")) * required_item.required_qty
 
   def on_submit(self):
     """
