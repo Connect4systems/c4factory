@@ -67,6 +67,7 @@
    "label": "QTY"
   },
   {
+   "fetch_from": "item.image",
    "fieldname": "image",
    "fieldtype": "Attach Image",
    "label": "Item Image"
