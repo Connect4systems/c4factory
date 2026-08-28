@@ -10,6 +10,7 @@
   "customer",
   "column_break_szwg",
   "date",
+  "technical_team",
   "section_break_qwki",
   "items",
   "naming_series",
@@ -69,6 +70,12 @@
    "fieldtype": "Link",
    "label": "Customer",
    "options": "Customer"
+  },
+  {
+   "fieldname": "technical_team",
+   "fieldtype": "Link",
+   "label": "Technical Team",
+   "options": "Technical Team"
   }
  ],
  "grid_page_length": 50,
@@ -81,7 +88,7 @@
    "table_fieldname": "items"
   }
  ],
- "modified": "2026-04-06 11:02:10.429765",
+ "modified": "2026-08-25 15:55:36.133117",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Contract BOM Request",
