@@ -10,17 +10,28 @@
   "item_name",
   "description",
   "qty",
+  "image",
   "bom",
   "create_bom",
   "section_break_razl",
+  "location_code",
+  "sub_code",
+  "plexi",
+  "top",
+  "modesty",
+  "column_break_nale",
   "wood",
   "metal",
-  "column_break_nale",
+  "leather",
+  "drawer_body",
+  "drawer_face",
+  "column_break_yvsv",
   "glass",
   "fabric",
-  "column_break_yvsv",
-  "other",
+  "direction",
   "column_break_epzy",
+  "other",
+  "column_break_notes",
   "additional_notes"
  ],
  "fields": [
@@ -53,6 +64,11 @@
    "label": "QTY"
   },
   {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Item Image"
+  },
+  {
    "fieldname": "bom",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -69,6 +85,34 @@
   {
    "fieldname": "section_break_razl",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "location_code",
+   "fieldtype": "Data",
+   "label": "Location Code"
+  },
+  {
+   "fieldname": "sub_code",
+   "fieldtype": "Data",
+   "label": "Sub Code"
+  },
+  {
+   "fieldname": "plexi",
+   "fieldtype": "Link",
+   "label": "Plexi",
+   "options": "Plexi"
+  },
+  {
+   "fieldname": "top",
+   "fieldtype": "Link",
+   "label": "Top",
+   "options": "P-Wood"
+  },
+  {
+   "fieldname": "modesty",
+   "fieldtype": "Link",
+   "label": "Modesty",
+   "options": "P-Wood"
   },
   {
    "fieldname": "column_break_nale",
@@ -89,10 +133,32 @@
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "column_break_notes",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "metal",
    "fieldtype": "Link",
    "label": "Metal",
    "options": "P-Metal"
+  },
+  {
+   "fieldname": "leather",
+   "fieldtype": "Link",
+   "label": "Leather",
+   "options": "Leather"
+  },
+  {
+   "fieldname": "drawer_body",
+   "fieldtype": "Link",
+   "label": "Drawer Body",
+   "options": "P-Wood"
+  },
+  {
+   "fieldname": "drawer_face",
+   "fieldtype": "Link",
+   "label": "Drawer Face",
+   "options": "P-Wood"
   },
   {
    "fieldname": "glass",
@@ -105,6 +171,12 @@
    "fieldtype": "Link",
    "label": "Fabric",
    "options": "P-Fabric"
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Direction",
+   "options": "Right\nLeft"
   },
   {
    "fieldname": "other",
@@ -121,7 +193,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-04-06 11:17:24.858569",
+ "modified": "2026-08-28 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Contract BOM Item",
