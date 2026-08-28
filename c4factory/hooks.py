@@ -122,6 +122,7 @@ patches = [
 
 override_doctype_dashboards = {
     "Pick List": "c4factory.api.pick_list_dashboard.get_data",
+    "Sales Order": "c4factory.api.sales_order_dashboard.get_data",
     "Sub Pick List": "c4factory.api.sub_pick_list_dashboard.get_data",
     "Work Order": "c4factory.api.work_order_dashboard.get_data",
 }
