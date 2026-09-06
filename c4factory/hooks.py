@@ -12,6 +12,7 @@ app_license = "mit"
 # ---------------------------------------------------------
 
 doctype_js = {
+    "Item": "public/js/doctype/item_material_color.js",
     "Pick List": "public/js/doctype/pick_list.js",
     "Stock Entry": "public/js/doctype/stock_entry.js",
     "BOM": "public/js/doctype/bom/bom_measurement_qty.js",
@@ -28,6 +29,9 @@ doctype_js = {
 # ---------------------------------------------------------
 
 doc_events = {
+    "Item": {
+        "before_validate": "c4factory.api.item_material_color.validate_material_color",
+    },
     # Work Order – source warehouse autofill from Item Group
     "Work Order": {
         "validate": [
