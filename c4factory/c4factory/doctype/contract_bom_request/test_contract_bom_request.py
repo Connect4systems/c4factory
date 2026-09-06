@@ -9,12 +9,25 @@ from frappe.tests.utils import FrappeTestCase
 from c4factory.c4factory.doctype.contract_bom_request.contract_bom_request import (
 	ContractBOMRequest,
 	create_bom_for_item,
+	get_request_company,
 )
 
 MODULE = "c4factory.c4factory.doctype.contract_bom_request.contract_bom_request"
 
 
 class TestContractBOMRequest(FrappeTestCase):
+	def test_company_resolution(self):
+		for sales_company, user_company, global_company, expected in (
+			("Sales Company", "User Company", "Global Company", "Sales Company"),
+			(None, "User Company", "Global Company", "User Company"),
+			(None, None, "Global Company", "Global Company"),
+			(None, None, None, None),
+		):
+			with self.subTest(expected=expected), patch("frappe.db.get_value", return_value=sales_company), patch(
+				"frappe.defaults.get_user_default", return_value=user_company
+			), patch("frappe.db.get_default", return_value=global_company):
+				self.assertEqual(get_request_company("SO-TEST"), expected)
+
 	def test_matching_draft_and_submitted_boms_are_allowed(self):
 		request = frappe._dict(sales_order="SO-TEST")
 		request.items = [frappe._dict(idx=1, item="ITEM-A", bom="BOM-A")]

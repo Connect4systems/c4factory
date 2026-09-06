@@ -38,7 +38,7 @@ class ContractBOMRequest(Document):
 
 def get_request_company(sales_order=None):
 	company = frappe.db.get_value("Sales Order", sales_order, "company") if sales_order else None
-	return company or frappe.defaults.get_default("company")
+	return company or frappe.defaults.get_user_default("Company") or frappe.db.get_default("company")
 
 
 @frappe.whitelist()
@@ -69,9 +69,6 @@ def create_bom_for_item(item, qty=1, company=None, contract_bom_request=None, co
 	if not item:
 		frappe.throw("Please set Item before creating BOM.")
 
-	if not company:
-		company = frappe.defaults.get_default("company")
-
 	item_doc = frappe.get_cached_doc("Item", item)
 
 	contract_row = None
@@ -95,6 +92,11 @@ def create_bom_for_item(item, qty=1, company=None, contract_bom_request=None, co
 			frappe.throw("Invalid Contract BOM row selected.")
 		if contract_row.item != item:
 			frappe.throw("The selected Item does not match the saved Contract BOM row.")
+
+	if not company:
+		company = get_request_company()
+	if not company:
+		frappe.throw("Please set a default Company or link a Sales Order with a Company before creating BOM.")
 
 	bom_values = {
 		"doctype": "BOM",
