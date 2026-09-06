@@ -77,8 +77,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "BOM",
-   "options": "BOM",
-   "read_only": 1
+   "options": "BOM"
   },
   {
    "fieldname": "create_bom",

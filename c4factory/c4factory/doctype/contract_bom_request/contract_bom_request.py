@@ -26,7 +26,42 @@ CONTRACT_BOM_TO_BOM_FIELD_MAP = {
 
 
 class ContractBOMRequest(Document):
-	pass
+	def validate(self):
+		company = get_request_company(self.sales_order)
+		for row in self.items:
+			if not row.bom:
+				continue
+			bom = frappe.db.get_value("BOM", row.bom, ["item", "company", "is_active", "docstatus"], as_dict=True)
+			if not bom or bom.item != row.item or bom.company != company or not bom.is_active or bom.docstatus == 2:
+				frappe.throw(f"Row {row.idx}: select an active, non-cancelled BOM for this Item and company.")
+
+
+def get_request_company(sales_order=None):
+	company = frappe.db.get_value("Sales Order", sales_order, "company") if sales_order else None
+	return company or frappe.defaults.get_default("company")
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_item_boms(doctype, txt, searchfield, start, page_len, filters):
+	filters = frappe._dict(filters or {})
+	if not filters.item:
+		return []
+	return frappe.get_list(
+		"BOM",
+		filters={
+			"item": filters.item,
+			"company": get_request_company(filters.sales_order),
+			"is_active": 1,
+			"docstatus": ["<", 2],
+			"name": ["like", f"%{txt}%"],
+		},
+		fields=["name", "item"],
+		order_by="modified desc",
+		start=start,
+		page_length=page_len,
+		as_list=True,
+	)
 
 
 @frappe.whitelist()
@@ -43,10 +78,13 @@ def create_bom_for_item(item, qty=1, company=None, contract_bom_request=None, co
 	if contract_bom_request and contract_bom_item:
 		request_doc = frappe.get_doc("Contract BOM Request", contract_bom_request)
 		request_doc.check_permission("write")
+		if request_doc.docstatus != 0:
+			frappe.throw("BOM links can only be changed on a draft Contract BOM Request.")
+		company = get_request_company(request_doc.sales_order)
 		contract_row = frappe.db.get_value(
 			"Contract BOM Item",
 			contract_bom_item,
-			["parent", "parenttype", *CONTRACT_BOM_TO_BOM_FIELD_MAP],
+			["parent", "parenttype", "item", *CONTRACT_BOM_TO_BOM_FIELD_MAP],
 			as_dict=True,
 		)
 		if (
@@ -55,6 +93,8 @@ def create_bom_for_item(item, qty=1, company=None, contract_bom_request=None, co
 			or contract_row.parent != contract_bom_request
 		):
 			frappe.throw("Invalid Contract BOM row selected.")
+		if contract_row.item != item:
+			frappe.throw("The selected Item does not match the saved Contract BOM row.")
 
 	bom_values = {
 		"doctype": "BOM",
@@ -80,5 +120,4 @@ def create_bom_for_item(item, qty=1, company=None, contract_bom_request=None, co
 		# Persist link on child row so dashboard internal link can resolve exact BOM names.
 		frappe.db.set_value("Contract BOM Item", contract_bom_item, "bom", bom.name, update_modified=False)
 
-	frappe.db.commit()
 	return bom.name
