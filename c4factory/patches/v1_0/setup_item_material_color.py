@@ -20,6 +20,7 @@ def execute():
 			"options": "DocType",
 			"hidden": 1,
 			"read_only": 1,
+			"depends_on": "",
 			"insert_after": "item_group",
 		},
 		{
@@ -27,6 +28,9 @@ def execute():
 			"label": "Material Color",
 			"fieldtype": "Dynamic Link",
 			"options": "custom_material_color_doctype",
+			"hidden": 0,
+			"read_only": 0,
+			"depends_on": "",
 			"insert_after": "custom_material_color_doctype",
 			"read_only_depends_on": "eval:!doc.custom_material_color_doctype",
 		},

@@ -8,7 +8,12 @@ frappe.ui.form.on("Item", {
 });
 
 async function sync_material_color(frm, clear) {
+	if (frm.fields_dict.custom_material_color_doctype) {
+		frm.set_df_property("custom_material_color_doctype", "hidden", 1);
+		frm.set_df_property("custom_material_color_doctype", "read_only", 1);
+	}
 	if (!frm.fields_dict.custom_material_color) return;
+	frm.set_df_property("custom_material_color", "hidden", 0);
 	const group = frm.doc.item_group;
 	const request = (frm.__material_color_request || 0) + 1;
 	frm.__material_color_request = request;
