@@ -29,6 +29,9 @@ doctype_js = {
 # ---------------------------------------------------------
 
 doc_events = {
+    "BOM": {
+        "before_validate": "c4factory.api.bom.calculate_item_qty",
+    },
     "Item": {
         "before_validate": "c4factory.api.item_material_color.validate_material_color",
     },
