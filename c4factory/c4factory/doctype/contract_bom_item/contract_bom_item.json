@@ -104,7 +104,7 @@
    "fieldname": "plexi",
    "fieldtype": "Link",
    "label": "Plexi",
-   "options": "Plexi"
+   "options": "P-Plexi"
   },
   {
    "fieldname": "top",
@@ -211,7 +211,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-28 20:52:35.614757",
+ "modified": "2026-09-11 15:28:45.681790",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Contract BOM Item",
