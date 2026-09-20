@@ -1,6 +1,18 @@
 {
  "custom_fields": [
   {
+   "dt": "Work Order Item",
+   "name": "Work Order Item-custom_part_type",
+   "fieldname": "custom_part_type",
+   "label": "Part Type",
+   "fieldtype": "Link",
+   "options": "Part Type",
+   "insert_after": "item_name",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
    "_assign": null,
    "_comments": null,
    "_liked_by": null,

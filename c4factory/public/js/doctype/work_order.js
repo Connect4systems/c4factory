@@ -31,6 +31,7 @@ function configure_required_item_measurement_columns(frm) {
   if (!grid) return;
   const columns = [
     ["item_code", 2],
+    ["custom_part_type", 1],
     ["custom_unit_qty", 1],
     ["custom_width", 1],
     ["custom_height", 1],
@@ -44,7 +45,7 @@ function configure_required_item_measurement_columns(frm) {
     df.in_list_view = column ? 1 : 0;
     if (column) df.columns = column[1];
   });
-  const measurements = columns.slice(1, 5).map(([fieldname]) => fieldname);
+  const measurements = columns.slice(1, 6).map(([fieldname]) => fieldname);
   const fields = grid.docfields.filter((df) => !measurements.includes(df.fieldname));
   const position = fields.findIndex((df) => df.fieldname === "required_qty");
   fields.splice(position, 0, ...measurements.map((name) =>

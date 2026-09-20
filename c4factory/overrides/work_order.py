@@ -40,11 +40,11 @@ class WorkOrder(ERPNextWorkOrder):
     return
 
   def _set_required_item_measurements(self):
-    """Copy BOM measurements; leave ambiguous grouped dimensions empty."""
+    """Copy BOM measurements and part type; leave ambiguous grouped values empty."""
     if not self.bom_no or not self.get("required_items"):
       return
 
-    fields = ["custom_unit_qty", "custom_width", "custom_height", "custom_depth"]
+    fields = ["custom_unit_qty", "custom_width", "custom_height", "custom_depth", "custom_part_type"]
     by_item = {}
 
     def collect(bom_no, ancestors):
