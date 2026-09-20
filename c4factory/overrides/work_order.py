@@ -29,6 +29,7 @@ class WorkOrder(ERPNextWorkOrder):
     if not self.get("required_items"):
       result = super().set_required_items(reset_only_qty=reset_only_qty)
       self._normalize_required_item_quantities()
+      self._set_required_item_measurements()
       set_source_warehouse_from_item_group(self)
       return result
 
@@ -37,6 +38,35 @@ class WorkOrder(ERPNextWorkOrder):
     # - we skip this to keep the user edits.
     set_source_warehouse_from_item_group(self)
     return
+
+  def _set_required_item_measurements(self):
+    """Copy BOM measurements; leave ambiguous grouped dimensions empty."""
+    if not self.bom_no or not self.get("required_items"):
+      return
+
+    fields = ["custom_unit_qty", "custom_width", "custom_height", "custom_depth"]
+    by_item = {}
+
+    def collect(bom_no, ancestors):
+      if bom_no in ancestors:
+        return
+      rows = frappe.get_all(
+        "BOM Item", filters={"parent": bom_no, "docstatus": ("<", 2)},
+        fields=["item_code", "bom_no", "do_not_explode", *fields],
+        order_by="idx asc",
+      )
+      for row in rows:
+        if self.get("use_multi_level_bom") and row.get("bom_no") and not row.get("do_not_explode"):
+          collect(row.get("bom_no"), ancestors | {bom_no})
+        else:
+          by_item.setdefault(row.get("item_code"), []).append(row)
+
+    collect(self.bom_no, set())
+    for item in self.get("required_items"):
+      matches = by_item.get(item.get("item_code"), [])
+      for field in fields:
+        values = {row.get(field) for row in matches}
+        item.set(field, values.pop() if len(values) == 1 else None)
 
   def _normalize_required_item_quantities(self):
     """

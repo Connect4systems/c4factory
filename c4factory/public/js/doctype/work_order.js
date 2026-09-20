@@ -2,6 +2,7 @@
 
 frappe.ui.form.on("Work Order", {
   refresh(frm) {
+    configure_required_item_measurement_columns(frm);
     configure_required_items_grid(frm);
     set_source_warehouses(frm);
     configure_continuous_start_button(frm);
@@ -10,6 +11,7 @@ frappe.ui.form.on("Work Order", {
     refresh_material_transferred_qty(frm);
   },
   onload_post_render(frm) {
+    configure_required_item_measurement_columns(frm);
     configure_required_items_grid(frm);
     hide_create_job_card_button(frm);
   },
@@ -23,6 +25,35 @@ frappe.ui.form.on("Work Order", {
     hide_create_job_card_button(frm);
   }
 });
+
+function configure_required_item_measurement_columns(frm) {
+  const grid = frm.fields_dict.required_items?.grid;
+  if (!grid) return;
+  const columns = [
+    ["item_code", 2],
+    ["custom_unit_qty", 1],
+    ["custom_width", 1],
+    ["custom_height", 1],
+    ["custom_depth", 1],
+    ["required_qty", 1],
+    ["source_warehouse", 2],
+  ];
+  // Supply the default grid layout, while retaining saved user preferences.
+  grid.docfields.forEach((df) => {
+    const column = columns.find(([fieldname]) => fieldname === df.fieldname);
+    df.in_list_view = column ? 1 : 0;
+    if (column) df.columns = column[1];
+  });
+  const measurements = columns.slice(1, 5).map(([fieldname]) => fieldname);
+  const fields = grid.docfields.filter((df) => !measurements.includes(df.fieldname));
+  const position = fields.findIndex((df) => df.fieldname === "required_qty");
+  fields.splice(position, 0, ...measurements.map((name) =>
+    grid.docfields.find((df) => df.fieldname === name)
+  ).filter(Boolean));
+  grid.docfields = fields;
+  grid.visible_columns = undefined;
+  grid.refresh();
+}
 
 frappe.ui.form.on("Work Order Item", {
   form_render(frm) {

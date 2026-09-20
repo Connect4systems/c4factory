@@ -63,6 +63,50 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "dt": "Work Order Item",
+   "name": "Work Order Item-custom_unit_qty",
+   "fieldname": "custom_unit_qty",
+   "label": "Unit Qty",
+   "fieldtype": "Float",
+   "insert_after": "source_warehouse",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "dt": "Work Order Item",
+   "name": "Work Order Item-custom_width",
+   "fieldname": "custom_width",
+   "label": "Width",
+   "fieldtype": "Float",
+   "insert_after": "custom_unit_qty",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "dt": "Work Order Item",
+   "name": "Work Order Item-custom_height",
+   "fieldname": "custom_height",
+   "label": "Height",
+   "fieldtype": "Float",
+   "insert_after": "custom_width",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "dt": "Work Order Item",
+   "name": "Work Order Item-custom_depth",
+   "fieldname": "custom_depth",
+   "label": "Depth",
+   "fieldtype": "Float",
+   "insert_after": "custom_height",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
   }
  ],
  "custom_perms": [],
