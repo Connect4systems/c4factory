@@ -9,11 +9,11 @@ def get_data(*args, **kwargs):
 
     transactions = data.setdefault("transactions", [])
     group = next(
-        (group for group in transactions if group.get("label") == _("Manufacturing")),
+        (group for group in transactions if group.get("label") == _("Stock")),
         None,
     )
     if group is None:
-        group = {"label": _("Manufacturing"), "items": []}
+        group = {"label": _("Stock"), "items": []}
         transactions.append(group)
 
     items = group.setdefault("items", [])
