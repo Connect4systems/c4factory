@@ -10,6 +10,17 @@ async function calculate_bom_item_qty(frm, cdt, cdn) {
   return frappe.model.set_value(cdt, cdn, "qty", flt(qty, precision("qty", row)));
 }
 
+frappe.ui.form.on("BOM", {
+  refresh(frm) {
+    if (frm.is_new() || frm.doc.docstatus === 2) return;
+    if (!frappe.model.can_create("Item Coding Request")) return;
+
+    frm.add_custom_button(__("Item Request"), () => {
+      frappe.new_doc("Item Coding Request", { bom: frm.doc.name });
+    }, __("Create"));
+  },
+});
+
 frappe.ui.form.on("BOM Item", {
   items_add: calculate_bom_item_qty,
   custom_unit_qty: calculate_bom_item_qty,
