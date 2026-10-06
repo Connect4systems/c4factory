@@ -9,12 +9,8 @@
   "product_name",
   "description",
   "column_break_vwca",
-<<<<<<< HEAD
-  "image_jjeu",
-  "product_image",
-=======
   "image",
->>>>>>> db6740a6a8301c47e60518e2d47c9f7f8fb9e05c
+  "product_image",
   "pds",
   "is_default",
   "section_break_vncv",
@@ -57,13 +53,6 @@
    "fieldtype": "Column Break"
   },
   {
-<<<<<<< HEAD
-   "fieldname": "image_jjeu",
-   "fieldtype": "Image",
-   "label": "Item Image",
-   "options": "product_image"
-  },
-  {
    "fetch_from": "product.image",
    "fieldname": "product_image",
    "fieldtype": "Attach Image",
@@ -72,8 +61,6 @@
    "read_only": 1
   },
   {
-=======
->>>>>>> db6740a6a8301c47e60518e2d47c9f7f8fb9e05c
    "fieldname": "section_break_vncv",
    "fieldtype": "Section Break"
   },
@@ -202,7 +189,8 @@
   {
    "fieldname": "image",
    "fieldtype": "Image",
-   "label": "Image"
+   "label": "Item Image",
+   "options": "product_image"
   }
  ],
  "grid_page_length": 50,

@@ -5,13 +5,13 @@ async function refreshPartListProductImage(frm) {
   const request = (frm._productImageRequest || 0) + 1;
   frm._productImageRequest = request;
   frm.doc.product_image = null;
-  frm.refresh_field("image_jjeu");
+  frm.refresh_field("image");
   const result = product
     ? await frappe.db.get_value("Item", product, "image")
     : null;
   if (frm._productImageRequest !== request || frm.doc.product !== product) return;
   frm.doc.product_image = result?.message?.image || null;
-  frm.refresh_field("image_jjeu");
+  frm.refresh_field("image");
 }
 
 async function syncPartMaterialColor(frm, cdt, cdn, clear = false) {
