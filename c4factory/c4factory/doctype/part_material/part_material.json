@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:material",
  "creation": "2026-10-06 18:07:59.556512",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -12,7 +13,8 @@
   {
    "fieldname": "material",
    "fieldtype": "Data",
-   "label": "Material"
+   "label": "Material",
+   "unique": 1
   },
   {
    "fieldname": "color",
@@ -23,10 +25,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-06 18:09:03.670613",
+ "modified": "2026-10-06 18:10:26.445254",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part Material",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
