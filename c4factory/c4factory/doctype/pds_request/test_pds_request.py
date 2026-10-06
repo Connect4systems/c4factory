@@ -12,13 +12,15 @@ from c4factory.c4factory.doctype.pds_request.pds_request import (
 
 
 class TestPDSRequest(unittest.TestCase):
-	def test_mapping_keeps_order_specs_and_selected_part_list(self):
+	def test_mapping_keeps_order_specs_and_excludes_rows_with_part_lists(self):
 		source = Mock(name="SO-TEST", customer="Customer")
 		source.name = "SO-TEST"
 		source.items = [
 			frappe._dict(idx=2, item_code="B", description="Second", qty=3),
 			frappe._dict(idx=1, item_code="A", description="First", qty=2,
-				custom_part_list="A-01", custom_location_code="Floor", additional_notes="Notes"),
+				custom_location_code="Floor", additional_notes="Notes"),
+			frappe._dict(idx=3, item_code="C", part_list="C-01"),
+			frappe._dict(idx=4, item_code="D", custom_part_list="D-01"),
 		]
 		target = Mock()
 		with patch("frappe.get_doc", return_value=source), patch("frappe.new_doc", return_value=target), patch(
@@ -30,7 +32,8 @@ class TestPDSRequest(unittest.TestCase):
 		first = target.append.call_args_list[0].args[1]
 		self.assertEqual(first["item"], "A")
 		self.assertEqual(first["qty"], 2)
-		self.assertEqual(first["part_list"], "A-01")
+		self.assertFalse(first.get("part_list"))
+		self.assertEqual([call.args[1]["item"] for call in target.append.call_args_list], ["A", "B"])
 		self.assertEqual(first["location_code"], "Floor")
 		self.assertEqual(first["additional_notes"], "Notes")
 
