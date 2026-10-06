@@ -1,7 +1,6 @@
 // Part List item selectors use the same filtering API as BOM in c4pricing.
 (() => {
   const SELECTOR_CONFIGS = [
-    { label: __("Add Material"), parent_group: "Raw Material", target_table: "pick_list_materials", item_field: "material", enable_color: true },
     { label: __("Add Accessories"), parent_group: "Accessorise", target_table: "accessorise_table", item_field: "item", enable_color: false },
   ];
   const esc = frappe.utils.escape_html;
@@ -323,7 +322,7 @@
 
   frappe.ui.form.on("Part List", {
     refresh(frm) {
-      if (frm.doc.docstatus !== 0 || frm.is_read_only()) return;
+      if (frm.doc.docstatus !== 0 || frm.read_only) return;
       SELECTOR_CONFIGS.forEach((config) => {
         frm.add_custom_button(config.label, () => openPartListItemSelector(frm, config), __("Add"));
       });
