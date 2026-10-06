@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestSOPickList(FrappeTestCase):
+class TestColorsample(FrappeTestCase):
 	pass

@@ -10,34 +10,29 @@
   "description",
   "column_break_vwca",
   "image_jjeu",
+  "pds",
   "section_break_vncv",
   "width",
   "column_break_zktq",
   "hight",
   "column_break_iptf",
   "depth",
-  "section_break_pebb",
-  "amended_from",
   "pick_list_tab",
+  "column_break_zyms",
+  "column_break_kruf",
+  "wood_color",
+  "section_break_lgnl",
   "pick_list_materials",
+  "metal_tab",
+  "metal_color",
+  "metal_material",
   "accessorise_tab",
-  "accessorise_table"
+  "accessorise_table",
+  "amended_from",
+  "others_tab",
+  "other_material"
  ],
  "fields": [
-  {
-   "fieldname": "section_break_pebb",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Product Pick List",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
-  },
   {
    "fieldname": "product",
    "fieldtype": "Link",
@@ -94,7 +89,7 @@
   {
    "fieldname": "pick_list_tab",
    "fieldtype": "Tab Break",
-   "label": "Pick List"
+   "label": "Panels"
   },
   {
    "fieldname": "pick_list_materials",
@@ -112,13 +107,74 @@
    "fieldtype": "Table",
    "label": "Accessorise Table",
    "options": "Accessorise Table"
+  },
+  {
+   "fieldname": "metal_color",
+   "fieldtype": "Link",
+   "label": "Metal Color",
+   "options": "P-Metal"
+  },
+  {
+   "fieldname": "column_break_kruf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "wood_color",
+   "fieldtype": "Link",
+   "label": "Wood Color",
+   "options": "P-Wood"
+  },
+  {
+   "fieldname": "section_break_lgnl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Part List",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_zyms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metal_tab",
+   "fieldtype": "Tab Break",
+   "label": "Metal"
+  },
+  {
+   "fieldname": "metal_material",
+   "fieldtype": "Table",
+   "label": "Metal Material",
+   "options": "Accessorise Table"
+  },
+  {
+   "fieldname": "others_tab",
+   "fieldtype": "Tab Break",
+   "label": "Others"
+  },
+  {
+   "fieldname": "other_material",
+   "fieldtype": "Table",
+   "label": "Other Material",
+   "options": "Accessorise Table"
+  },
+  {
+   "fieldname": "pds",
+   "fieldtype": "Attach",
+   "label": "PDS"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 13:38:55.350991",
+ "modified": "2026-10-06 14:51:33.027381",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
