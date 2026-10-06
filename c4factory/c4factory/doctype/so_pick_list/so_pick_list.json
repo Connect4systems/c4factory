@@ -48,7 +48,7 @@
    "fieldname": "pick_list",
    "fieldtype": "Link",
    "label": "Pick List",
-   "options": "Product Pick List"
+   "options": "Part List"
   },
   {
    "fieldname": "section_break_zmpc",
@@ -65,7 +65,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 13:42:00.974115",
+ "modified": "2026-10-06 13:46:55.824027",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "SO Pick List",

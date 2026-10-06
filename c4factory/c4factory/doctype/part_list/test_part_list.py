@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestProductPickList(FrappeTestCase):
+class TestPartList(FrappeTestCase):
 	pass
