@@ -1,5 +1,19 @@
 const partMaterialColorRequests = new Map();
 
+async function refreshPartListProductImage(frm) {
+  const product = frm.doc.product;
+  const request = (frm._productImageRequest || 0) + 1;
+  frm._productImageRequest = request;
+  frm.doc.product_image = null;
+  frm.refresh_field("image_jjeu");
+  const result = product
+    ? await frappe.db.get_value("Item", product, "image")
+    : null;
+  if (frm._productImageRequest !== request || frm.doc.product !== product) return;
+  frm.doc.product_image = result?.message?.image || null;
+  frm.refresh_field("image_jjeu");
+}
+
 async function syncPartMaterialColor(frm, cdt, cdn, clear = false) {
   const row = locals[cdt]?.[cdn];
   if (!row) return;
@@ -23,9 +37,12 @@ async function syncPartMaterialColor(frm, cdt, cdn, clear = false) {
 
 frappe.ui.form.on("Part List", {
   refresh(frm) {
-    return Promise.all((frm.doc.pick_list_materials || []).map((row) =>
+    return Promise.all([refreshPartListProductImage(frm), ...(frm.doc.pick_list_materials || []).map((row) =>
       syncPartMaterialColor(frm, row.doctype, row.name)
-    ));
+    )]);
+  },
+  product(frm) {
+    return refreshPartListProductImage(frm);
   }
 });
 

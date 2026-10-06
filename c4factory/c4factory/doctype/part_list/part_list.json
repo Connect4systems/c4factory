@@ -10,6 +10,7 @@
   "description",
   "column_break_vwca",
   "image_jjeu",
+  "product_image",
   "pds",
   "is_default",
   "section_break_vncv",
@@ -53,7 +54,17 @@
   },
   {
    "fieldname": "image_jjeu",
-   "fieldtype": "Image"
+   "fieldtype": "Image",
+   "label": "Item Image",
+   "options": "product_image"
+  },
+  {
+   "fetch_from": "product.image",
+   "fieldname": "product_image",
+   "fieldtype": "Attach Image",
+   "hidden": 1,
+   "label": "Item Image",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_vncv",
