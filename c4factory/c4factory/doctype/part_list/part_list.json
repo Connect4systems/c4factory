@@ -44,12 +44,7 @@
    "label": "Product",
    "link_filters": "[[\"Item\",\"is_sales_item\",\"=\",1]]",
    "options": "Item",
-<<<<<<< HEAD
    "reqd": 1
-=======
-   "reqd": 1,
-   "unique": 1
->>>>>>> 52dade652b0a4e5b2dd8a0567d79415272fc001f
   },
   {
    "fetch_from": "product.description",
