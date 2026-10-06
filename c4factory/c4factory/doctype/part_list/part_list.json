@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:{product}-{##}",
  "creation": "2026-10-06 13:17:06.561149",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -40,7 +41,7 @@
    "fieldtype": "Link",
    "label": "Product",
    "options": "Item",
-   "unique": 1
+   "reqd": 1
   },
   {
    "fetch_from": "product.description",
