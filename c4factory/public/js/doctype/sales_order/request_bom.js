@@ -1,15 +1,17 @@
 // c4napata/public/js/doctype/sales_order/request_bom.js
 frappe.ui.form.on('Sales Order', {
   setup(frm) {
-    frm.set_query('custom_part_list', 'items', (doc, cdt, cdn) => ({
-      filters: {
-        product: locals[cdt][cdn].item_code || '',
-        disable: 0,
-        docstatus: ['!=', 2],
-      },
-    }));
+    configureSalesOrderPartListQueries(frm);
+  },
+  onload_post_render(frm) {
+    configureSalesOrderPartListQueries(frm);
+    if (frm.doc.docstatus !== 0) return;
+    return Promise.all((frm.doc.items || []).map(row =>
+      setSalesOrderDefaultPartList(frm, row.doctype, row.name, false)
+    ));
   },
   refresh(frm) {
+    configureSalesOrderPartListQueries(frm);
     if (!frm.is_new()) {
       frm.add_custom_button(__('Request BOM'), async () => {
         // The mapper runs on the server, so save any specification changes first.
@@ -38,35 +40,65 @@ frappe.ui.form.on('Sales Order', {
 // Each row keeps its own request so delayed responses cannot replace a manual choice.
 const salesOrderPartListRequests = new WeakMap();
 
-frappe.ui.form.on('Sales Order Item', {
-  async item_code(frm, cdt, cdn) {
-    const row = locals[cdt]?.[cdn];
-    if (!row) return;
-    const item = row.item_code;
-    const request = { applying: true, cancelled: false };
-    salesOrderPartListRequests.set(row, request);
-    await frappe.model.set_value(cdt, cdn, 'custom_part_list', null);
-    request.applying = false;
-    if (!item || salesOrderPartListRequests.get(row) !== request || row.item_code !== item) return;
+function salesOrderPartListFields(frm) {
+  return (frm.fields_dict.items?.grid?.docfields || []).filter(field =>
+    field.fieldtype === 'Link' && field.options === 'Part List'
+  ).map(field => field.fieldname);
+}
 
-    const partLists = await frappe.db.get_list('Part List', {
-      fields: ['name'],
-      filters: { product: item, is_default: 1, disable: 0, docstatus: ['!=', 2] },
-      order_by: 'name asc',
-      limit: 1,
-    });
-    if (salesOrderPartListRequests.get(row) !== request || request.cancelled ||
-        row.item_code !== item || locals[cdt]?.[cdn] !== row || row.custom_part_list) return;
-    request.applying = true;
-    try {
-      await frappe.model.set_value(cdt, cdn, 'custom_part_list', partLists[0]?.name || null);
-    } finally {
-      request.applying = false;
+function configureSalesOrderPartListQueries(frm) {
+  for (const field of salesOrderPartListFields(frm)) {
+    frm.set_query(field, 'items', (doc, cdt, cdn) => ({
+      filters: {
+        product: locals[cdt]?.[cdn]?.item_code || '',
+        disable: 0,
+        docstatus: 1,
+      },
+    }));
+  }
+}
+
+async function setSalesOrderDefaultPartList(frm, cdt, cdn, clear) {
+  const row = locals[cdt]?.[cdn];
+  const fields = salesOrderPartListFields(frm);
+  if (!row || !fields.length) return;
+  const item = row.item_code;
+  const request = { applying: true, cancelled: false };
+  salesOrderPartListRequests.set(row, request);
+  if (clear) {
+    for (const field of fields) await frappe.model.set_value(cdt, cdn, field, null);
+  }
+  request.applying = false;
+  if (!item || salesOrderPartListRequests.get(row) !== request || row.item_code !== item ||
+      fields.every(field => row[field])) return;
+  const partLists = await frappe.db.get_list('Part List', {
+    fields: ['name'],
+    filters: { product: item, is_default: 1, disable: 0, docstatus: 1 },
+    order_by: 'name asc',
+    limit: 1,
+  });
+  if (salesOrderPartListRequests.get(row) !== request || request.cancelled ||
+      row.item_code !== item || locals[cdt]?.[cdn] !== row || !partLists.length) return;
+  request.applying = true;
+  try {
+    for (const field of fields) {
+      if (!row[field]) await frappe.model.set_value(cdt, cdn, field, partLists[0].name);
     }
+  } finally {
+    request.applying = false;
+  }
+}
+
+function cancelSalesOrderPartListLookup(frm, cdt, cdn) {
+  const row = locals[cdt]?.[cdn];
+  const request = row && salesOrderPartListRequests.get(row);
+  if (request && !request.applying) request.cancelled = true;
+}
+
+frappe.ui.form.on('Sales Order Item', {
+  item_code(frm, cdt, cdn) {
+    return setSalesOrderDefaultPartList(frm, cdt, cdn, true);
   },
-  custom_part_list(frm, cdt, cdn) {
-    const row = locals[cdt]?.[cdn];
-    const request = row && salesOrderPartListRequests.get(row);
-    if (request && !request.applying) request.cancelled = true;
-  },
+  custom_part_list: cancelSalesOrderPartListLookup,
+  part_list: cancelSalesOrderPartListLookup,
 });
