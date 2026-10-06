@@ -2,6 +2,12 @@ import frappe
 from frappe.model.document import Document
 
 
+PDS_ITEM_SPCS_FIELDS = (
+	"wood", "top", "modesty", "drawer_body", "drawer_face", "plexi",
+	"metal", "fabric", "glass", "direction", "additional_notes",
+)
+
+
 class PDSRequest(Document):
 	def validate(self):
 		for row in self.get("items") or []:
@@ -52,7 +58,7 @@ def create_part_list_for_item(item, qty=1, pds_request=None, pds_request_item=No
 	if row.item != item:
 		frappe.throw("The selected Item does not match the saved PDS Request row.")
 	item_doc = frappe.get_cached_doc("Item", item)
-	part_list = frappe.get_doc({
+	part_list_values = {
 		"doctype": "Part List",
 		"product": item,
 		"product_name": item_doc.item_name,
@@ -63,7 +69,10 @@ def create_part_list_for_item(item, qty=1, pds_request=None, pds_request_item=No
 		"depth": item_doc.get("custom_depth"),
 		"wood_color": row.get("wood"),
 		"metal_color": row.get("metal"),
-	})
+	}
+	for field in PDS_ITEM_SPCS_FIELDS:
+		part_list_values[field] = row.get(field)
+	part_list = frappe.get_doc(part_list_values)
 	part_list.insert(ignore_permissions=False)
 	frappe.db.set_value("PDS Request Item", row.name, "part_list", part_list.name, update_modified=False)
 	return part_list.name

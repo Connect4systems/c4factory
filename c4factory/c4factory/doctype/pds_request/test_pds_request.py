@@ -6,6 +6,7 @@ import frappe
 from c4factory.api.pds_request import make_pds_request
 from c4factory.c4factory.doctype.pds_request.pds_request import (
 	PDSRequest,
+	PDS_ITEM_SPCS_FIELDS,
 	create_part_list_for_item,
 	get_item_part_lists,
 )
@@ -55,6 +56,8 @@ class TestPDSRequest(unittest.TestCase):
 	def test_creation_copies_saved_values_and_persists_row_link(self):
 		row = frappe._dict(name="ROW-A", item="A", description="Request description", image="/files/a.jpg",
 			wood="Wood A", metal="Metal A")
+		for field in PDS_ITEM_SPCS_FIELDS:
+			row[field] = f"Saved {field}"
 		request = Mock(docstatus=0)
 		request.get.return_value = [row]
 		part_list = Mock()
@@ -67,7 +70,9 @@ class TestPDSRequest(unittest.TestCase):
 		values = get_doc.call_args_list[1].args[0]
 		self.assertEqual(values["product"], "A")
 		self.assertEqual(values["width"], 100)
-		self.assertEqual(values["wood_color"], "Wood A")
+		self.assertEqual(values["wood_color"], row.wood)
+		for field in PDS_ITEM_SPCS_FIELDS:
+			self.assertEqual(values[field], row[field])
 		self.assertEqual(values["description"], "Request description")
 		request.check_permission.assert_called_once_with("write")
 		part_list.insert.assert_called_once_with(ignore_permissions=False)
