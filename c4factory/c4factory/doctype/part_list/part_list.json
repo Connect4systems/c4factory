@@ -42,12 +42,6 @@
    "unique": 1
   },
   {
-   "fetch_from": "product.item_name",
-   "fieldname": "product_name",
-   "fieldtype": "Data",
-   "label": "Product Name"
-  },
-  {
    "fetch_from": "product.description",
    "fieldname": "description",
    "fieldtype": "Small Text",
@@ -66,6 +60,7 @@
    "fieldtype": "Section Break"
   },
   {
+   "fetch_from": "product.custom_width",
    "fieldname": "width",
    "fieldtype": "Float",
    "label": "Width",
@@ -76,15 +71,17 @@
    "fieldtype": "Column Break"
   },
   {
+   "fetch_from": "product.custom_hight",
    "fieldname": "hight",
    "fieldtype": "Float",
-   "label": "Hight"
+   "label": "Height"
   },
   {
    "fieldname": "column_break_iptf",
    "fieldtype": "Column Break"
   },
   {
+   "fetch_from": "product.custom_depth",
    "fieldname": "depth",
    "fieldtype": "Float",
    "label": "Depth"
@@ -177,13 +174,19 @@
    "fieldname": "is_default",
    "fieldtype": "Check",
    "label": "is Default "
+  },
+  {
+   "fetch_from": "product.item_name",
+   "fieldname": "product_name",
+   "fieldtype": "Data",
+   "label": "Product Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 19:23:47.406237",
+ "modified": "2026-10-06 19:30:33.058230",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
