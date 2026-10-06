@@ -1,3 +1,40 @@
+const partMaterialColorRequests = new Map();
+
+async function syncPartMaterialColor(frm, cdt, cdn, clear = false) {
+  const row = locals[cdt]?.[cdn];
+  if (!row) return;
+  const material = row.material;
+  const request = (partMaterialColorRequests.get(cdn) || 0) + 1;
+  partMaterialColorRequests.set(cdn, request);
+  if (clear) {
+    await frappe.model.set_value(cdt, cdn, { basic_color: null, color_doctype: null });
+  }
+  const result = material
+    ? await frappe.db.get_value("Part Material", material, "color")
+    : null;
+  if (partMaterialColorRequests.get(cdn) !== request || row.material !== material || !locals[cdt]?.[cdn]) return;
+  const target = result?.message?.color || null;
+  if (!target || row.color_doctype !== target) {
+    await frappe.model.set_value(cdt, cdn, "basic_color", null);
+  }
+  await frappe.model.set_value(cdt, cdn, "color_doctype", target);
+  frm.refresh_field("pick_list_materials");
+}
+
+frappe.ui.form.on("Part List", {
+  refresh(frm) {
+    return Promise.all((frm.doc.pick_list_materials || []).map((row) =>
+      syncPartMaterialColor(frm, row.doctype, row.name)
+    ));
+  }
+});
+
+frappe.ui.form.on("Pick List Materials", {
+  material(frm, cdt, cdn) {
+    return syncPartMaterialColor(frm, cdt, cdn, true);
+  }
+});
+
 // Part List item selectors use the same filtering API as BOM in c4pricing.
 (() => {
   const SELECTOR_CONFIGS = [

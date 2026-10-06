@@ -18,8 +18,9 @@
   },
   {
    "fieldname": "color",
-   "fieldtype": "Data",
-   "label": "Color"
+   "fieldtype": "Link",
+   "label": "Color",
+   "options": "DocType"
   }
  ],
  "grid_page_length": 50,
