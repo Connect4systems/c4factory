@@ -9,8 +9,9 @@ from frappe.model.document import Document
 class PartList(Document):
 	def before_validate(self):
 		previous = self.get_doc_before_save()
-		old_rows = {row.name: row for row in previous.pick_list_materials} if previous else {}
-		for row in self.get("pick_list_materials") or []:
+		table_field = "panel_materials" if self.meta.has_field("panel_materials") else "pick_list_materials"
+		old_rows = {row.name: row for row in (previous.get(table_field) or [])} if previous else {}
+		for row in self.get(table_field) or []:
 			target = frappe.db.get_value("Part Material", row.material, "color") if row.material else None
 			old_row = old_rows.get(row.name)
 			if (old_row and old_row.material != row.material) or row.color_doctype != target or not target:

@@ -32,12 +32,13 @@ async function syncPartMaterialColor(frm, cdt, cdn, clear = false) {
     await frappe.model.set_value(cdt, cdn, "basic_color", null);
   }
   await frappe.model.set_value(cdt, cdn, "color_doctype", target);
-  frm.refresh_field("pick_list_materials");
+  frm.refresh_field(row.parentfield || "pick_list_materials");
 }
 
 frappe.ui.form.on("Part List", {
   refresh(frm) {
-    return Promise.all([refreshPartListProductImage(frm), ...(frm.doc.pick_list_materials || []).map((row) =>
+    const tableField = frm.fields_dict.panel_materials ? "panel_materials" : "pick_list_materials";
+    return Promise.all([refreshPartListProductImage(frm), ...(frm.doc[tableField] || []).map((row) =>
       syncPartMaterialColor(frm, row.doctype, row.name)
     )]);
   },
