@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:{product}-{##}",
+ "autoname": "product.-.##",
  "creation": "2026-10-06 13:17:06.561149",
  "doctype": "DocType",
  "engine": "InnoDB",
