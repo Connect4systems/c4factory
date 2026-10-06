@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import frappe
 
-from c4factory.api.pds_request import make_pds_request
+from c4factory.api.pds_request import make_pds_request, update_sales_order_part_list
 from c4factory.c4factory.doctype.pds_request.pds_request import (
 	PDSRequest,
 	PDS_ITEM_SPCS_FIELDS,
@@ -13,6 +13,29 @@ from c4factory.c4factory.doctype.pds_request.pds_request import (
 
 
 class TestPDSRequest(unittest.TestCase):
+	def test_submit_updates_exact_row_on_submitted_sales_order(self):
+		part_list = frappe._dict(name="A-01", product="A")
+		request_row = frappe._dict(parent="REQ", item="A", sales_order_item="SO-ROW")
+		meta = frappe._dict(fields=[frappe._dict(fieldname="custom_part_list", fieldtype="Link", options="Part List")])
+		with patch("frappe.get_meta", return_value=meta), patch(
+			"frappe.get_all", side_effect=[[request_row], [frappe._dict(name="SO-ROW")]]
+		) as get_all, patch("frappe.db.get_value", side_effect=[frappe._dict(sales_order="SO", docstatus=0), 1]), patch(
+			"frappe.db.set_value"
+		) as set_value:
+			update_sales_order_part_list(part_list)
+		self.assertEqual(get_all.call_args.kwargs["filters"]["name"], "SO-ROW")
+		self.assertEqual(set_value.call_args_list[0].args, ("Sales Order Item", "SO-ROW", {"custom_part_list": "A-01"}))
+
+	def test_submit_skips_ambiguous_legacy_rows(self):
+		meta = frappe._dict(fields=[frappe._dict(fieldname="part_list", fieldtype="Link", options="Part List")])
+		with patch("frappe.get_meta", return_value=meta), patch("frappe.get_all", side_effect=[
+			[frappe._dict(parent="REQ", item="A")], [frappe._dict(name="ROW1"), frappe._dict(name="ROW2")]
+		]), patch("frappe.db.get_value", side_effect=[frappe._dict(sales_order="SO", docstatus=0), 1]), patch(
+			"frappe.db.set_value"
+		) as set_value:
+			update_sales_order_part_list(frappe._dict(name="A-01", product="A"))
+		set_value.assert_not_called()
+
 	def test_mapping_keeps_order_specs_and_excludes_rows_with_part_lists(self):
 		source = Mock(name="SO-TEST", customer="Customer")
 		source.name = "SO-TEST"

@@ -7,6 +7,11 @@ from frappe.model.document import Document
 
 
 class PartList(Document):
+	def on_submit(self):
+		from c4factory.api.pds_request import update_sales_order_part_list
+
+		update_sales_order_part_list(self)
+
 	def before_validate(self):
 		previous = self.get_doc_before_save()
 		table_field = "panel_materials" if self.meta.has_field("panel_materials") else "pick_list_materials"

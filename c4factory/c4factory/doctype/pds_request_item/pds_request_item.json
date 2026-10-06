@@ -29,7 +29,8 @@
   "glass",
   "column_break_yvsv",
   "direction",
-  "additional_notes"
+  "additional_notes",
+  "sales_order_item"
  ],
  "fields": [
   {
@@ -170,6 +171,13 @@
   {
    "fieldname": "section_break_gykw",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Data",
+   "label": "Sales Order Item",
+   "hidden": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
