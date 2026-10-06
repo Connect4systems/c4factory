@@ -13,6 +13,18 @@ frappe.ui.form.on('Sales Order', {
   refresh(frm) {
     configureSalesOrderPartListQueries(frm);
     if (!frm.is_new()) {
+      frm.add_custom_button(__('Request PDS'), async () => {
+        if (frm.is_dirty()) await frm.save();
+        if (frm.is_dirty()) return;
+        const result = await frappe.call({
+          method: 'c4factory.api.pds_request.make_pds_request',
+          args: { sales_order: frm.doc.name },
+          freeze: true,
+        });
+        if (!result.message) return;
+        const doc = frappe.model.sync(result.message)[0];
+        frappe.set_route('Form', doc.doctype, doc.name);
+      }, __('Create'));
       frm.add_custom_button(__('Request BOM'), async () => {
         // The mapper runs on the server, so save any specification changes first.
         // Otherwise it would read the previous values from the database.
