@@ -1,0 +1,93 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-10-06 13:39:51.395668",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sales_order",
+  "column_break_nwsm",
+  "date",
+  "pick_list",
+  "section_break_zmpc",
+  "pick_list_materials",
+  "section_break_dtdf",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_dtdf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "SO Pick List",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order"
+  },
+  {
+   "fieldname": "column_break_nwsm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "fieldname": "pick_list",
+   "fieldtype": "Link",
+   "label": "Pick List",
+   "options": "Product Pick List"
+  },
+  {
+   "fieldname": "section_break_zmpc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "pick_list_materials",
+   "fieldtype": "Table",
+   "label": "Pick List Materials",
+   "options": "Pick List Materials"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-06 13:42:00.974115",
+ "modified_by": "Administrator",
+ "module": "C4Factory",
+ "name": "SO Pick List",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -33,11 +33,15 @@
    "search_index": 1
   },
   {
+   "allow_in_quick_entry": 1,
    "fieldname": "name1",
    "fieldtype": "Data",
-   "label": "Name"
+   "in_list_view": 1,
+   "label": "Name",
+   "reqd": 1
   },
   {
+   "allow_in_quick_entry": 1,
    "fieldname": "item_description",
    "fieldtype": "Text",
    "label": "Item Description"
@@ -81,7 +85,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-03 20:23:12.637988",
+ "modified": "2026-10-03 20:36:22.883176",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Item Coding Request",
@@ -139,6 +143,7 @@
    "write": 1
   }
  ],
+ "quick_entry": 1,
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",

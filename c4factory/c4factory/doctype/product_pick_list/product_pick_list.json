@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-10-06 13:17:06.561149",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "product",
+  "product_name",
+  "description",
+  "column_break_vwca",
+  "image_jjeu",
+  "section_break_vncv",
+  "width",
+  "column_break_zktq",
+  "hight",
+  "column_break_iptf",
+  "depth",
+  "section_break_pebb",
+  "amended_from",
+  "pick_list_tab",
+  "pick_list_materials",
+  "accessorise_tab",
+  "accessorise_table"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_pebb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Product Pick List",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "product",
+   "fieldtype": "Link",
+   "label": "Product",
+   "options": "Item"
+  },
+  {
+   "fetch_from": "product.item_name",
+   "fieldname": "product_name",
+   "fieldtype": "Data",
+   "label": "Product Name"
+  },
+  {
+   "fetch_from": "product.description",
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_vwca",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image_jjeu",
+   "fieldtype": "Image"
+  },
+  {
+   "fieldname": "section_break_vncv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width"
+  },
+  {
+   "fieldname": "column_break_zktq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hight",
+   "fieldtype": "Float",
+   "label": "Hight"
+  },
+  {
+   "fieldname": "column_break_iptf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "depth",
+   "fieldtype": "Float",
+   "label": "Depth"
+  },
+  {
+   "fieldname": "pick_list_tab",
+   "fieldtype": "Tab Break",
+   "label": "Pick List"
+  },
+  {
+   "fieldname": "pick_list_materials",
+   "fieldtype": "Table",
+   "label": "Pick List Materials",
+   "options": "Pick List Materials"
+  },
+  {
+   "fieldname": "accessorise_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accessorise "
+  },
+  {
+   "fieldname": "accessorise_table",
+   "fieldtype": "Table",
+   "label": "Accessorise Table",
+   "options": "Accessorise Table"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-06 13:38:55.350991",
+ "modified_by": "Administrator",
+ "module": "C4Factory",
+ "name": "Product Pick List",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
