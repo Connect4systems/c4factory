@@ -173,6 +173,7 @@
    "label": "PDS"
   },
   {
+   "allow_on_submit": 1,
    "default": "0",
    "fieldname": "is_default",
    "fieldtype": "Check",
@@ -197,20 +198,22 @@
    "options": "Pick List Materials"
   },
   {
+   "allow_on_submit": 1,
    "default": "0",
    "fieldname": "disable",
    "fieldtype": "Check",
-   "label": "disable"
+   "label": "Disable"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 20:01:57.427219",
+ "modified": "2026-10-06 20:26:02.402300",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
