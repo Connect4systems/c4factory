@@ -17,24 +17,18 @@
   "section_break_gykw",
   "description",
   "section_break_razl",
-  "location_code",
-  "sub_code",
-  "plexi",
+  "wood",
   "top",
   "modesty",
-  "column_break_nale",
-  "wood",
-  "metal",
-  "leather",
   "drawer_body",
   "drawer_face",
-  "column_break_yvsv",
-  "glass",
+  "column_break_nale",
+  "plexi",
+  "metal",
   "fabric",
+  "glass",
+  "column_break_yvsv",
   "direction",
-  "column_break_epzy",
-  "other",
-  "column_break_notes",
   "additional_notes"
  ],
  "fields": [
@@ -91,16 +85,6 @@
    "label": "Spcs"
   },
   {
-   "fieldname": "location_code",
-   "fieldtype": "Data",
-   "label": "Location Code"
-  },
-  {
-   "fieldname": "sub_code",
-   "fieldtype": "Data",
-   "label": "Sub Code"
-  },
-  {
    "fieldname": "plexi",
    "fieldtype": "Link",
    "label": "Plexi",
@@ -133,24 +117,10 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "column_break_epzy",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_notes",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "metal",
    "fieldtype": "Link",
    "label": "Metal",
    "options": "P-Metal"
-  },
-  {
-   "fieldname": "leather",
-   "fieldtype": "Link",
-   "label": "Leather",
-   "options": "Leather"
   },
   {
    "fieldname": "drawer_body",
@@ -183,11 +153,6 @@
    "options": "Right\nLeft"
   },
   {
-   "fieldname": "other",
-   "fieldtype": "Small Text",
-   "label": "Other"
-  },
-  {
    "fieldname": "additional_notes",
    "fieldtype": "Text",
    "label": "Additional Notes"
@@ -211,7 +176,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-11 15:28:45.681790",
+ "modified": "2026-10-07 00:17:52.648887",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "PDS Request Item",
