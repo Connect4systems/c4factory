@@ -11,6 +11,7 @@
   "column_break_vwca",
   "image_jjeu",
   "pds",
+  "is_default",
   "section_break_vncv",
   "width",
   "column_break_zktq",
@@ -67,7 +68,8 @@
   {
    "fieldname": "width",
    "fieldtype": "Float",
-   "label": "Width"
+   "label": "Width",
+   "precision": "0"
   },
   {
    "fieldname": "column_break_zktq",
@@ -169,13 +171,19 @@
    "fieldname": "pds",
    "fieldtype": "Attach",
    "label": "PDS"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "is Default "
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 19:18:35.900980",
+ "modified": "2026-10-06 19:23:47.406237",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
