@@ -9,7 +9,7 @@
   "product_name",
   "description",
   "column_break_vwca",
-  "image_jjeu",
+  "image",
   "pds",
   "is_default",
   "section_break_vncv",
@@ -50,10 +50,6 @@
   {
    "fieldname": "column_break_vwca",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "image_jjeu",
-   "fieldtype": "Image"
   },
   {
    "fieldname": "section_break_vncv",
@@ -180,13 +176,18 @@
    "fieldname": "product_name",
    "fieldtype": "Data",
    "label": "Product Name"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Image",
+   "label": "Image"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 19:30:33.058230",
+ "modified": "2026-10-06 19:32:01.400218",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
