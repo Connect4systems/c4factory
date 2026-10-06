@@ -6,14 +6,15 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "is_default",
   "product",
   "product_name",
   "description",
   "column_break_vwca",
+  "disable",
+  "pds",
   "image",
   "product_image",
-  "pds",
-  "is_default",
   "section_break_vncv",
   "width",
   "column_break_zktq",
@@ -25,23 +26,30 @@
   "column_break_kruf",
   "wood_color",
   "section_break_lgnl",
-  "pick_list_materials",
+  "panel_materials",
   "metal_tab",
   "metal_color",
   "metal_material",
+  "others_tab",
+  "other_material",
   "accessorise_tab",
   "accessorise_table",
-  "amended_from",
-  "others_tab",
-  "other_material"
+  "amended_from"
  ],
  "fields": [
   {
    "fieldname": "product",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Product",
+   "link_filters": "[[\"Item\",\"is_sales_item\",\"=\",1]]",
    "options": "Item",
+<<<<<<< HEAD
    "reqd": 1
+=======
+   "reqd": 1,
+   "unique": 1
+>>>>>>> 52dade652b0a4e5b2dd8a0567d79415272fc001f
   },
   {
    "fetch_from": "product.description",
@@ -98,12 +106,6 @@
    "label": "Panels"
   },
   {
-   "fieldname": "pick_list_materials",
-   "fieldtype": "Table",
-   "label": "Pick List Materials",
-   "options": "Pick List Materials"
-  },
-  {
    "fieldname": "accessorise_tab",
    "fieldtype": "Tab Break",
    "label": "Accessorise "
@@ -157,7 +159,7 @@
    "fieldname": "metal_material",
    "fieldtype": "Table",
    "label": "Metal Material",
-   "options": "Accessorise Table"
+   "options": "Pick List Materials"
   },
   {
    "fieldname": "others_tab",
@@ -168,7 +170,7 @@
    "fieldname": "other_material",
    "fieldtype": "Table",
    "label": "Other Material",
-   "options": "Accessorise Table"
+   "options": "Pick List Materials"
   },
   {
    "fieldname": "pds",
@@ -192,13 +194,25 @@
    "fieldtype": "Image",
    "label": "Item Image",
    "options": "product_image"
+  },
+  {
+   "fieldname": "panel_materials",
+   "fieldtype": "Table",
+   "label": "Panel Materials",
+   "options": "Pick List Materials"
+  },
+  {
+   "default": "0",
+   "fieldname": "disable",
+   "fieldtype": "Check",
+   "label": "disable"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 19:32:01.400218",
+ "modified": "2026-10-06 20:01:57.427219",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
