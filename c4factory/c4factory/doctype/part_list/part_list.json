@@ -37,7 +37,8 @@
    "fieldname": "product",
    "fieldtype": "Link",
    "label": "Product",
-   "options": "Item"
+   "options": "Item",
+   "unique": 1
   },
   {
    "fetch_from": "product.item_name",
@@ -174,7 +175,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-06 14:51:33.027381",
+ "modified": "2026-10-06 19:18:35.900980",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
