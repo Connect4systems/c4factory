@@ -114,3 +114,77 @@ frappe.ui.form.on('Sales Order Item', {
   custom_part_list: cancelSalesOrderPartListLookup,
   part_list: cancelSalesOrderPartListLookup,
 });
+
+// Sales Order Item is a child DocType: store selections as JSON and render
+// native Dynamic Link controls instead of an unsupported nested child table.
+const salesOrderColorRequests = new WeakMap();
+
+async function renderSalesOrderColors(frm, cdt, cdn) {
+  const item = locals[cdt]?.[cdn];
+  const gridRow = frm.fields_dict.items?.grid?.grid_rows_by_docname?.[cdn];
+  const wrapper = gridRow?.grid_form?.fields_dict.custom_color_sample_table?.$wrapper;
+  if (!item || !wrapper) return;
+  const partList = item.custom_part_list || item.part_list;
+  const request = {};
+  salesOrderColorRequests.set(item, request);
+  wrapper.empty();
+  if (!partList) return;
+  wrapper.text(__('Loading colors…'));
+  let result;
+  try {
+    result = await frappe.call({
+      method: 'c4factory.api.sales_order_colors.get_color_rows',
+      args: { part_list: partList },
+    });
+  } catch (error) {
+    if (salesOrderColorRequests.get(item) === request) wrapper.text(__('Unable to load colors. Reopen this item to retry.'));
+    throw error;
+  }
+  if (salesOrderColorRequests.get(item) !== request || locals[cdt]?.[cdn] !== item ||
+      (item.custom_part_list || item.part_list) !== partList) return;
+  let saved = {};
+  try { saved = JSON.parse(item.custom_color_sample_data || '{}'); } catch { /* Rebuild invalid data. */ }
+  const choices = new Map((saved.part_list === partList && Array.isArray(saved.rows) ? saved.rows : [])
+    .filter(row => row && typeof row === 'object').map(row => [row.source_row, row]));
+  const rows = (result.message || []).map(source => {
+    const choice = choices.get(source.source_row);
+    return { ...source, color: !source.color_doctype ? null :
+      choice?.color_doctype === source.color_doctype ? choice.color : source.color };
+  });
+  const esc = frappe.utils.escape_html;
+  wrapper.html(`<h6>${__('Color Sample Table')}</h6>`);
+  if (!rows.length) {
+    wrapper.append($('<p class="text-muted">').text(__('No materials with Edite Color enabled.')));
+    return;
+  }
+  const table = $(`<table class="table table-bordered"><thead><tr><th>${__('Material')}</th><th>${__('Part Name')}</th><th>${__('Color')}</th></tr></thead><tbody></tbody></table>`).appendTo(wrapper);
+  for (const row of rows) {
+    const tr = $(`<tr><td>${esc(row.material || '')}</td><td>${esc(row.part_name || '')}</td><td></td></tr>`).appendTo(table.find('tbody'));
+    const control = frappe.ui.form.make_control({
+      parent: tr.find('td').last(),
+      df: {
+        fieldname: 'color', fieldtype: 'Dynamic Link', options: 'color_doctype',
+        label: __('Color'), read_only: !row.color_doctype || frm.doc.docstatus !== 0 || frm.read_only,
+        onchange: () => {
+          if (salesOrderColorRequests.get(item) !== request ||
+              (item.custom_part_list || item.part_list) !== partList) return;
+          row.color = control.get_value() || null;
+          frappe.model.set_value(cdt, cdn, 'custom_color_sample_data', JSON.stringify({ part_list: partList, rows }));
+        },
+      },
+      doc: row,
+      render_input: true,
+    });
+    control.set_input(row.color || '');
+  }
+}
+
+frappe.ui.form.on('Sales Order Item', {
+  form_render: renderSalesOrderColors,
+  custom_part_list(frm, cdt, cdn) {
+    return renderSalesOrderColors(frm, cdt, cdn);
+  },
+  part_list(frm, cdt, cdn) {
+    return renderSalesOrderColors(frm, cdt, cdn);
+  },
+});
