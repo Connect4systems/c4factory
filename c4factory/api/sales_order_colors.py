@@ -3,12 +3,13 @@ import json
 import frappe
 from frappe import _
 
+from c4factory.api.part_list_material_colors import material_table_fields
+
 
 @frappe.whitelist()
 def get_color_rows(part_list):
 	part = frappe.get_doc("Part List", part_list)
 	part.check_permission("read")
-	field = "panel_materials" if part.meta.has_field("panel_materials") else "pick_list_materials"
 	return [
 		{
 			"source_row": row.name,
@@ -17,6 +18,7 @@ def get_color_rows(part_list):
 			"color_doctype": frappe.db.get_value("Part Material", row.material, "color"),
 			"color": row.basic_color,
 		}
+		for field in material_table_fields(part)
 		for row in part.get(field) or [] if row.edite_color
 	]
 

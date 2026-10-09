@@ -7,6 +7,8 @@ app_description = "Factory App"
 app_email = "info@connect4systems.com"
 app_license = "mit"
 
+app_include_js = ["/assets/c4factory/js/doctype/part_list_material_colors.js"]
+
 # ---------------------------------------------------------
 # Client Scripts
 # ---------------------------------------------------------
@@ -29,6 +31,9 @@ doctype_js = {
 # ---------------------------------------------------------
 
 doc_events = {
+    "*": {
+        "before_validate": "c4factory.api.part_list_material_colors.validate_material_colors",
+    },
     "Sales Order": {
         "before_validate": "c4factory.api.sales_order_colors.validate_colors",
     },

@@ -1,5 +1,3 @@
-const partMaterialColorRequests = new Map();
-
 async function refreshPartListProductImage(frm) {
   const product = frm.doc.product;
   const request = (frm._productImageRequest || 0) + 1;
@@ -14,43 +12,9 @@ async function refreshPartListProductImage(frm) {
   frm.refresh_field("image");
 }
 
-async function syncPartMaterialColor(frm, cdt, cdn, clear = false) {
-  const row = locals[cdt]?.[cdn];
-  if (!row) return;
-  const material = row.material;
-  const request = (partMaterialColorRequests.get(cdn) || 0) + 1;
-  partMaterialColorRequests.set(cdn, request);
-  if (clear) {
-    await frappe.model.set_value(cdt, cdn, { basic_color: null, color_doctype: null });
-  }
-  const result = material
-    ? await frappe.db.get_value("Part Material", material, "color")
-    : null;
-  if (partMaterialColorRequests.get(cdn) !== request || row.material !== material || !locals[cdt]?.[cdn]) return;
-  const target = result?.message?.color || null;
-  if (!target || row.color_doctype !== target) {
-    await frappe.model.set_value(cdt, cdn, "basic_color", null);
-  }
-  await frappe.model.set_value(cdt, cdn, "color_doctype", target);
-  frm.refresh_field(row.parentfield || "pick_list_materials");
-}
-
 frappe.ui.form.on("Part List", {
-  refresh(frm) {
-    const tableField = frm.fields_dict.panel_materials ? "panel_materials" : "pick_list_materials";
-    return Promise.all([refreshPartListProductImage(frm), ...(frm.doc[tableField] || []).map((row) =>
-      syncPartMaterialColor(frm, row.doctype, row.name)
-    )]);
-  },
-  product(frm) {
-    return refreshPartListProductImage(frm);
-  }
-});
-
-frappe.ui.form.on("Pick List Materials", {
-  material(frm, cdt, cdn) {
-    return syncPartMaterialColor(frm, cdt, cdn, true);
-  }
+  refresh: refreshPartListProductImage,
+  product: refreshPartListProductImage,
 });
 
 // Part List item selectors use the same filtering API as BOM in c4pricing.
