@@ -12,8 +12,21 @@ async function refreshPartListProductImage(frm) {
   frm.refresh_field("image");
 }
 
+async function syncPartListWoodColor(frm, clear = false) {
+  const target = { "Artificial Wood": "P-Wood", "Natural Wood": "P-Natural" }[frm.doc.wood_type || "Artificial Wood"] || null;
+  if (clear || (frm.doc.wood_color_doctype && frm.doc.wood_color_doctype !== target)) {
+    await frm.set_value("wood_color", null);
+  }
+  await frm.set_value("wood_color_doctype", target);
+}
+
 frappe.ui.form.on("Part List", {
-  refresh: refreshPartListProductImage,
+  refresh(frm) {
+    return Promise.all([refreshPartListProductImage(frm), syncPartListWoodColor(frm)]);
+  },
+  wood_type(frm) {
+    return syncPartListWoodColor(frm, true);
+  },
   product: refreshPartListProductImage,
 });
 
