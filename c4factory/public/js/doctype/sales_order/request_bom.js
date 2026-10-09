@@ -3,6 +3,10 @@ frappe.ui.form.on('Sales Order', {
   setup(frm) {
     configureSalesOrderPartListQueries(frm);
   },
+  items_on_form_rendered(frm) {
+    const row = frm.cur_grid?.doc;
+    if (row?.doctype === 'Sales Order Item') return syncSalesOrderColors(frm, row.doctype, row.name);
+  },
   onload_post_render(frm) {
     configureSalesOrderPartListQueries(frm);
     if (frm.doc.docstatus !== 0) return;
@@ -13,6 +17,9 @@ frappe.ui.form.on('Sales Order', {
   },
   refresh(frm) {
     configureSalesOrderPartListQueries(frm);
+    if (frm.doc.docstatus === 1 && frappe.model.can_create('Color sample')) {
+      frm.add_custom_button(__('Color Sample'), () => openSalesOrderColorSample(frm), __('Create'));
+    }
     if (!frm.is_new()) {
       frm.add_custom_button(__('Request PDS'), async () => {
         if (frm.is_dirty()) await frm.save();
@@ -116,165 +123,61 @@ frappe.ui.form.on('Sales Order Item', {
   part_list: cancelSalesOrderPartListLookup,
 });
 
-// Both views edit the same per-item data; the original Part List is read-only.
-const salesOrderColorRequests = new WeakMap();
-const salesOrderColorInitializing = new WeakSet();
 
-function salesOrderStoredColors(item) {
-  try {
-    const data = JSON.parse(item.custom_color_sample_data || '{}');
-    return data && Array.isArray(data.rows) ? data : { rows: [] };
-  } catch { return { rows: [] }; }
-}
-
-async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
-  const item = locals[cdt]?.[cdn];
-  if (!item) return;
-  if (frm.doc.docstatus !== 0 || frm.read_only) {
-    renderSalesOrderColors(frm, cdt, cdn);
-    return;
-  }
-  const partList = item.custom_part_list || item.part_list;
-  const request = {};
-  salesOrderColorRequests.set(item, request);
-  if (!partList) {
-    salesOrderColorInitializing.add(item);
-    try {
-      await frappe.model.set_value(cdt, cdn, {
-        custom_color_sample_data: null, custom_wood: null,
-        custom_metal: null, custom_wood_color_doctype: null,
-      });
-    } finally { salesOrderColorInitializing.delete(item); }
-    renderSalesOrderColors(frm, cdt, cdn);
-    return;
-  }
-  const result = await frappe.call({
-    method: 'c4factory.api.sales_order_colors.get_part_list_colors',
-    args: { part_list: partList },
+async function openSalesOrderColorSample(frm) {
+  const response = await frappe.call({
+    method: 'c4factory.api.color_sample.get_available_items',
+    args: { sales_order: frm.doc.name },
   });
-  if (salesOrderColorRequests.get(item) !== request || locals[cdt]?.[cdn] !== item ||
-      (item.custom_part_list || item.part_list) !== partList) return;
-  const config = result.message;
-  const saved = salesOrderStoredColors(item);
-  const matching = !reset && saved.part_list === partList;
-  const choices = new Map((matching ? saved.rows : [])
-    .filter(row => row && typeof row === 'object').map(row => [row.source_row, row]));
-  const rows = (config.rows || []).map(source => {
-    const choice = choices.get(source.source_row);
-    return { ...source, color: !source.color_doctype ? null :
-      choice?.color_doctype === source.color_doctype ? choice.color : source.color };
-  });
-  const values = {
-    custom_wood_color_doctype: config.wood_color_doctype,
-    custom_color_sample_data: JSON.stringify({ part_list: partList, headers_initialized: true, rows }),
-  };
-  if (!matching || !item.custom_wood_color_doctype) {
-    values.custom_wood = config.wood_color || null;
-    values.custom_metal = config.metal_color || null;
-  } else if (item.custom_wood_color_doctype && item.custom_wood_color_doctype !== config.wood_color_doctype) {
-    values.custom_wood = config.wood_color || null;
-  }
-  // A previously initialized payload can still have empty header fields.
-  // Always use the source default for an empty header, preserving nonempty overrides.
-  if (!item.custom_wood) values.custom_wood = config.wood_color || null;
-  if (!item.custom_metal) values.custom_metal = config.metal_color || null;
-  salesOrderColorInitializing.add(item);
-  try { await frappe.model.set_value(cdt, cdn, values); }
-  finally { salesOrderColorInitializing.delete(item); }
-  const gridForm = frm.fields_dict.items?.grid?.grid_rows_by_docname?.[cdn]?.grid_form;
-  for (const field of ['custom_wood_color_doctype', 'custom_wood', 'custom_metal']) {
-    gridForm?.fields_dict[field]?.refresh();
-  }
-  renderSalesOrderColors(frm, cdt, cdn);
-}
-
-function renderSalesOrderColors(frm, cdt, cdn) {
-  const item = locals[cdt]?.[cdn];
-  const fields = frm.fields_dict.items?.grid?.grid_rows_by_docname?.[cdn]?.grid_form?.fields_dict;
-  if (!item || !fields) return;
-  const partList = item.custom_part_list || item.part_list;
-  const data = salesOrderStoredColors(item);
-  const editable = frm.doc.docstatus === 0 && !frm.read_only;
+  const items = response.message || [];
   const esc = frappe.utils.escape_html;
-  const views = [
-    ['custom_part_list_color', __('Part List Color'), row => row.has_source_color],
-    ['custom_color_sample_table', __('Color Sample Table'), row => Number(row.edite_color) === 1],
-  ];
-  for (const [field, label, include] of views) {
-    const wrapper = fields[field]?.$wrapper;
-    if (!wrapper) continue;
-    wrapper.empty();
-    if (!partList || data.part_list !== partList) continue;
-    wrapper.append($('<h6>').text(label));
-    const rows = data.rows.filter(include);
-    if (!rows.length) {
-      wrapper.append($('<p class="text-muted">').text(__('No matching materials.')));
-      continue;
-    }
-    const table = $(`<table class="table table-bordered"><thead><tr><th>${__('Table')}</th><th>${__('Material')}</th><th>${__('Part Name')}</th><th>${__('Color')}</th></tr></thead><tbody></tbody></table>`).appendTo(wrapper);
-    const labels = { panel_materials: __('Panel Materials'), metal_material: __('Metal Material'), other_material: __('Other Material') };
-    for (const row of rows) {
-      const tr = $(`<tr><td>${esc(labels[row.source_table] || '')}</td><td>${esc(row.material || '')}</td><td>${esc(row.part_name || '')}</td><td></td></tr>`).appendTo(table.find('tbody'));
-      if (field === 'custom_part_list_color') {
-        tr.find('td').last().text(row.color || '');
-        continue;
-      }
-      const control = frappe.ui.form.make_control({
-        parent: tr.find('td').last(),
-        df: {
-          fieldname: 'color', fieldtype: 'Link', options: row.color_doctype,
-          label: __('Color'), read_only: !editable || !row.color_doctype,
-          onchange: async () => {
-            if (!editable || (item.custom_part_list || item.part_list) !== partList) return;
-            const current = salesOrderStoredColors(item);
-            const selected = current.rows.find(candidate => candidate.source_row === row.source_row);
-            if (current.part_list !== partList || !selected) return;
-            selected.color = control.get_value() || null;
-            await frappe.model.set_value(cdt, cdn, 'custom_color_sample_data', JSON.stringify(current));
-            renderSalesOrderColors(frm, cdt, cdn);
-          },
-        },
-        render_input: true,
+  const dialog = new frappe.ui.Dialog({
+    title: __('Create Color Sample'), size: 'extra-large',
+    fields: [{ fieldname: 'items_html', fieldtype: 'HTML' }],
+    primary_action_label: __('Create'),
+    primary_action: async () => {
+      const selections = [];
+      let invalid = false;
+      dialog.fields_dict.items_html.$wrapper.find('tbody tr').each(function () {
+        if (!$(this).find('.sample-select').prop('checked')) return;
+        const index = Number($(this).attr('data-index'));
+        const item = items[index];
+        const qty = Number($(this).find('.sample-qty').val());
+        if (!Number.isFinite(qty) || qty <= 0 || qty > Number(item.remaining_qty)) {
+          invalid = true;
+          return;
+        }
+        selections.push({ sales_order_item: item.sales_order_item, qty });
       });
-      control.set_input(row.color || '');
-    }
-  }
+      if (invalid) { frappe.msgprint(__('Enter a positive quantity within the available balance.')); return; }
+      if (!selections.length) { frappe.msgprint(__('Select at least one item.')); return; }
+      dialog.get_primary_btn().prop('disabled', true);
+      try {
+        const result = await frappe.call({
+          method: 'c4factory.api.color_sample.make_color_sample',
+          args: { sales_order: frm.doc.name, selections: JSON.stringify(selections) },
+          freeze: true,
+        });
+        if (!result.message) return;
+        const doc = frappe.model.sync(result.message)[0];
+        dialog.hide();
+        frappe.set_route('Form', doc.doctype, doc.name);
+      } finally { dialog.get_primary_btn().prop('disabled', false); }
+    },
+  });
+  dialog.fields_dict.items_html.$wrapper.html(`
+    <p class="text-muted">${__('Only submitted Color Samples reduce the available quantity. Cancelled samples release their quantity.')}</p>
+    <div style="overflow:auto"><table class="table table-bordered">
+    <thead><tr><th>${__('Select')}</th><th>${__('Row')}</th><th>${__('Item')}</th><th>${__('Part List')}</th><th>${__('Order Qty')}</th><th>${__('Sampled Qty')}</th><th>${__('Available Qty')}</th><th>${__('Quantity')}</th></tr></thead>
+    <tbody>${items.map((item, index) => {
+      const enabled = Number(item.remaining_qty) > 0 && item.part_list;
+      return `<tr data-index="${index}">
+        <td><input class="sample-select" type="checkbox" ${enabled ? '' : 'disabled'}></td>
+        <td>${index + 1}</td><td>${esc(item.item_code)}<br>${esc(item.item_name || '')}</td>
+        <td>${esc(item.part_list || __('No Part List'))}</td>
+        <td>${Number(item.order_qty)}</td><td>${Number(item.submitted_qty)}</td><td>${Number(item.remaining_qty)}</td>
+        <td><input class="form-control sample-qty" type="number" min="0" step="any" max="${Number(item.remaining_qty)}" value="${Number(item.remaining_qty)}" ${enabled ? '' : 'disabled'}></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`);
+  dialog.show();
 }
-
-async function applySalesOrderHeaderColor(frm, cdt, cdn, table, field) {
-  const item = locals[cdt]?.[cdn];
-  if (!item || salesOrderColorInitializing.has(item)) return;
-  const color = item[field] || null;
-  let data = salesOrderStoredColors(item);
-  const partList = item.custom_part_list || item.part_list;
-  if (!partList) return;
-  if (data.part_list !== partList) {
-    await syncSalesOrderColors(frm, cdt, cdn);
-    if ((item.custom_part_list || item.part_list) !== partList) return;
-    data = salesOrderStoredColors(item);
-    salesOrderColorInitializing.add(item);
-    try { await frappe.model.set_value(cdt, cdn, field, color); }
-    finally { salesOrderColorInitializing.delete(item); }
-  }
-  for (const row of data.rows) {
-    if (row.source_table === table) row.color = color;
-  }
-  await frappe.model.set_value(cdt, cdn, 'custom_color_sample_data', JSON.stringify(data));
-  renderSalesOrderColors(frm, cdt, cdn);
-}
-
-frappe.ui.form.on('Sales Order Item', {
-  async custom_update_part_list(frm, cdt, cdn) {
-    await syncSalesOrderColors(frm, cdt, cdn, true);
-    frappe.show_alert({ message: __('Part List colors updated for this item.'), indicator: 'green' });
-  },
-  form_render: syncSalesOrderColors,
-  custom_part_list: syncSalesOrderColors,
-  part_list: syncSalesOrderColors,
-  custom_wood(frm, cdt, cdn) {
-    return applySalesOrderHeaderColor(frm, cdt, cdn, 'panel_materials', 'custom_wood');
-  },
-  custom_metal(frm, cdt, cdn) {
-    return applySalesOrderHeaderColor(frm, cdt, cdn, 'metal_material', 'custom_metal');
-  },
-});

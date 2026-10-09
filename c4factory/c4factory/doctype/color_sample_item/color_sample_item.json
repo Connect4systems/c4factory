@@ -1,0 +1,134 @@
+{
+ "doctype": "DocType",
+ "name": "Color Sample Item",
+ "module": "C4Factory",
+ "istable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sales_order_item",
+  "item_code",
+  "item_name",
+  "qty",
+  "order_qty",
+  "remaining_qty",
+  "uom",
+  "custom_part_list",
+  "colors_section",
+  "custom_wood_color_doctype",
+  "custom_wood",
+  "custom_metal",
+  "custom_part_list_color",
+  "custom_color_sample_table",
+  "custom_color_sample_data"
+ ],
+ "fields": [
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Data",
+   "label": "Sales Order Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Item",
+   "read_only": 1,
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "order_qty",
+   "fieldtype": "Float",
+   "label": "Sales Order Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remaining_qty",
+   "fieldtype": "Float",
+   "label": "Available Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "options": "UOM",
+   "label": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_part_list",
+   "fieldtype": "Link",
+   "options": "Part List",
+   "label": "Part List",
+   "read_only": 1,
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "colors_section",
+   "fieldtype": "Section Break",
+   "label": "Colors"
+  },
+  {
+   "fieldname": "custom_wood_color_doctype",
+   "fieldtype": "Link",
+   "options": "DocType",
+   "label": "Wood Color DocType",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_wood",
+   "fieldtype": "Dynamic Link",
+   "options": "custom_wood_color_doctype",
+   "label": "Wood Color",
+   "read_only_depends_on": "eval:!doc.custom_wood_color_doctype"
+  },
+  {
+   "fieldname": "custom_metal",
+   "fieldtype": "Link",
+   "options": "P-Metal",
+   "label": "Metal Color"
+  },
+  {
+   "fieldname": "custom_part_list_color",
+   "fieldtype": "HTML",
+   "label": "Part List Color",
+   "options": "<p class=\"text-muted\">Loading colors...</p>"
+  },
+  {
+   "fieldname": "custom_color_sample_table",
+   "fieldtype": "HTML",
+   "label": "Color Sample Table",
+   "options": "<p class=\"text-muted\">Loading colors...</p>"
+  },
+  {
+   "fieldname": "custom_color_sample_data",
+   "fieldtype": "Long Text",
+   "label": "Color Sample Data",
+   "hidden": 1
+  }
+ ],
+ "permissions": [],
+ "actions": [],
+ "links": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

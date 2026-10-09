@@ -7,6 +7,7 @@ def get_data(*args, **kwargs):
 	data = get_core_data()
 	data.setdefault("non_standard_fieldnames", {})["Contract BOM Request"] = "sales_order"
 	data["non_standard_fieldnames"]["PDS Request"] = "sales_order"
+	data["non_standard_fieldnames"]["Color sample"] = "sales_order"
 
 	transactions = data.setdefault("transactions", [])
 	manufacturing_group = next(
@@ -22,5 +23,7 @@ def get_data(*args, **kwargs):
 		items.append("Contract BOM Request")
 	if "PDS Request" not in items:
 		items.append("PDS Request")
+	if "Color sample" not in items:
+		items.append("Color sample")
 
 	return data

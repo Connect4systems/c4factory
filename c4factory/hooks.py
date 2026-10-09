@@ -7,7 +7,10 @@ app_description = "Factory App"
 app_email = "info@connect4systems.com"
 app_license = "mit"
 
-app_include_js = ["/assets/c4factory/js/doctype/part_list_material_colors.js"]
+app_include_js = [
+    "/assets/c4factory/js/doctype/part_list_material_colors.js",
+    "/assets/c4factory/js/doctype/sales_order/item_colors.js",
+]
 
 # ---------------------------------------------------------
 # Client Scripts
@@ -136,6 +139,7 @@ patches = [
 ]
 
 override_doctype_dashboards = {
+    "Project": "c4factory.api.project_dashboard.get_data",
     "BOM": "c4factory.api.bom_dashboard.get_data",
     "Pick List": "c4factory.api.pick_list_dashboard.get_data",
     "Sales Order": "c4factory.api.sales_order_dashboard.get_data",
