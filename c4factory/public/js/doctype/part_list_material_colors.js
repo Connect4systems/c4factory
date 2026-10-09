@@ -1,5 +1,19 @@
 const sharedPartMaterialColorRequests = new Map();
 
+function configurePartListMaterialQueries(frm) {
+  const categories = {
+    panel_materials: "Panel Material",
+    metal_material: "Metal Material",
+    other_material: "Other Material",
+  };
+  for (const [table, category] of Object.entries(categories)) {
+    if (!frm.fields_dict[table]) continue;
+    frm.set_query("material", table, () => ({
+      filters: { material_table: category },
+    }));
+  }
+}
+
 function partListTableColorDefault(frm, row) {
   if (frm.doc.doctype !== "Part List") return null;
   if (row.parentfield === "panel_materials") {
@@ -73,6 +87,8 @@ frappe.ui.form.on("Part List Materials", {
 });
 
 frappe.ui.form.on("Part List", {
+  setup: configurePartListMaterialQueries,
+  refresh: configurePartListMaterialQueries,
   wood_color(frm) { return applyPartListTableColor(frm, "panel_materials"); },
   metal_color(frm) { return applyPartListTableColor(frm, "metal_material"); },
   wood_type(frm) { return refreshSharedPartMaterialColors(frm); },
