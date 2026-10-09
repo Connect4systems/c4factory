@@ -14,6 +14,16 @@ async function refreshPartListProductImage(frm) {
 
 async function syncPartListWoodColor(frm, clear = false) {
   const target = { "Artificial Wood": "P-Wood", "Natural Wood": "P-Natural" }[frm.doc.wood_type || "Artificial Wood"] || null;
+  const colorField = frm.fields_dict.wood_color;
+  if (!colorField) return;
+  // Older sites may receive this script before the DocType migration.
+  if (!frm.fields_dict.wood_color_doctype) {
+    if (colorField.df.fieldtype === "Link") {
+      if (clear) await frm.set_value("wood_color", null);
+      frm.set_df_property("wood_color", "options", target || "P-Wood");
+    }
+    return;
+  }
   if (clear || (frm.doc.wood_color_doctype && frm.doc.wood_color_doctype !== target)) {
     await frm.set_value("wood_color", null);
   }

@@ -25,6 +25,7 @@
   "column_break_zyms",
   "wood_type",
   "column_break_kruf",
+  "wood_color_doctype",
   "wood_color",
   "section_break_lgnl",
   "panel_materials",
@@ -133,9 +134,10 @@
   },
   {
    "fieldname": "wood_color",
-   "fieldtype": "Link",
+   "fieldtype": "Dynamic Link",
    "label": "Wood Color",
-   "options": "P-Wood"
+   "options": "wood_color_doctype",
+   "read_only_depends_on": "eval:!doc.wood_color_doctype"
   },
   {
    "fieldname": "section_break_lgnl",
@@ -302,6 +304,15 @@
    "fieldtype": "Select",
    "label": "Wood Type",
    "options": "Artificial Wood\nNatural Wood"
+  },
+  {
+   "fieldname": "wood_color_doctype",
+   "fieldtype": "Link",
+   "label": "Wood Color DocType",
+   "options": "DocType",
+   "hidden": 1,
+   "read_only": 1,
+   "default": "P-Wood"
   }
  ],
  "grid_page_length": 50,
