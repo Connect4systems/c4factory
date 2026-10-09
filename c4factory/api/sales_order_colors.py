@@ -3,7 +3,7 @@ import json
 import frappe
 from frappe import _
 
-from c4factory.api.part_list_material_colors import material_table_fields
+from c4factory.api.part_list_material_colors import material_color_target, material_table_fields
 
 
 @frappe.whitelist()
@@ -15,7 +15,7 @@ def get_color_rows(part_list):
 			"source_row": row.name,
 			"material": row.material,
 			"part_name": row.part_name,
-			"color_doctype": frappe.db.get_value("Part Material", row.material, "color"),
+			"color_doctype": material_color_target(part, field, row),
 			"color": row.basic_color,
 		}
 		for field in material_table_fields(part)
