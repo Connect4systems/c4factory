@@ -73,6 +73,11 @@ def validate_colors(doc, method=None):
 			item.custom_metal = config["metal_color"]
 		elif item.get("custom_wood_color_doctype") and item.custom_wood_color_doctype != config["wood_color_doctype"]:
 			item.custom_wood = config["wood_color"]
+		if matching and not stored.get("headers_initialized"):
+			if not item.get("custom_wood"):
+				item.custom_wood = config["wood_color"]
+			if not item.get("custom_metal"):
+				item.custom_metal = config["metal_color"]
 		item.custom_wood_color_doctype = config["wood_color_doctype"]
 		for value, target in ((item.get("custom_wood"), config["wood_color_doctype"]), (item.get("custom_metal"), "P-Metal")):
 			if value and not frappe.db.exists(target, value):
@@ -92,4 +97,4 @@ def validate_colors(doc, method=None):
 			if row["color"] and not frappe.db.exists(target, row["color"]):
 				frappe.throw(_("Row {0}: Color must be an existing record in {1}.").format(item.idx, target))
 			rows.append(row)
-		item.custom_color_sample_data = json.dumps({"part_list": part_list, "rows": rows})
+		item.custom_color_sample_data = json.dumps({"part_list": part_list, "headers_initialized": True, "rows": rows})

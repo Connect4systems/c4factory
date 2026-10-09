@@ -127,7 +127,7 @@ function salesOrderStoredColors(item) {
   } catch { return { rows: [] }; }
 }
 
-async function syncSalesOrderColors(frm, cdt, cdn) {
+async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   const item = locals[cdt]?.[cdn];
   if (!item) return;
   if (frm.doc.docstatus !== 0 || frm.read_only) {
@@ -156,7 +156,7 @@ async function syncSalesOrderColors(frm, cdt, cdn) {
       (item.custom_part_list || item.part_list) !== partList) return;
   const config = result.message;
   const saved = salesOrderStoredColors(item);
-  const matching = saved.part_list === partList;
+  const matching = !reset && saved.part_list === partList;
   const choices = new Map((matching ? saved.rows : [])
     .filter(row => row && typeof row === 'object').map(row => [row.source_row, row]));
   const rows = (config.rows || []).map(source => {
@@ -166,13 +166,17 @@ async function syncSalesOrderColors(frm, cdt, cdn) {
   });
   const values = {
     custom_wood_color_doctype: config.wood_color_doctype,
-    custom_color_sample_data: JSON.stringify({ part_list: partList, rows }),
+    custom_color_sample_data: JSON.stringify({ part_list: partList, headers_initialized: true, rows }),
   };
   if (!matching || !item.custom_wood_color_doctype) {
     values.custom_wood = config.wood_color || null;
     values.custom_metal = config.metal_color || null;
   } else if (item.custom_wood_color_doctype && item.custom_wood_color_doctype !== config.wood_color_doctype) {
     values.custom_wood = config.wood_color || null;
+  }
+  if (matching && !saved.headers_initialized) {
+    if (!item.custom_wood) values.custom_wood = config.wood_color || null;
+    if (!item.custom_metal) values.custom_metal = config.metal_color || null;
   }
   salesOrderColorInitializing.add(item);
   try { await frappe.model.set_value(cdt, cdn, values); }
@@ -252,6 +256,10 @@ async function applySalesOrderHeaderColor(frm, cdt, cdn, table, field) {
 }
 
 frappe.ui.form.on('Sales Order Item', {
+  async custom_update_part_list(frm, cdt, cdn) {
+    await syncSalesOrderColors(frm, cdt, cdn, true);
+    frappe.show_alert({ message: __('Part List colors updated for this item.'), indicator: 'green' });
+  },
   form_render: syncSalesOrderColors,
   custom_part_list: syncSalesOrderColors,
   part_list: syncSalesOrderColors,
