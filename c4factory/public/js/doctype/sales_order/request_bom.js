@@ -129,7 +129,7 @@ async function renderSalesOrderColors(frm, cdt, cdn) {
   salesOrderColorRequests.set(item, request);
   wrapper.empty();
   if (!partList) return;
-  wrapper.text(__('Loading colors…'));
+  wrapper.text(__('Loading colors...'));
   let result;
   try {
     result = await frappe.call({
