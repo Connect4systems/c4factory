@@ -21,8 +21,9 @@
   "hight",
   "column_break_iptf",
   "depth",
-  "pick_list_tab",
+  "part_list_tab",
   "column_break_zyms",
+  "wood_type",
   "column_break_kruf",
   "wood_color",
   "section_break_lgnl",
@@ -42,8 +43,8 @@
   "drawer_body",
   "drawer_face",
   "column_break_vtmc",
-  "plexi",
   "metal",
+  "plexi",
   "fabric",
   "glass",
   "column_break_noaw",
@@ -108,11 +109,6 @@
    "fieldname": "depth",
    "fieldtype": "Float",
    "label": "Depth"
-  },
-  {
-   "fieldname": "pick_list_tab",
-   "fieldtype": "Tab Break",
-   "label": "Panels"
   },
   {
    "fieldname": "accessorise_tab",
@@ -295,13 +291,24 @@
    "fieldname": "additional_notes",
    "fieldtype": "Text",
    "label": "Additional Notes"
+  },
+  {
+   "fieldname": "part_list_tab",
+   "fieldtype": "Tab Break",
+   "label": "Panels"
+  },
+  {
+   "fieldname": "wood_type",
+   "fieldtype": "Select",
+   "label": "Wood Type",
+   "options": "Artificial Wood\nNatural Wood"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-09 10:36:25.711936",
+ "modified": "2026-10-09 12:17:46.894490",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
