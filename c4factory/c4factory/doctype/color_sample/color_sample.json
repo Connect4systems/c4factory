@@ -10,7 +10,8 @@
   "date",
   "pick_list",
   "section_break_zmpc",
-  "pick_list_materials"
+  "pick_list_materials",
+  "amended_from"
  ],
  "fields": [
   {
@@ -41,15 +42,25 @@
   {
    "fieldname": "pick_list_materials",
    "fieldtype": "Table",
-   "label": "Pick List Materials",
-   "options": "Pick List Materials"
+   "label": "Part List Materials",
+   "options": "Part List Materials"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Color sample",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-07 00:34:16.446203",
+ "modified": "2026-10-09 10:36:44.134245",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Color sample",

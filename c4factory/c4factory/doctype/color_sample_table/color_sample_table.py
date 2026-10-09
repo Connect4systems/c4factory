@@ -5,5 +5,5 @@
 from frappe.model.document import Document
 
 
-class PickListMaterials(Document):
+class ColorSampleTable(Document):
 	pass
