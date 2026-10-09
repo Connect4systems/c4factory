@@ -1,22 +1,3 @@
-// All three grids share one child DocType. Resolve the category from the
-// actual row rather than capturing a table-specific category on shared fields.
-function configurePartListMaterialQueries(frm) {
-  const categories = {
-    panel_materials: "Panel Material",
-    metal_material: "Metal Material",
-    other_material: "Other Material",
-  };
-  const query = (doc, cdt, cdn) => {
-    const row = locals[cdt]?.[cdn];
-    const category = categories[row?.parentfield];
-    return { filters: { material_table: category || "__no_material_category__" } };
-  };
-  for (const table of Object.keys(categories)) {
-    if (!frm.fields_dict[table]?.grid) continue;
-    frm.set_query("material", table, query);
-  }
-}
-
 async function refreshPartListProductImage(frm) {
   const product = frm.doc.product;
   const request = (frm._productImageRequest || 0) + 1;
@@ -50,10 +31,7 @@ async function syncPartListWoodColor(frm, clear = false) {
 }
 
 frappe.ui.form.on("Part List", {
-  setup: configurePartListMaterialQueries,
-  onload: configurePartListMaterialQueries,
   refresh(frm) {
-    configurePartListMaterialQueries(frm);
     return Promise.all([refreshPartListProductImage(frm), syncPartListWoodColor(frm)]);
   },
   wood_type(frm) {
