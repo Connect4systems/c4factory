@@ -73,11 +73,10 @@ def validate_colors(doc, method=None):
 			item.custom_metal = config["metal_color"]
 		elif item.get("custom_wood_color_doctype") and item.custom_wood_color_doctype != config["wood_color_doctype"]:
 			item.custom_wood = config["wood_color"]
-		if matching and not stored.get("headers_initialized"):
-			if not item.get("custom_wood"):
-				item.custom_wood = config["wood_color"]
-			if not item.get("custom_metal"):
-				item.custom_metal = config["metal_color"]
+		if not item.get("custom_wood"):
+			item.custom_wood = config["wood_color"]
+		if not item.get("custom_metal"):
+			item.custom_metal = config["metal_color"]
 		item.custom_wood_color_doctype = config["wood_color_doctype"]
 		for value, target in ((item.get("custom_wood"), config["wood_color_doctype"]), (item.get("custom_metal"), "P-Metal")):
 			if value and not frappe.db.exists(target, value):
