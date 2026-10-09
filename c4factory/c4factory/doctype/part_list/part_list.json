@@ -21,11 +21,10 @@
   "hight",
   "column_break_iptf",
   "depth",
-  "pick_list_tab",
+  "part_list_tab",
   "column_break_zyms",
-  "column_break_kruf",
   "wood_type",
-  "wood_color_doctype",
+  "column_break_kruf",
   "wood_color",
   "section_break_lgnl",
   "panel_materials",
@@ -44,8 +43,8 @@
   "drawer_body",
   "drawer_face",
   "column_break_vtmc",
-  "plexi",
   "metal",
+  "plexi",
   "fabric",
   "glass",
   "column_break_noaw",
@@ -112,11 +111,6 @@
    "label": "Depth"
   },
   {
-   "fieldname": "pick_list_tab",
-   "fieldtype": "Tab Break",
-   "label": "Panels"
-  },
-  {
    "fieldname": "accessorise_tab",
    "fieldtype": "Tab Break",
    "label": "Accessorise "
@@ -139,10 +133,9 @@
   },
   {
    "fieldname": "wood_color",
-   "fieldtype": "Dynamic Link",
+   "fieldtype": "Link",
    "label": "Wood Color",
-   "options": "wood_color_doctype",
-   "read_only_depends_on": "eval:!doc.wood_color_doctype"
+   "options": "P-Wood"
   },
   {
    "fieldname": "section_break_lgnl",
@@ -300,27 +293,22 @@
    "label": "Additional Notes"
   },
   {
+   "fieldname": "part_list_tab",
+   "fieldtype": "Tab Break",
+   "label": "Panels"
+  },
+  {
    "fieldname": "wood_type",
    "fieldtype": "Select",
    "label": "Wood Type",
-   "options": "Artificial Wood\nNatural Wood",
-   "default": "Artificial Wood"
-  },
-  {
-   "fieldname": "wood_color_doctype",
-   "fieldtype": "Link",
-   "label": "Wood Color DocType",
-   "options": "DocType",
-   "hidden": 1,
-   "read_only": 1,
-   "default": "P-Wood"
+   "options": "Artificial Wood\nNatural Wood"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-09 10:36:25.711936",
+ "modified": "2026-10-09 12:17:46.894490",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
