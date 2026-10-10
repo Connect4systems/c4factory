@@ -9,59 +9,36 @@
   "project",
   "column_break_nwsm",
   "date",
-  "items",
   "pick_list",
-  "section_break_zmpc",
-  "pick_list_materials",
-  "amended_from"
+  "section_break_oikl",
+  "items"
  ],
  "fields": [
   {
    "fieldname": "sales_order",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Sales Order",
    "options": "Sales Order",
-   "reqd": 1,
-   "read_only": 1
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fieldname": "column_break_nwsm",
    "fieldtype": "Column Break"
   },
   {
+   "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
-   "label": "Date",
-   "default": "Today"
+   "label": "Date"
   },
   {
    "fieldname": "pick_list",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Pick List",
-   "options": "Part List",
-   "hidden": 1
-  },
-  {
-   "fieldname": "section_break_zmpc",
-   "fieldtype": "Section Break",
-   "hidden": 1
-  },
-  {
-   "fieldname": "pick_list_materials",
-   "fieldtype": "Table",
-   "label": "Part List Materials",
-   "options": "Part List Materials",
-   "hidden": 1
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Color sample",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
+   "options": "Part List"
   },
   {
    "fieldname": "project",
@@ -75,19 +52,25 @@
    "label": "Items",
    "options": "Color Sample Item",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_oikl",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-09 10:36:44.134245",
+ "modified": "2026-10-09 19:25:59.368046",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Color sample",
  "owner": "Administrator",
  "permissions": [
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -98,9 +81,7 @@
    "role": "System Manager",
    "share": 1,
    "submit": 1,
-   "write": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   }
  ],
  "row_format": "Dynamic",
