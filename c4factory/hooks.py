@@ -25,7 +25,7 @@ doctype_js = {
     "Job Card": "public/js/doctype/job_card.js",
 
     # moved from c4napata → c4factory
-    "Sales Order": "public/js/doctype/sales_order/request_bom.js",
+    "Sales Order": "public/js/doctype/sales_order/sales_order.js",
     "Sample Request": "public/js/doctype/sample_request/sample_request.js",
 }
 

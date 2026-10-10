@@ -1,7 +1,23 @@
 import frappe
 from frappe.utils import now_datetime, today
 
-from c4factory.api.contract_bom import SALES_ORDER_ITEM_SPEC_FIELD_MAP
+SALES_ORDER_ITEM_SPEC_FIELD_MAP = {
+    "custom_location_code": "location_code",
+    "custom_sub_code": "sub_code",
+    "custom_plexi": "plexi",
+    "custom_top": "top",
+    "custom_modesty": "modesty",
+    "custom_wood": "wood",
+    "custom_metal": "metal",
+    "custom_leather": "leather",
+    "custom_drawer_body": "drawer_body",
+    "custom_drawer_face": "drawer_face",
+    "custom_glass": "glass",
+    "custom_fabric": "fabric",
+    "custom_direction": "direction",
+    "custom_other": "other",
+    "additional_notes": "additional_notes",
+}
 
 
 @frappe.whitelist()

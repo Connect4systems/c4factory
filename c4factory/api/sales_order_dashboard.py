@@ -5,7 +5,7 @@ from erpnext.selling.doctype.sales_order.sales_order_dashboard import get_data a
 
 def get_data(*args, **kwargs):
 	data = get_core_data()
-	data.setdefault("non_standard_fieldnames", {})["Contract BOM Request"] = "sales_order"
+	data.setdefault("non_standard_fieldnames", {})
 	data["non_standard_fieldnames"]["PDS Request"] = "sales_order"
 	data["non_standard_fieldnames"]["Color sample"] = "sales_order"
 
@@ -19,8 +19,6 @@ def get_data(*args, **kwargs):
 		transactions.append(manufacturing_group)
 
 	items = manufacturing_group.setdefault("items", [])
-	if "Contract BOM Request" not in items:
-		items.append("Contract BOM Request")
 	if "PDS Request" not in items:
 		items.append("PDS Request")
 	if "Color sample" not in items:
