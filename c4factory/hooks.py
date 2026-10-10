@@ -39,6 +39,7 @@ doc_events = {
     },
     "Sales Order": {
         "before_validate": "c4factory.api.sales_order_colors.validate_colors",
+        "before_submit": "c4factory.api.sales_order_project.before_submit",
     },
     "BOM": {
         "before_validate": "c4factory.api.bom.calculate_item_qty",

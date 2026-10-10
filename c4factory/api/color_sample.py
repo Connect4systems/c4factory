@@ -114,8 +114,7 @@ def validate_sample(doc, lock=False):
 		# Serialize submissions against one order before calculating the balance.
 		frappe.db.sql("select name from `tabSales Order` where name = %s for update", doc.sales_order)
 	order = get_order(doc.sales_order)
-	if order.get("project"):
-		doc.project = order.project
+	doc.project = order.get("project")
 	if not doc.get("items"):
 		frappe.throw(_("Select at least one Sales Order item."))
 	by_name = {row.name: row for row in order.items}
