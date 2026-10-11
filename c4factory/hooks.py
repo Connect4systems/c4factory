@@ -7,6 +7,9 @@ app_description = "Factory App"
 app_email = "info@connect4systems.com"
 app_license = "mit"
 
+# Reapply after customization sync, including sites that ran the original patch.
+after_migrate = "c4factory.patches.v1_0.allow_sales_order_part_list_after_submit.execute"
+
 app_include_js = [
     "/assets/c4factory/js/doctype/part_list_material_colors.js",
     "/assets/c4factory/js/doctype/sales_order/item_colors.js",

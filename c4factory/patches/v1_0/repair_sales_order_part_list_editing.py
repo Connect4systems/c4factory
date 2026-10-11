@@ -1,0 +1,1 @@
+from c4factory.patches.v1_0.allow_sales_order_part_list_after_submit import execute
