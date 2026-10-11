@@ -86,6 +86,11 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   // Always use the source default for an empty header, preserving nonempty overrides.
   if (!item.custom_wood) values.custom_wood = config.wood_color || null;
   if (!item.custom_metal) values.custom_metal = config.metal_color || null;
+  // Python's JSON includes spaces. Formatting alone must not dirty a saved form
+  // when an item is opened or its colors are refreshed.
+  if (JSON.stringify(saved) === values.custom_color_sample_data) {
+    delete values.custom_color_sample_data;
+  }
   salesOrderColorInitializing.add(item);
   try { await frappe.model.set_value(cdt, cdn, values); }
   finally { salesOrderColorInitializing.delete(item); }
