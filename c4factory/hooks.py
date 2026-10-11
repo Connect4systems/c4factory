@@ -38,6 +38,7 @@ doc_events = {
         "before_validate": "c4factory.api.part_list_material_colors.validate_material_colors",
     },
     "Sales Order": {
+        "before_update_after_submit": "c4factory.api.sales_order_part_list.before_update_after_submit",
         "before_validate": "c4factory.api.sales_order_colors.validate_colors",
         "on_submit": "c4factory.api.sales_order_project.on_submit",
     },

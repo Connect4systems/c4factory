@@ -78,5 +78,10 @@ def update_sales_order_part_list(part_list):
 		# Older requests lack row references: use the item only when unambiguous.
 		if len(rows) != 1:
 			continue
+		if status == 1:
+			from c4factory.api.sales_order_part_list import check_part_list_change
+			current = frappe.db.get_value("Sales Order Item", rows[0].name, link_fields, as_dict=True)
+			if any(current.get(field) != part_list.name for field in link_fields):
+				check_part_list_change(request.sales_order, rows[0].name)
 		frappe.db.set_value("Sales Order Item", rows[0].name, {field: part_list.name for field in link_fields})
 		frappe.db.set_value("Sales Order", request.sales_order, "modified", now_datetime())
