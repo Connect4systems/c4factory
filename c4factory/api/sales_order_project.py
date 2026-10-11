@@ -2,7 +2,10 @@ import frappe
 from frappe import _
 
 
-def before_submit(doc, method=None):
+def on_submit(doc, method=None):
+	# Workflow requests must not create projects while the order is still a draft.
+	if doc.docstatus != 1:
+		return
 	project_name = (doc.get("custom_project_no") or "").strip()
 	if not project_name:
 		frappe.throw(_("Project No is required before submitting the Sales Order."))
@@ -19,6 +22,7 @@ def before_submit(doc, method=None):
 			frappe.throw(_("The linked Project must match Project No, customer, company and Sales Order."))
 		project.sales_order = doc.name
 		project.save(ignore_permissions=True)
+		doc.db_set("custom_project_no", project_name, update_modified=False)
 		return
 
 	if frappe.db.exists("Project", {"project_name": project_name}):
@@ -34,4 +38,5 @@ def before_submit(doc, method=None):
 	})
 	# Project creation is part of the authorized Sales Order submission transaction.
 	project.insert(ignore_permissions=True)
-	doc.project = project.name
+	# on_submit runs after the Sales Order has been written; persist the link too.
+	doc.db_set({"project": project.name, "custom_project_no": project_name}, update_modified=False)

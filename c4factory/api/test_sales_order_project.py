@@ -8,23 +8,27 @@ class Doc(dict):
 	__getattr__ = dict.__getitem__
 	__setattr__ = dict.__setitem__
 
+	def db_set(self, field, value=None, **kwargs):
+		self.setdefault("db_updates", []).append((field, value, kwargs))
+		self.update(field if isinstance(field, dict) else {field: value})
+
 
 class TestSalesOrderProject(unittest.TestCase):
 	def setUp(self):
-		self.doc = Doc(name="SO-1", customer="Customer", company="Company", custom_project_no=" P-1 ")
+		self.doc = Doc(name="SO-1", docstatus=1, customer="Customer", company="Company", custom_project_no=" P-1 ")
 		self.project = Mock(name="project")
 		self.project.name = "PROJ-0001"
 
 	def test_blank_number_blocks_submit(self):
 		self.doc.custom_project_no = "  "
 		with patch.object(api.frappe, "throw", side_effect=ValueError), self.assertRaises(ValueError):
-			api.before_submit(self.doc)
+			api.on_submit(self.doc)
 
 	def test_creation_sets_name_customer_order_and_link(self):
 		with patch.object(api.frappe.db, "exists", return_value=False), patch.object(
 			api.frappe, "get_doc", return_value=self.project
 		) as get_doc:
-			api.before_submit(self.doc)
+			api.on_submit(self.doc)
 		self.assertEqual(self.doc.project, "PROJ-0001")
 		self.assertEqual(self.doc.custom_project_no, "P-1")
 		values = get_doc.call_args.args[0]
@@ -32,12 +36,15 @@ class TestSalesOrderProject(unittest.TestCase):
 		self.assertEqual(values["customer"], "Customer")
 		self.assertEqual(values["sales_order"], "SO-1")
 		self.project.insert.assert_called_once_with(ignore_permissions=True)
+		self.assertEqual(self.doc.db_updates, [
+			({"project": "PROJ-0001", "custom_project_no": "P-1"}, None, {"update_modified": False})
+		])
 
 	def test_duplicate_number_blocks_submit(self):
 		with patch.object(api.frappe.db, "exists", return_value=True), patch.object(
 			api.frappe, "throw", side_effect=ValueError
 		), self.assertRaises(ValueError):
-			api.before_submit(self.doc)
+			api.on_submit(self.doc)
 
 	def test_unrelated_project_blocks_submit(self):
 		self.doc.project = "PROJ-0001"
@@ -45,4 +52,27 @@ class TestSalesOrderProject(unittest.TestCase):
 		with patch.object(api.frappe, "get_doc", return_value=project), patch.object(
 			api.frappe, "throw", side_effect=ValueError
 		), self.assertRaises(ValueError):
-			api.before_submit(self.doc)
+			api.on_submit(self.doc)
+
+	def test_workflow_request_does_not_create_or_validate_project(self):
+		self.doc.docstatus = 0
+		self.doc.workflow_state = "Pending"
+		self.doc.custom_project_no = ""
+		self.doc.project = "UNRELATED-PROJECT"
+		with patch.object(api.frappe, "get_doc") as get_doc, patch.object(
+			api.frappe, "throw"
+		) as throw:
+			api.on_submit(self.doc)
+		get_doc.assert_not_called()
+		throw.assert_not_called()
+		self.assertNotIn("db_updates", self.doc)
+
+	def test_matching_project_is_reused_and_linked(self):
+		self.doc.project = self.project.name
+		self.project.project_name = "P-1"
+		self.project.get.side_effect = {"customer": "Customer", "company": "Company", "sales_order": "SO-1"}.get
+		with patch.object(api.frappe, "get_doc", return_value=self.project):
+			api.on_submit(self.doc)
+		self.project.insert.assert_not_called()
+		self.project.save.assert_called_once_with(ignore_permissions=True)
+		self.assertEqual(self.doc.custom_project_no, "P-1")
