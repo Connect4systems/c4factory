@@ -18,6 +18,9 @@ class TestSalesOrderProject(unittest.TestCase):
 		self.doc = Doc(name="SO-1", docstatus=1, customer="Customer", company="Company", custom_project_no=" P-1 ")
 		self.project = Mock(name="project")
 		self.project.name = "PROJ-0001"
+		meta_patch = patch.object(api.frappe, "get_meta", return_value=Mock(fields=[]))
+		self.project_meta = meta_patch.start().return_value
+		self.addCleanup(meta_patch.stop)
 
 	def test_blank_number_blocks_submit(self):
 		self.doc.custom_project_no = "  "
@@ -99,4 +102,27 @@ class TestSalesOrderProject(unittest.TestCase):
 		self.assertEqual(self.doc.project, self.project.name)
 		self.assertEqual(self.project.sales_order, "SO-1")
 		self.project.insert.assert_not_called()
+		self.project.save.assert_called_once_with(ignore_permissions=True)
+
+	def test_creation_copies_required_project_number(self):
+		for fieldname in ("custom_project_no", "project_no", "custom_reference"):
+			with self.subTest(fieldname=fieldname):
+				self.doc.pop("project", None)
+				self.project.reset_mock()
+				self.project_meta.fields = [Doc(fieldname=fieldname, label="Project No")]
+				with patch.object(api.frappe.db, "exists", return_value=False), patch.object(
+					api.frappe, "get_doc", return_value=self.project
+				):
+					api.on_submit(self.doc)
+				self.project.set.assert_called_once_with(fieldname, "P-1")
+				self.project.insert.assert_called_once_with(ignore_permissions=True)
+
+	def test_reused_project_receives_required_number_before_save(self):
+		self.doc.project = self.project.name
+		self.project.project_name = "P-1"
+		self.project.get.side_effect = {"customer": "Customer", "company": "Company", "sales_order": "SO-1"}.get
+		self.project_meta.fields = [Doc(fieldname="custom_project_no", label="Project No")]
+		with patch.object(api.frappe, "get_doc", return_value=self.project):
+			api.on_submit(self.doc)
+		self.project.set.assert_called_once_with("custom_project_no", "P-1")
 		self.project.save.assert_called_once_with(ignore_permissions=True)
