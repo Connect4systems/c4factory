@@ -10,6 +10,8 @@ app_license = "mit"
 app_include_js = [
     "/assets/c4factory/js/doctype/part_list_material_colors.js",
     "/assets/c4factory/js/doctype/sales_order/item_colors.js",
+    # Register Sales Order actions independently of other apps' doctype_js hooks.
+    "/assets/c4factory/js/doctype/sales_order/sales_order.js",
 ]
 
 # ---------------------------------------------------------
@@ -24,8 +26,6 @@ doctype_js = {
     "Work Order": "public/js/doctype/work_order.js",
     "Job Card": "public/js/doctype/job_card.js",
 
-    # moved from c4napata → c4factory
-    "Sales Order": "public/js/doctype/sales_order/sales_order.js",
     "Sample Request": "public/js/doctype/sample_request/sample_request.js",
 }
 
