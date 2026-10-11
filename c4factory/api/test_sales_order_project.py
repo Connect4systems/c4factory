@@ -41,7 +41,8 @@ class TestSalesOrderProject(unittest.TestCase):
 		])
 
 	def test_duplicate_number_blocks_submit(self):
-		with patch.object(api.frappe.db, "exists", return_value=True), patch.object(
+		project = Doc(project_name="P-1", customer="Other Customer", company="Company", sales_order="SO-2")
+		with patch.object(api.frappe, "get_doc", return_value=project), patch.object(api.frappe.db, "exists", return_value="OTHER"), patch.object(
 			api.frappe, "throw", side_effect=ValueError
 		), self.assertRaises(ValueError):
 			api.on_submit(self.doc)
@@ -49,7 +50,7 @@ class TestSalesOrderProject(unittest.TestCase):
 	def test_unrelated_project_blocks_submit(self):
 		self.doc.project = "PROJ-0001"
 		project = Doc(project_name="P-1", customer="Customer", company="Company", sales_order="SO-2")
-		with patch.object(api.frappe, "get_doc", return_value=project), patch.object(
+		with patch.object(api.frappe.db, "exists", return_value="PROJ-0001"), patch.object(api.frappe, "get_doc", return_value=project), patch.object(
 			api.frappe, "throw", side_effect=ValueError
 		), self.assertRaises(ValueError):
 			api.on_submit(self.doc)
@@ -76,3 +77,26 @@ class TestSalesOrderProject(unittest.TestCase):
 		self.project.insert.assert_not_called()
 		self.project.save.assert_called_once_with(ignore_permissions=True)
 		self.assertEqual(self.doc.custom_project_no, "P-1")
+
+	def test_stale_link_is_replaced_with_new_project(self):
+		self.doc.project = "OLD-PROJECT"
+		old = Doc(project_name="OLD", customer="Customer", company="Company", sales_order="SO-OLD")
+		with patch.object(api.frappe.db, "exists", return_value=False), patch.object(
+			api.frappe, "get_doc", side_effect=[old, self.project]
+		):
+			api.on_submit(self.doc)
+		self.assertEqual(self.doc.project, "PROJ-0001")
+		self.assertEqual(old.sales_order, "SO-OLD")
+		self.project.insert.assert_called_once_with(ignore_permissions=True)
+
+	def test_matching_unassigned_project_is_reused(self):
+		self.project.project_name = "P-1"
+		self.project.get.side_effect = {"customer": "Customer", "company": "Company", "sales_order": None}.get
+		with patch.object(api.frappe.db, "exists", return_value=self.project.name), patch.object(
+			api.frappe, "get_doc", return_value=self.project
+		):
+			api.on_submit(self.doc)
+		self.assertEqual(self.doc.project, self.project.name)
+		self.assertEqual(self.project.sales_order, "SO-1")
+		self.project.insert.assert_not_called()
+		self.project.save.assert_called_once_with(ignore_permissions=True)

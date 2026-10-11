@@ -11,22 +11,28 @@ def on_submit(doc, method=None):
 		frappe.throw(_("Project No is required before submitting the Sales Order."))
 	doc.custom_project_no = project_name
 
-	if doc.get("project"):
-		project = frappe.get_doc("Project", doc.project)
-		if (
-			project.project_name != project_name
-			or project.get("customer") != doc.customer
-			or project.get("company") != doc.company
-			or project.get("sales_order") not in {value for value in (doc.name, doc.get("amended_from")) if value}
-		):
-			frappe.throw(_("The linked Project must match Project No, customer, company and Sales Order."))
+	def matches(project):
+		return (
+			project.project_name == project_name
+			and project.get("customer") == doc.customer
+			and project.get("company") == doc.company
+			and (not project.get("sales_order") or project.get("sales_order") in
+				{doc.name, doc.get("amended_from")})
+		)
+
+	project = frappe.get_doc("Project", doc.project) if doc.get("project") else None
+	if project is None or not matches(project):
+		# An old/manual link must not prevent creating the order's own Project.
+		existing = frappe.db.exists("Project", {"project_name": project_name})
+		project = frappe.get_doc("Project", existing) if existing else None
+		if project is not None and not matches(project):
+			frappe.throw(_("A Project named {0} belongs to another customer, company or Sales Order. Enter a unique Project No.").format(project_name))
+
+	if project is not None:
 		project.sales_order = doc.name
 		project.save(ignore_permissions=True)
-		doc.db_set("custom_project_no", project_name, update_modified=False)
+		doc.db_set({"project": project.name, "custom_project_no": project_name}, update_modified=False)
 		return
-
-	if frappe.db.exists("Project", {"project_name": project_name}):
-		frappe.throw(_("A Project named {0} already exists. Enter a unique Project No.").format(project_name))
 
 	project = frappe.get_doc({
 		"doctype": "Project",
