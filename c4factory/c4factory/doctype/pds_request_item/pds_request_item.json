@@ -10,6 +10,7 @@
   "item_name",
   "qty",
   "part_list",
+  "open_part_list",
   "create_part_list",
   "column_break_erjd",
   "image_ftht",
@@ -73,6 +74,13 @@
    "in_list_view": 1,
    "label": "Part List",
    "options": "Part List"
+  },
+  {
+   "fieldname": "open_part_list",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "allow_on_submit": 1,
+   "label": "Open Part List"
   },
   {
    "fieldname": "create_part_list",

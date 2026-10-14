@@ -14,6 +14,14 @@ frappe.ui.form.on("PDS Request", {
 });
 
 frappe.ui.form.on("PDS Request Item", {
+	open_part_list(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.part_list) {
+			frappe.msgprint(__("No Part List is linked to this item yet."));
+			return;
+		}
+		frappe.set_route("Form", "Part List", row.part_list);
+	},
 	item(frm, cdt, cdn) {
 		frappe.model.set_value(cdt, cdn, "part_list", null);
 	},
