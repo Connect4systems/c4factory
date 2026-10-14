@@ -9,6 +9,7 @@ def get_data(*args, **kwargs):
 	data.setdefault("non_standard_fieldnames", {})
 	data["non_standard_fieldnames"]["PDS Request"] = "sales_order"
 	data["non_standard_fieldnames"]["Color sample"] = "sales_order"
+	data["non_standard_fieldnames"]["Production Order"] = "sales_order"
 	# Part Lists are referenced by SO items, rather than pointing back to an SO.
 	part_list_fields = [field.fieldname for field in frappe.get_meta("Sales Order Item").fields
 		if field.fieldtype == "Link" and field.options == "Part List"]
@@ -30,6 +31,8 @@ def get_data(*args, **kwargs):
 		items.append("PDS Request")
 	if "Color sample" not in items:
 		items.append("Color sample")
+	if "Production Order" not in items:
+		items.append("Production Order")
 	if part_list_fields and "Part List" not in items:
 		items.append("Part List")
 

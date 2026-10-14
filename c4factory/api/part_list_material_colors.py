@@ -12,6 +12,9 @@ def material_color_target(doc, field, row):
 
 
 def validate_material_colors(doc, method=None):
+	# Production Orders retain the approved sample's colors as a snapshot.
+	if doc.doctype == "Production Order":
+		return
 	fields = material_table_fields(doc)
 	if not fields:
 		return

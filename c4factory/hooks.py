@@ -42,6 +42,9 @@ doctype_js = {
 # ---------------------------------------------------------
 
 doc_events = {
+	"Color sample": {
+		"before_cancel": "c4factory.api.production_order.prevent_sample_cancel",
+	},
     "*": {
         "before_validate": "c4factory.api.part_list_material_colors.validate_material_colors",
     },
@@ -153,6 +156,7 @@ patches = [
 ]
 
 override_doctype_dashboards = {
+	"Color sample": "c4factory.api.color_sample_dashboard.get_data",
     "Project": "c4factory.api.project_dashboard.get_data",
     "BOM": "c4factory.api.bom_dashboard.get_data",
     "Pick List": "c4factory.api.pick_list_dashboard.get_data",

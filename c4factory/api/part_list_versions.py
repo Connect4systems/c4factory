@@ -161,9 +161,10 @@ def activate_for_product(part):
 
 def link_copied_attachments(part):
 	"""Give readers of a copied Part List access to its existing private PDS files."""
+	doctype = part.get("doctype") or "Part List"
 	urls = {row.get("arttach") for row in part.get("pds_table") or [] if row.get("arttach")}
 	for url in urls:
-		if frappe.db.exists("File", {"file_url": url, "attached_to_doctype": "Part List", "attached_to_name": part.name}):
+		if frappe.db.exists("File", {"file_url": url, "attached_to_doctype": doctype, "attached_to_name": part.name}):
 			continue
 		files = frappe.get_all("File", filters={"file_url": url}, fields=["name"], limit_page_length=1)
 		if not files:
@@ -172,7 +173,7 @@ def link_copied_attachments(part):
 		# Only reuse a file the submitting/saving user can already read.
 		file.check_permission("read")
 		frappe.get_doc({"doctype": "File", "file_name": file.file_name, "file_url": file.file_url,
-			"is_private": file.is_private, "attached_to_doctype": "Part List", "attached_to_name": part.name,
+			"is_private": file.is_private, "attached_to_doctype": doctype, "attached_to_name": part.name,
 			"attached_to_field": "pds_table"}).insert(ignore_permissions=True)
 
 

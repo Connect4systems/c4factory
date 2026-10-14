@@ -6,5 +6,7 @@ from erpnext.projects.doctype.project.project_dashboard import get_data as get_c
 def get_data(*args, **kwargs):
 	data = get_core_data()
 	data.setdefault("non_standard_fieldnames", {})["Color sample"] = "project"
+	data["non_standard_fieldnames"]["Production Order"] = "project"
+	data.setdefault("transactions", []).append({"label": _("Manufacturing"), "items": ["Production Order"]})
 	data.setdefault("transactions", []).append({"label": _("Color Samples"), "items": ["Color sample"]})
 	return data

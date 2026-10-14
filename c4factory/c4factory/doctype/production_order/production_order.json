@@ -1,0 +1,353 @@
+{
+ "doctype": "DocType",
+ "name": "Production Order",
+ "module": "C4Factory",
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "allow_rename": 0,
+ "field_order": [
+  "order_details",
+  "color_sample",
+  "color_sample_item",
+  "sales_order",
+  "project",
+  "part_list",
+  "order_column",
+  "date",
+  "qty",
+  "uom",
+  "sample_qty",
+  "ordered_qty",
+  "remaining_qty",
+  "design_details",
+  "product",
+  "product_name",
+  "description",
+  "column_break_vwca",
+  "image",
+  "product_image",
+  "section_break_vncv",
+  "width",
+  "column_break_zktq",
+  "hight",
+  "column_break_iptf",
+  "depth",
+  "section_break_iuan",
+  "pds_table",
+  "part_list_tab",
+  "material_line",
+  "section_break_lgnl",
+  "panel_materials",
+  "metal_tab",
+  "metal_material_line",
+  "metal_material",
+  "others_tab",
+  "other_material",
+  "accessorise_tab",
+  "accessorise_table"
+ ],
+ "fields": [
+  {
+   "fieldname": "order_details",
+   "fieldtype": "Section Break",
+   "label": "Production Order"
+  },
+  {
+   "fieldname": "color_sample",
+   "fieldtype": "Link",
+   "label": "Color Sample",
+   "options": "Color sample",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "color_sample_item",
+   "fieldtype": "Data",
+   "label": "Color Sample Item",
+   "reqd": 1,
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fieldname": "part_list",
+   "fieldtype": "Link",
+   "label": "Source Part List",
+   "options": "Part List",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "order_column",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "default": "Today",
+   "reqd": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Production Quantity",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sample_qty",
+   "fieldtype": "Float",
+   "label": "Color Sample Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ordered_qty",
+   "fieldtype": "Float",
+   "label": "Previously Ordered Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remaining_qty",
+   "fieldtype": "Float",
+   "label": "Balance After This Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "design_details",
+   "fieldtype": "Section Break",
+   "label": "Product and Part List Details",
+   "description": "Part List quantities are per product. Colors are copied from the approved Color Sample."
+  },
+  {
+   "fieldname": "product",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Product",
+   "link_filters": "[[\"Item\",\"is_sales_item\",\"=\",1]]",
+   "options": "Item",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "product_name",
+   "fieldtype": "Data",
+   "label": "Product Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_vwca",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Image",
+   "label": "Item Image",
+   "options": "product_image"
+  },
+  {
+   "fieldname": "product_image",
+   "fieldtype": "Attach Image",
+   "hidden": 1,
+   "label": "Item Image",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_vncv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width",
+   "precision": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_zktq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hight",
+   "fieldtype": "Float",
+   "label": "Height",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_iptf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "depth",
+   "fieldtype": "Float",
+   "label": "Depth",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_iuan",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "pds_table",
+   "fieldtype": "Table",
+   "label": "PDS Table",
+   "options": "PDS Table",
+   "read_only": 1
+  },
+  {
+   "fieldname": "part_list_tab",
+   "fieldtype": "Tab Break",
+   "label": "Panels"
+  },
+  {
+   "fieldname": "material_line",
+   "fieldtype": "Link",
+   "label": "Material Line",
+   "options": "Material Line",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_lgnl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "panel_materials",
+   "fieldtype": "Table",
+   "label": "Panel Materials",
+   "options": "Part List Materials",
+   "read_only": 1
+  },
+  {
+   "fieldname": "metal_tab",
+   "fieldtype": "Tab Break",
+   "label": "Metal"
+  },
+  {
+   "fieldname": "metal_material_line",
+   "fieldtype": "Link",
+   "label": "Material Line",
+   "options": "Material Line",
+   "read_only": 1
+  },
+  {
+   "fieldname": "metal_material",
+   "fieldtype": "Table",
+   "label": "Metal Material",
+   "options": "Part List Materials",
+   "read_only": 1
+  },
+  {
+   "fieldname": "others_tab",
+   "fieldtype": "Tab Break",
+   "label": "Others"
+  },
+  {
+   "fieldname": "other_material",
+   "fieldtype": "Table",
+   "label": "Other Material",
+   "options": "Part List Materials",
+   "read_only": 1
+  },
+  {
+   "fieldname": "accessorise_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accessorise "
+  },
+  {
+   "fieldname": "accessorise_table",
+   "fieldtype": "Table",
+   "label": "Accessorise Table",
+   "options": "Accessorise Table",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1,
+   "cancel": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales User"
+  },
+  {
+   "read": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Technical",
+   "submit": 1,
+   "write": 1,
+   "cancel": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "PM",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
+  }
+ ],
+ "actions": [],
+ "links": [],
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-10-14 14:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "creation": "2026-10-14 14:00:00.000000",
+ "title_field": "product_name",
+ "search_fields": "product,color_sample,sales_order,project"
+}

@@ -21,6 +21,24 @@ Factors must be positive, UOM rows unique, and the default UOM factor must be 1.
 ERPNext transactions retain their own conversion factors and stock quantities;
 editing an item factor does not rewrite submitted transactions.
 
+### Production Orders from Color Samples
+
+On a submitted Color Sample, choose **Create > Production Order**, select a product,
+and enter all or part of its available sample quantity. Each order uses the name
+`PO-{item code}-01` and links to the Color Sample row, Sales Order, project, and
+source Part List. It copies the complete Part List tables, details and PDS files,
+replacing material colors with the approved sample choices. Material quantities
+remain per product; the order has a separate production quantity.
+
+Only submitted Production Orders consume the sample balance. Drafts do not reserve
+quantity, and cancellation releases it. The balance is checked again under a
+database lock on submission. Existing orders keep their copied design and colors;
+change the quantity or create another order for a different sample or design.
+Cancel submitted Production Orders before cancelling their Color Sample.
+
+Run `bench --site <site> migrate` after deploying to create the new DocType, then
+rebuild assets and reload the page.
+
 ### Installation
 
 You can install this app using the [bench](https://github.com/frappe/bench) CLI:
