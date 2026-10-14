@@ -25,7 +25,7 @@ async function applyPartListTableColor(frm, field) {
   frm.refresh_field(field);
 }
 
-async function syncSharedPartMaterialColor(frm, cdt, cdn, clear = false) {
+async function syncSharedPartMaterialColor(frm, cdt, cdn, clear = false, displayOnly = false) {
   const row = locals[cdt]?.[cdn];
   if (!row) return;
   const material = row.material;
@@ -40,6 +40,13 @@ async function syncSharedPartMaterialColor(frm, cdt, cdn, clear = false) {
     : null;
   if (sharedPartMaterialColorRequests.get(cdn) !== request || row.material !== material || locals[cdt]?.[cdn] !== row) return;
   const target = tableDefault?.target || result?.message?.color || null;
+  if (displayOnly) {
+    // Only configure the Dynamic Link while rendering. Server validation owns
+    // normalization; model.set_value here can hide Submit after every save.
+    row.color_doctype = target;
+    frm.refresh_field(row.parentfield || "pick_list_materials");
+    return;
+  }
   if ((!target || row.color_doctype !== target) && row.basic_color) {
     await frappe.model.set_value(cdt, cdn, "basic_color", null);
   }
@@ -54,11 +61,11 @@ async function syncSharedPartMaterialColor(frm, cdt, cdn, clear = false) {
   frm.refresh_field(row.parentfield || "pick_list_materials");
 }
 
-function refreshSharedPartMaterialColors(frm) {
+function refreshSharedPartMaterialColors(frm, displayOnly = false) {
   return Promise.all((frm.meta.fields || [])
     .filter(field => field.fieldtype === "Table" && field.options === "Part List Materials")
     .flatMap(field => (frm.doc[field.fieldname] || []).map(row =>
-      syncSharedPartMaterialColor(frm, row.doctype, row.name))));
+      syncSharedPartMaterialColor(frm, row.doctype, row.name, false, displayOnly))));
 }
 
 frappe.ui.form.on("Part List Materials", {
@@ -72,7 +79,7 @@ frappe.ui.form.on("Part List Materials", {
     return syncSharedPartMaterialColor(frm, cdt, cdn, true);
   },
   form_render(frm, cdt, cdn) {
-    return syncSharedPartMaterialColor(frm, cdt, cdn);
+    return syncSharedPartMaterialColor(frm, cdt, cdn, false, true);
   },
 });
 
@@ -83,5 +90,7 @@ frappe.ui.form.on("Part List", {
 });
 
 for (const parent of ["Part List", "Color sample"]) {
-  frappe.ui.form.on(parent, { refresh: refreshSharedPartMaterialColors });
+  frappe.ui.form.on(parent, {
+    refresh(frm) { return refreshSharedPartMaterialColors(frm, true); },
+  });
 }

@@ -2,8 +2,6 @@ async function refreshPartListProductImage(frm) {
   const product = frm.doc.product;
   const request = (frm._productImageRequest || 0) + 1;
   frm._productImageRequest = request;
-  frm.doc.product_image = null;
-  frm.refresh_field("image");
   const result = product
     ? await frappe.db.get_value("Item", product, "image")
     : null;
@@ -12,10 +10,21 @@ async function refreshPartListProductImage(frm) {
   frm.refresh_field("image");
 }
 
-async function syncPartListWoodColor(frm, clear = false) {
+async function syncPartListWoodColor(frm, clear = false, displayOnly = false) {
   const target = { "Artificial Wood": "P-Wood", "Natural Wood": "P-Natural" }[frm.doc.wood_type || "Artificial Wood"] || null;
   const colorField = frm.fields_dict.wood_color;
   if (!colorField) return;
+  if (displayOnly) {
+    // Rendering a saved document must not put it back into the Save state.
+    // before_validate persists this derived field when the document is saved.
+    if (frm.fields_dict.wood_color_doctype) {
+      frm.doc.wood_color_doctype = target;
+    } else if (colorField.df.fieldtype === "Link") {
+      frm.set_df_property("wood_color", "options", target || "P-Wood");
+    }
+    frm.refresh_field("wood_color");
+    return;
+  }
   // Older sites may receive this script before the DocType migration.
   if (!frm.fields_dict.wood_color_doctype) {
     if (colorField.df.fieldtype === "Link") {
@@ -34,7 +43,7 @@ async function syncPartListWoodColor(frm, clear = false) {
 
 frappe.ui.form.on("Part List", {
   refresh(frm) {
-    return Promise.all([refreshPartListProductImage(frm), syncPartListWoodColor(frm)]);
+    return Promise.all([refreshPartListProductImage(frm), syncPartListWoodColor(frm, false, true)]);
   },
   wood_type(frm) {
     return syncPartListWoodColor(frm, true);
