@@ -40,10 +40,14 @@ async function syncSharedPartMaterialColor(frm, cdt, cdn, clear = false) {
     : null;
   if (sharedPartMaterialColorRequests.get(cdn) !== request || row.material !== material || locals[cdt]?.[cdn] !== row) return;
   const target = tableDefault?.target || result?.message?.color || null;
-  if (!target || row.color_doctype !== target) {
+  if ((!target || row.color_doctype !== target) && row.basic_color) {
     await frappe.model.set_value(cdt, cdn, "basic_color", null);
   }
-  await frappe.model.set_value(cdt, cdn, "color_doctype", target);
+  // Frappe treats an empty string and null as different values. Avoid dirtying
+  // saved documents on refresh when both represent an empty color source.
+  if ((row.color_doctype || null) !== target) {
+    await frappe.model.set_value(cdt, cdn, "color_doctype", target);
+  }
   if (tableDefault && clear) {
     await frappe.model.set_value(cdt, cdn, "basic_color", tableDefault.color);
   }

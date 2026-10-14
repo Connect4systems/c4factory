@@ -27,7 +27,9 @@ async function syncPartListWoodColor(frm, clear = false) {
   if (clear || (frm.doc.wood_color_doctype && frm.doc.wood_color_doctype !== target)) {
     await frm.set_value("wood_color", null);
   }
-  await frm.set_value("wood_color_doctype", target);
+  if ((frm.doc.wood_color_doctype || null) !== target) {
+    await frm.set_value("wood_color_doctype", target);
+  }
 }
 
 frappe.ui.form.on("Part List", {
