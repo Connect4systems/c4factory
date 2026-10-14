@@ -33,6 +33,8 @@ class TestSalesOrderColorCleanup(TestPartListSave):
 		config = {"rows": [{"source_row": "M", "color_doctype": "P-Natural", "color": "Oak"}]}
 		with patch.object(api, "get_part_list_colors", return_value=config):
 			api.validate_colors(SimpleNamespace(items=[item]))
+			item.doctype = "Color Sample Item"
+			api.validate_colors(SimpleNamespace(items=[item]))
 		self.assertEqual(json.loads(item.custom_color_sample_data)["rows"][0]["color"], "Walnut")
 		for name in ("custom_wood", "custom_metal", "custom_wood_color_doctype"):
 			self.assertNotIn(name, item)

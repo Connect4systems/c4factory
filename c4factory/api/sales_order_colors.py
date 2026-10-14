@@ -28,9 +28,6 @@ def get_part_list_colors(part_list):
 	part = frappe.get_doc("Part List", part_list)
 	part.check_permission("read")
 	return {
-		"wood_color": part.get("wood"),
-		"wood_color_doctype": "P-Wood",
-		"metal_color": part.get("metal"),
 		"rows": [
 			{
 				"source_row": row.name, "source_table": field,
@@ -52,10 +49,6 @@ def validate_colors(doc, method=None):
 		part_list = item.get("custom_part_list") or item.get("part_list")
 		if not part_list:
 			item.custom_color_sample_data = None
-			if item.get("doctype") == "Color Sample Item":
-				item.custom_wood = None
-				item.custom_metal = None
-				item.custom_wood_color_doctype = None
 			continue
 		if part_list not in cache:
 			cache[part_list] = get_part_list_colors(part_list)
@@ -67,20 +60,6 @@ def validate_colors(doc, method=None):
 		except (ValueError, TypeError):
 			frappe.throw(_("Row {0}: Invalid color sample data.").format(item.idx))
 		matching = stored.get("part_list") == part_list
-		if item.get("doctype") == "Color Sample Item":
-			if not matching or not item.get("custom_wood_color_doctype"):
-				item.custom_wood = config["wood_color"]
-				item.custom_metal = config["metal_color"]
-			elif item.get("custom_wood_color_doctype") and item.custom_wood_color_doctype != config["wood_color_doctype"]:
-				item.custom_wood = config["wood_color"]
-			if not item.get("custom_wood"):
-				item.custom_wood = config["wood_color"]
-			if not item.get("custom_metal"):
-				item.custom_metal = config["metal_color"]
-			item.custom_wood_color_doctype = config["wood_color_doctype"]
-			for value, target in ((item.get("custom_wood"), config["wood_color_doctype"]), (item.get("custom_metal"), "P-Metal")):
-				if value and not frappe.db.exists(target, value):
-					frappe.throw(_("Row {0}: Color must be an existing record in {1}.").format(item.idx, target))
 		selected = {row.get("source_row"): row for row in stored.get("rows", []) if isinstance(row, dict)}
 		rows = []
 		for source in config["rows"]:

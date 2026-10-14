@@ -1,6 +1,5 @@
 // Both views edit the same per-item data; the original Part List is read-only.
 const salesOrderColorRequests = new WeakMap();
-const salesOrderColorInitializing = new WeakSet();
 
 function salesOrderColorGridForm(frm, cdn) {
   const row = frm.fields_dict.items?.grid?.grid_rows_by_docname?.[cdn];
@@ -34,14 +33,7 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   const request = {};
   salesOrderColorRequests.set(item, request);
   if (!partList) {
-    salesOrderColorInitializing.add(item);
-    try {
-      const values = { custom_color_sample_data: null };
-      if (cdt === 'Color Sample Item') {
-        Object.assign(values, { custom_wood: null, custom_metal: null, custom_wood_color_doctype: null });
-      }
-      await frappe.model.set_value(cdt, cdn, values);
-    } finally { salesOrderColorInitializing.delete(item); }
+    await frappe.model.set_value(cdt, cdn, { custom_color_sample_data: null });
     renderSalesOrderColors(frm, cdt, cdn);
     return;
   }
@@ -76,31 +68,12 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   const values = {
     custom_color_sample_data: JSON.stringify({ part_list: partList, rows }),
   };
-  if (cdt === 'Color Sample Item') {
-    values.custom_wood_color_doctype = config.wood_color_doctype;
-    if (!matching || !item.custom_wood_color_doctype) {
-      values.custom_wood = config.wood_color || null;
-      values.custom_metal = config.metal_color || null;
-    } else if (item.custom_wood_color_doctype && item.custom_wood_color_doctype !== config.wood_color_doctype) {
-      values.custom_wood = config.wood_color || null;
-    }
-    // A previously initialized payload can still have empty header fields.
-    // Always use the source default for an empty header, preserving nonempty overrides.
-    if (!item.custom_wood) values.custom_wood = config.wood_color || null;
-    if (!item.custom_metal) values.custom_metal = config.metal_color || null;
-  }
   // Python's JSON includes spaces. Formatting alone must not dirty a saved form
   // when an item is opened or its colors are refreshed.
   if (JSON.stringify(saved) === values.custom_color_sample_data) {
     delete values.custom_color_sample_data;
   }
-  salesOrderColorInitializing.add(item);
-  try { await frappe.model.set_value(cdt, cdn, values); }
-  finally { salesOrderColorInitializing.delete(item); }
-  const gridForm = salesOrderColorGridForm(frm, cdn);
-  for (const field of cdt === 'Color Sample Item' ? ['custom_wood_color_doctype', 'custom_wood', 'custom_metal'] : []) {
-    gridForm?.fields_dict[field]?.refresh();
-  }
+  await frappe.model.set_value(cdt, cdn, values);
   renderSalesOrderColors(frm, cdt, cdn);
 }
 
@@ -161,28 +134,6 @@ function renderSalesOrderColors(frm, cdt, cdn) {
   }
 }
 
-async function applySalesOrderHeaderColor(frm, cdt, cdn, table, field) {
-  const item = locals[cdt]?.[cdn];
-  if (!item || salesOrderColorInitializing.has(item)) return;
-  const color = item[field] || null;
-  let data = salesOrderStoredColors(item);
-  const partList = item.custom_part_list || item.part_list;
-  if (!partList) return;
-  if (data.part_list !== partList) {
-    await syncSalesOrderColors(frm, cdt, cdn);
-    if ((item.custom_part_list || item.part_list) !== partList) return;
-    data = salesOrderStoredColors(item);
-    salesOrderColorInitializing.add(item);
-    try { await frappe.model.set_value(cdt, cdn, field, color); }
-    finally { salesOrderColorInitializing.delete(item); }
-  }
-  for (const row of data.rows) {
-    if (row.source_table === table) row.color = color;
-  }
-  await frappe.model.set_value(cdt, cdn, 'custom_color_sample_data', JSON.stringify(data));
-  renderSalesOrderColors(frm, cdt, cdn);
-}
-
 for (const colorItemType of ['Sales Order Item', 'Color Sample Item']) {
   frappe.ui.form.on(colorItemType, {
     async custom_update_part_list(frm, cdt, cdn) {
@@ -194,13 +145,3 @@ for (const colorItemType of ['Sales Order Item', 'Color Sample Item']) {
     part_list: syncSalesOrderColors,
   });
 }
-
-// Header color choices belong to Color Samples, not Sales Order items.
-frappe.ui.form.on('Color Sample Item', {
-  custom_wood(frm, cdt, cdn) {
-    return applySalesOrderHeaderColor(frm, cdt, cdn, 'panel_materials', 'custom_wood');
-  },
-  custom_metal(frm, cdt, cdn) {
-    return applySalesOrderHeaderColor(frm, cdt, cdn, 'metal_material', 'custom_metal');
-  },
-});

@@ -70,12 +70,8 @@ def source_colors(row):
 		choice = choices.get(material["source_row"], {})
 		if choice.get("color_doctype") == material["color_doctype"]:
 			material["color"] = choice.get("color")
-	wood = config["wood_color"]
-	metal = config["metal_color"]
 	return {
 		"custom_part_list": part_list,
-		"custom_wood_color_doctype": config["wood_color_doctype"],
-		"custom_wood": wood, "custom_metal": metal,
 		"custom_color_sample_data": json.dumps({
 			"part_list": part_list, "rows": config["rows"],
 		}),
@@ -141,7 +137,7 @@ def validate_sample(doc, lock=False):
 		if item.get("custom_part_list") != baseline["custom_part_list"] or not item.get("custom_color_sample_data"):
 			item.update(baseline)
 	validate_colors(doc)
-	# Unchecked materials allow header changes, but no individual row override.
+	# Materials without individual editing enabled must retain their source color.
 	for item in doc.items:
 		source = by_name[item.sales_order_item]
 		baseline = json.loads(source_colors(source)["custom_color_sample_data"])
@@ -149,10 +145,5 @@ def validate_sample(doc, lock=False):
 		for row in json.loads(item.custom_color_sample_data)["rows"]:
 			if row["edite_color"]:
 				continue
-			allowed = [original[row["source_row"]]["color"]]
-			if row["source_table"] == "panel_materials":
-				allowed.append(item.custom_wood)
-			elif row["source_table"] == "metal_material":
-				allowed.append(item.custom_metal)
-			if row["color"] not in allowed:
+			if row["color"] != original[row["source_row"]]["color"]:
 				frappe.throw(_("Row {0}: Individual color editing is not enabled for material {1}.").format(item.idx, row["material"]))

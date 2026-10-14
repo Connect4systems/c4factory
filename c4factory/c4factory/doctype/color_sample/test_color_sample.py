@@ -21,8 +21,7 @@ class TestColorsample(unittest.TestCase):
         self.source = Doc(name="SO-ROW-1", item_code="Desk", item_name="Desk", qty=10, uom="Nos")
         self.order = Doc(name="SO", docstatus=1, project="PROJECT", items=[self.source])
         self.colors = {
-            "custom_part_list": "PL", "custom_wood": "Oak", "custom_metal": "Black",
-            "custom_wood_color_doctype": "P-Wood",
+            "custom_part_list": "PL",
             "custom_color_sample_data": json.dumps({"part_list": "PL", "rows": []}),
         }
 
@@ -92,19 +91,19 @@ class TestColorsample(unittest.TestCase):
         self.assertTrue(sql.call_args.args[0].endswith(" for update"))
 
     def test_inherits_order_colors_without_changing_source_part_list(self):
-        config = {"wood_color": "Standard", "wood_color_doctype": "P-Wood",
-                  "metal_color": "Black", "rows": [
+        config = {"rows": [
                       {"source_row": "M", "color_doctype": "P-Wood", "color": "Standard"}
                   ]}
         self.source.custom_part_list = "PL"
-        self.source.custom_wood = "Order Override"
         self.source.custom_color_sample_data = json.dumps({"part_list": "PL", "rows": [
             {"source_row": "M", "color_doctype": "P-Wood", "color": "Row Override"}
         ]})
         before = dict(self.source)
         with patch.object(api, "get_part_list_colors", side_effect=lambda name: copy.deepcopy(config)):
             result = api.source_colors(self.source)
-        self.assertEqual(result["custom_wood"], "Standard")
+        self.assertNotIn("custom_wood", result)
+        self.assertNotIn("custom_metal", result)
+        self.assertNotIn("custom_wood_color_doctype", result)
         self.assertEqual(json.loads(result["custom_color_sample_data"])["rows"][0]["color"], "Row Override")
         self.assertEqual(config["rows"][0]["color"], "Standard")
         self.assertEqual(dict(self.source), before)
