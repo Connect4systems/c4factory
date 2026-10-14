@@ -45,11 +45,11 @@
    "options": "PDS Request Item"
   },
   {
+   "default": "SO-PDS-.###",
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Naming series",
-   "options": "SO-PDS-.###",
-   "default": "SO-PDS-.###"
+   "options": "SO-PDS-.###"
   },
   {
    "fieldname": "section_break_klg4",
@@ -89,7 +89,7 @@
    "table_fieldname": "items"
   }
  ],
- "modified": "2026-08-25 15:55:36.133117",
+ "modified": "2026-10-12 10:04:04.802843",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "PDS Request",
@@ -142,6 +142,18 @@
    "role": "Technical",
    "share": 1,
    "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "PM",
+   "share": 1,
    "write": 1
   }
  ],

@@ -12,7 +12,6 @@
   "description",
   "column_break_vwca",
   "disable",
-  "pds",
   "image",
   "product_image",
   "section_break_vncv",
@@ -21,6 +20,8 @@
   "hight",
   "column_break_iptf",
   "depth",
+  "section_break_iuan",
+  "pds_table",
   "part_list_tab",
   "column_break_zyms",
   "wood_type",
@@ -180,11 +181,6 @@
    "options": "Part List Materials"
   },
   {
-   "fieldname": "pds",
-   "fieldtype": "Attach",
-   "label": "PDS"
-  },
-  {
    "allow_on_submit": 1,
    "default": "0",
    "fieldname": "is_default",
@@ -306,20 +302,30 @@
    "options": "Artificial Wood\nNatural Wood"
   },
   {
+   "default": "P-Wood",
    "fieldname": "wood_color_doctype",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Wood Color DocType",
    "options": "DocType",
-   "hidden": 1,
-   "read_only": 1,
-   "default": "P-Wood"
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_iuan",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "pds_table",
+   "fieldtype": "Table",
+   "label": "PDS Table",
+   "options": "PDS Table"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-09 12:17:46.894490",
+ "modified": "2026-10-13 16:09:34.240858",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",
@@ -349,11 +355,24 @@
   },
   {
    "create": 1,
+   "delete": 1,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "Technical",
    "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "PM",
+   "share": 1,
    "write": 1
   }
  ],
