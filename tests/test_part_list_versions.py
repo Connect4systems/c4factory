@@ -76,6 +76,16 @@ class TestPartListVersions(unittest.TestCase):
 		with self.assertRaises(ValueError):
 			self.api.get_copy_payload("CUBE-01", target="CUBE-01")
 
+	def test_import_payload_excludes_destination_product_identity(self):
+		target = Doc(name="TARGET", docstatus=0, product="OTHER", check_permission=Mock())
+		self.frappe.get_doc.side_effect = [self.source, target]
+		values = self.api.get_copy_payload("CUBE-01", target="TARGET")["values"]
+		self.assertNotIn("product", values)
+		self.assertNotIn("product_name", values)
+		self.assertEqual(values["material_line"], "Custom Line")
+		self.assertEqual(values["panel_materials"][0]["qty"], 3)
+		self.assertEqual(target.product, "OTHER")
+
 	def test_selector_filters_on_part_list_overrides_and_treats_zero_as_unset(self):
 		part = Doc(name="CUBE-01", product="CUBE", product_name="Table", description="Custom description",
 			product_image="custom.png", material_line="Custom Line", width=80, hight=40, depth=60)

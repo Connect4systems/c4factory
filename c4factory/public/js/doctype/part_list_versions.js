@@ -45,6 +45,7 @@ async function applyPartListCopy(frm, payload) {
     const scalar = {};
     const tables = [];
     for (const field of frm.meta.fields) {
+      if (["product", "product_name"].includes(field.fieldname)) continue;
       if (!(field.fieldname in payload.values)) continue;
       if (["Table", "Table MultiSelect"].includes(field.fieldtype)) tables.push(field);
       else scalar[field.fieldname] = payload.values[field.fieldname];
@@ -164,7 +165,7 @@ async function openImportPartListDialog(frm) {
       }
 
       const confirmed = await new Promise(resolve => frappe.confirm(
-        __("Replace this draft's product, details, PDS links, and all table contents with the selected Part List?"),
+        __("Import details, PDS links, and all table contents from the selected Part List while keeping the current product?"),
         () => resolve(true), () => resolve(false),
       ));
       if (!confirmed) return;

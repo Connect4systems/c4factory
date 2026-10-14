@@ -47,7 +47,12 @@ def get_copy_payload(source, target=None, new_version=False):
 		frappe.throw(_("You do not have permission to create Part Lists."), frappe.PermissionError)
 	if cint(new_version) and part.docstatus != 1:
 		frappe.throw(_("New Version requires a submitted Part List."))
-	return {"source": part.name, "values": copy_values(part)}
+	values = copy_values(part)
+	if target:
+		# Import design data without replacing the destination product identity.
+		values.pop("product", None)
+		values.pop("product_name", None)
+	return {"source": part.name, "values": values}
 
 
 def allowed_item_groups(item_line):

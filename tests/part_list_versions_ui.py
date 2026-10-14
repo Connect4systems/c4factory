@@ -109,6 +109,7 @@ window.makeForm=(status)=>({
 		page.wait_for_function("frm.doc.__unsaved === 1")
 		copied = page.evaluate("frm.doc")
 		assert copied["name"] == "TARGET" and copied["version_of"] == "ORIGINAL"
+		assert copied["product"] == "OTHER"
 		assert copied["material_line"] == "Custom Material"
 		assert copied["description"] == "Imported description"
 		assert copied["pds_table"][0]["arttach"] == "/private/files/design.pdf"
