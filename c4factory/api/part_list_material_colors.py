@@ -8,12 +8,6 @@ def material_table_fields(doc):
 
 
 def material_color_target(doc, field, row):
-	if doc.doctype == "Part List":
-		if field == "panel_materials":
-			return {"Artificial Wood": "P-Wood", "Natural Wood": "P-Natural"}.get(
-				doc.get("wood_type") or "Artificial Wood")
-		if field == "metal_material":
-			return "P-Metal"
 	return frappe.db.get_value("Part Material", row.material, "color") if row.material else None
 
 
@@ -27,14 +21,9 @@ def validate_material_colors(doc, method=None):
 		for row in doc.get(field) or []:
 			target = material_color_target(doc, field, row)
 			old_row = old_rows.get(row.name)
-			header_color = doc.doctype == "Part List" and field in ("panel_materials", "metal_material")
-			if (not header_color and old_row and old_row.material != row.material) or row.color_doctype != target or not target:
+			if (old_row and old_row.material != row.material) or row.color_doctype != target or not target:
 				row.basic_color = None
 			row.color_doctype = target
-			if doc.doctype == "Part List" and not old_row and not row.basic_color:
-				default_field = {"panel_materials": "wood_color", "metal_material": "metal_color"}.get(field)
-				if default_field:
-					row.basic_color = doc.get(default_field)
 			if target:
 				meta = frappe.get_meta(target)
 				if meta.istable or meta.issingle:

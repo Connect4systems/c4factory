@@ -23,15 +23,11 @@
   "section_break_iuan",
   "pds_table",
   "part_list_tab",
-  "column_break_zyms",
-  "wood_type",
-  "column_break_kruf",
-  "wood_color_doctype",
-  "wood_color",
+  "material_line",
   "section_break_lgnl",
   "panel_materials",
   "metal_tab",
-  "metal_color",
+  "metal_material_line",
   "metal_material",
   "others_tab",
   "other_material",
@@ -124,23 +120,6 @@
    "options": "Accessorise Table"
   },
   {
-   "fieldname": "metal_color",
-   "fieldtype": "Link",
-   "label": "Metal Color",
-   "options": "P-Metal"
-  },
-  {
-   "fieldname": "column_break_kruf",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "wood_color",
-   "fieldtype": "Dynamic Link",
-   "label": "Wood Color",
-   "options": "wood_color_doctype",
-   "read_only_depends_on": "eval:!doc.wood_color_doctype"
-  },
-  {
    "fieldname": "section_break_lgnl",
    "fieldtype": "Section Break"
   },
@@ -153,10 +132,6 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
-  },
-  {
-   "fieldname": "column_break_zyms",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "metal_tab",
@@ -296,21 +271,6 @@
    "label": "Panels"
   },
   {
-   "fieldname": "wood_type",
-   "fieldtype": "Select",
-   "label": "Wood Type",
-   "options": "Artificial Wood\nNatural Wood"
-  },
-  {
-   "default": "P-Wood",
-   "fieldname": "wood_color_doctype",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Wood Color DocType",
-   "options": "DocType",
-   "read_only": 1
-  },
-  {
    "fieldname": "section_break_iuan",
    "fieldtype": "Section Break"
   },
@@ -319,13 +279,29 @@
    "fieldtype": "Table",
    "label": "PDS Table",
    "options": "PDS Table"
+  },
+  {
+   "fieldname": "material_line",
+   "fieldtype": "Link",
+   "label": "Material Line",
+   "options": "Material Line",
+   "fetch_from": "product.custom_material_line",
+   "read_only": 1
+  },
+  {
+   "fieldname": "metal_material_line",
+   "fieldtype": "Link",
+   "label": "Material Line",
+   "options": "Material Line",
+   "fetch_from": "product.custom_material_line",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-13 16:09:34.240858",
+ "modified": "2026-10-14 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part List",

@@ -27,12 +27,10 @@ def get_color_rows(part_list):
 def get_part_list_colors(part_list):
 	part = frappe.get_doc("Part List", part_list)
 	part.check_permission("read")
-	wood_target = {"Artificial Wood": "P-Wood", "Natural Wood": "P-Natural"}.get(
-		part.get("wood_type") or "Artificial Wood", "P-Wood")
 	return {
-		"wood_color": part.get("wood_color"),
-		"wood_color_doctype": wood_target,
-		"metal_color": part.get("metal_color"),
+		"wood_color": part.get("wood"),
+		"wood_color_doctype": "P-Wood",
+		"metal_color": part.get("metal"),
 		"rows": [
 			{
 				"source_row": row.name, "source_table": field,
