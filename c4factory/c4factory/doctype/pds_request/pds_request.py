@@ -9,6 +9,9 @@ PDS_ITEM_SPCS_FIELDS = (
 
 class PDSRequest(Document):
 	def validate(self):
+		from c4factory.api.pds_request import validate_new_pds_items
+
+		validate_new_pds_items(self)
 		for row in self.get("items") or []:
 			if not row.part_list:
 				continue
