@@ -5,8 +5,8 @@ import frappe
 
 from c4factory.api.pds_request import make_pds_request, update_sales_order_part_list
 from c4factory.c4factory.doctype.pds_request.pds_request import (
-	PDSRequest,
 	PDS_ITEM_SPCS_FIELDS,
+	PDSRequest,
 	create_part_list_for_item,
 	get_item_part_lists,
 )
@@ -19,7 +19,9 @@ class TestPDSRequest(unittest.TestCase):
 		meta = frappe._dict(fields=[frappe._dict(fieldname="custom_part_list", fieldtype="Link", options="Part List")])
 		with patch("frappe.get_meta", return_value=meta), patch(
 			"frappe.get_all", side_effect=[[request_row], [frappe._dict(name="SO-ROW")]]
-		) as get_all, patch("frappe.db.get_value", side_effect=[frappe._dict(sales_order="SO", docstatus=0), 1]), patch(
+		) as get_all, patch("frappe.db.get_value", side_effect=[
+			frappe._dict(sales_order="SO", docstatus=0), 1, frappe._dict(custom_part_list="OLD")
+		]), patch("c4factory.api.sales_order_part_list.check_part_list_change"), patch(
 			"frappe.db.set_value"
 		) as set_value:
 			update_sales_order_part_list(part_list)
@@ -96,7 +98,7 @@ class TestPDSRequest(unittest.TestCase):
 		self.assertNotIn("wood_color", values)
 		self.assertNotIn("metal_color", values)
 		for field in PDS_ITEM_SPCS_FIELDS:
-			self.assertEqual(values[field], row[field])
+			self.assertNotIn(field, values)
 		self.assertEqual(values["description"], "Request description")
 		request.check_permission.assert_called_once_with("write")
 		part_list.insert.assert_called_once_with(ignore_permissions=False)

@@ -14,6 +14,7 @@ after_migrate = [
 ]
 
 app_include_js = [
+    "/assets/c4factory/js/doctype/part_list_versions.js",
     "/assets/c4factory/js/doctype/part_list_material_colors.js",
     "/assets/c4factory/js/doctype/sales_order/item_colors.js",
     # Register Sales Order actions independently of other apps' doctype_js hooks.
@@ -45,7 +46,10 @@ doc_events = {
     },
     "Sales Order": {
         "before_update_after_submit": "c4factory.api.sales_order_part_list.before_update_after_submit",
-        "before_validate": "c4factory.api.sales_order_colors.validate_colors",
+        "before_validate": [
+            "c4factory.api.part_list_versions.set_sales_order_active_parts",
+            "c4factory.api.sales_order_colors.validate_colors",
+        ],
         "on_submit": "c4factory.api.sales_order_project.on_submit",
     },
     "BOM": {

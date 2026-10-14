@@ -1,21 +1,36 @@
 async function refreshPartListProductImage(frm) {
+  if (frm._applyingPartListCopy) return;
   const product = frm.doc.product;
   const request = (frm._productImageRequest || 0) + 1;
   frm._productImageRequest = request;
-  const result = product
-    ? await frappe.db.get_value("Item", product, "image")
-    : null;
-  if (frm._productImageRequest !== request || frm.doc.product !== product) return;
-  frm.doc.product_image = result?.message?.image || null;
+  const result = product ? await frappe.db.get_value("Item", product, [
+    "item_name", "description", "image", "custom_material_line", "custom_width", "custom_hight", "custom_depth",
+  ]) : null;
+  if (frm._productImageRequest !== request || frm.doc.product !== product || frm._applyingPartListCopy) return;
+  const item = result?.message || {};
+  await frm.set_value({
+    product_name: item.item_name || null, description: item.description || null,
+    product_image: item.image || null, material_line: item.custom_material_line || null,
+    metal_material_line: item.custom_material_line || null,
+    width: item.custom_width || 0, hight: item.custom_hight || 0, depth: item.custom_depth || 0,
+  });
   frm.refresh_field("image");
 }
 
 frappe.ui.form.on("Part List", {
   refresh(frm) {
-    // Render the persisted image only. Refresh must never change document data.
     frm.refresh_field("image");
+    configurePartListVersionActions(frm);
   },
   product: refreshPartListProductImage,
+  material_line(frm) {
+    if (!frm._applyingPartListCopy && frm.doc.metal_material_line !== frm.doc.material_line)
+      return frm.set_value("metal_material_line", frm.doc.material_line);
+  },
+  metal_material_line(frm) {
+    if (!frm._applyingPartListCopy && frm.doc.material_line !== frm.doc.metal_material_line)
+      return frm.set_value("material_line", frm.doc.metal_material_line);
+  },
 });
 
 // Part List item selectors use the same filtering API as BOM in c4pricing.

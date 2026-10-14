@@ -1,7 +1,6 @@
 import frappe
 from frappe.model.document import Document
 
-
 PDS_ITEM_SPCS_FIELDS = (
 	"wood", "top", "modesty", "drawer_body", "drawer_face", "plexi",
 	"metal", "fabric", "glass", "direction", "additional_notes",
@@ -68,8 +67,6 @@ def create_part_list_for_item(item, qty=1, pds_request=None, pds_request_item=No
 		"hight": item_doc.get("custom_hight"),
 		"depth": item_doc.get("custom_depth"),
 	}
-	for field in PDS_ITEM_SPCS_FIELDS:
-		part_list_values[field] = row.get(field)
 	part_list = frappe.get_doc(part_list_values)
 	part_list.insert(ignore_permissions=False)
 	frappe.db.set_value("PDS Request Item", row.name, "part_list", part_list.name, update_modified=False)

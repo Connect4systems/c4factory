@@ -7,8 +7,8 @@ let lookups = 0;
 const row = {doctype: 'Part List Materials', name: 'row1', parentfield: 'panel_materials', material: 'MDF', color_doctype: '', basic_color: ''};
 const frm = {
   doc: {doctype: 'Part List', docstatus: 0, product: 'CUBE', product_image: 'image.png', material_line: 'LINE-1', metal_material_line: 'LINE-1', panel_materials: [row]},
-  refresh_field() {}, add_custom_button() {},
-  async set_value(field, value) {writes++; this.doc[field] = value;},
+  fields_dict: {}, refresh_field() {}, add_custom_button() {},
+  async set_value(field, value) {writes++; Object.assign(this.doc, typeof field === "object" ? field : {[field]: value});},
 };
 const context = vm.createContext({
   __: x => x, locals: {'Part List Materials': {row1: row}},
@@ -16,10 +16,10 @@ const context = vm.createContext({
     ui: {form: {on(type, events) {(handlers[type] ||= []).push(events);}}},
     utils: {escape_html: x => x},
     db: {async get_value(type) {lookups++; return {message: type === 'Item' ? {image: 'new.png'} : {color: 'P-Natural'}};}},
-    model: {async set_value(type, name, field, value) {writes++; Object.assign(row, typeof field === 'object' ? field : {[field]: value});}},
+    model: {can_create: () => false, async set_value(type, name, field, value) {writes++; Object.assign(row, typeof field === 'object' ? field : {[field]: value});}},
   },
 });
-for (const path of ['c4factory/c4factory/doctype/part_list/part_list.js', 'c4factory/public/js/doctype/part_list_material_colors.js']) {
+for (const path of ['c4factory/public/js/doctype/part_list_versions.js', 'c4factory/c4factory/doctype/part_list/part_list.js', 'c4factory/public/js/doctype/part_list_material_colors.js']) {
   vm.runInContext(fs.readFileSync(path, 'utf8'), context);
 }
 (async () => {
@@ -41,9 +41,9 @@ for (const path of ['c4factory/c4factory/doctype/part_list/part_list.js', 'c4fac
   for (const name of ['wood_type', 'wood_color', 'wood_color_doctype', 'metal_color']) assert.ok(!meta.fields.some(f => f.fieldname === name));
   for (const name of ['material_line', 'metal_material_line']) {
     const field = meta.fields.find(f => f.fieldname === name);
-    assert.equal(field.fetch_from, 'product.custom_material_line');
+    assert.ok(!field.fetch_from, 'Editable imported values must not be overwritten by automatic fetches');
     assert.equal(field.options, 'Material Line');
-    assert.equal(field.read_only, 1);
+    assert.ok(!field.read_only);
   }
   console.log('PASS: draft/submitted refresh preserves data, no async refresh writes, material colors, product image, and field schema');
 })().catch(error => {console.error(error); process.exitCode = 1;});
