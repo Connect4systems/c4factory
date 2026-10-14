@@ -14,6 +14,7 @@ after_migrate = [
 ]
 
 app_include_js = [
+    "/assets/c4factory/js/doctype/item_uom.js",
     "/assets/c4factory/js/doctype/part_list_versions.js",
     "/assets/c4factory/js/doctype/part_list_material_colors.js",
     "/assets/c4factory/js/doctype/sales_order/item_colors.js",
@@ -57,6 +58,7 @@ doc_events = {
     },
     "Item": {
         "before_validate": "c4factory.api.item_material_color.validate_material_color",
+        "validate": "c4factory.api.item_uom.validate_item_uoms",
     },
     # Work Order – source warehouse autofill from Item Group
     "Work Order": {

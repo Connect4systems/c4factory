@@ -2,6 +2,25 @@
 
 Factory App
 
+### Item units of measure
+
+Use the Item's **Default Unit of Measure** for stock quantities and its existing
+**Units of Measure** table for item-specific conversions. Create each UOM (such as
+Kilogram) once and reuse it across items. A conversion factor is the number of
+default units in one additional unit:
+
+| Item | Default UOM | Additional UOM | Conversion Factor |
+| --- | --- | --- | --- |
+| Pins 3 cm | Piece | Kilogram | 300 |
+| Pins 5 cm | Piece | Kilogram | 200 |
+
+Receiving 2 Kilograms therefore adds 600 Pieces of Pins 3 cm or 400 Pieces of
+Pins 5 cm. No global Kilogram-to-Piece conversion is needed. Purchase and Sales
+UOMs must also be listed in the item's table when they differ from its default.
+Factors must be positive, UOM rows unique, and the default UOM factor must be 1.
+ERPNext transactions retain their own conversion factors and stock quantities;
+editing an item factor does not rewrite submitted transactions.
+
 ### Installation
 
 You can install this app using the [bench](https://github.com/frappe/bench) CLI:
