@@ -104,7 +104,7 @@ class TestColorsample(unittest.TestCase):
         before = dict(self.source)
         with patch.object(api, "get_part_list_colors", side_effect=lambda name: copy.deepcopy(config)):
             result = api.source_colors(self.source)
-        self.assertEqual(result["custom_wood"], "Order Override")
+        self.assertEqual(result["custom_wood"], "Standard")
         self.assertEqual(json.loads(result["custom_color_sample_data"])["rows"][0]["color"], "Row Override")
         self.assertEqual(config["rows"][0]["color"], "Standard")
         self.assertEqual(dict(self.source), before)

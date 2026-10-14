@@ -7,8 +7,6 @@ SALES_ORDER_ITEM_SPEC_FIELD_MAP = {
     "custom_plexi": "plexi",
     "custom_top": "top",
     "custom_modesty": "modesty",
-    "custom_wood": "wood",
-    "custom_metal": "metal",
     "custom_leather": "leather",
     "custom_drawer_body": "drawer_body",
     "custom_drawer_face": "drawer_face",

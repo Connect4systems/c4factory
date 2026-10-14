@@ -6,7 +6,7 @@ def execute():
 	# The parent table must permit updates as well as its individual link fields.
 	make_property_setter("Sales Order", "items", "allow_on_submit", 1, "Check")
 	make_property_setter("Sales Order", "items", "read_only", 0, "Check")
-	derived = {"custom_color_sample_data", "custom_wood_color_doctype", "custom_wood", "custom_metal"}
+	derived = {"custom_color_sample_data"}
 	for field in frappe.get_meta("Sales Order Item").fields:
 		is_part_list = field.fieldtype == "Link" and field.options == "Part List"
 		if is_part_list or field.fieldname in derived:

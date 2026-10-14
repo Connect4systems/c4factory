@@ -93,7 +93,8 @@ class TestPDSRequest(unittest.TestCase):
 		values = get_doc.call_args_list[1].args[0]
 		self.assertEqual(values["product"], "A")
 		self.assertEqual(values["width"], 100)
-		self.assertEqual(values["wood_color"], row.wood)
+		self.assertNotIn("wood_color", values)
+		self.assertNotIn("metal_color", values)
 		for field in PDS_ITEM_SPCS_FIELDS:
 			self.assertEqual(values[field], row[field])
 		self.assertEqual(values["description"], "Request description")

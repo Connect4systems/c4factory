@@ -70,14 +70,14 @@ def source_colors(row):
 		choice = choices.get(material["source_row"], {})
 		if choice.get("color_doctype") == material["color_doctype"]:
 			material["color"] = choice.get("color")
-	wood = row.get("custom_wood") or config["wood_color"]
-	metal = row.get("custom_metal") or config["metal_color"]
+	wood = config["wood_color"]
+	metal = config["metal_color"]
 	return {
 		"custom_part_list": part_list,
 		"custom_wood_color_doctype": config["wood_color_doctype"],
 		"custom_wood": wood, "custom_metal": metal,
 		"custom_color_sample_data": json.dumps({
-			"part_list": part_list, "headers_initialized": True, "rows": config["rows"],
+			"part_list": part_list, "rows": config["rows"],
 		}),
 	}
 

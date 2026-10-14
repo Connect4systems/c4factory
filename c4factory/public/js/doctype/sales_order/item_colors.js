@@ -36,10 +36,11 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   if (!partList) {
     salesOrderColorInitializing.add(item);
     try {
-      await frappe.model.set_value(cdt, cdn, {
-        custom_color_sample_data: null, custom_wood: null,
-        custom_metal: null, custom_wood_color_doctype: null,
-      });
+      const values = { custom_color_sample_data: null };
+      if (cdt === 'Color Sample Item') {
+        Object.assign(values, { custom_wood: null, custom_metal: null, custom_wood_color_doctype: null });
+      }
+      await frappe.model.set_value(cdt, cdn, values);
     } finally { salesOrderColorInitializing.delete(item); }
     renderSalesOrderColors(frm, cdt, cdn);
     return;
@@ -73,19 +74,21 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
       choice?.color_doctype === source.color_doctype ? choice.color : source.color };
   });
   const values = {
-    custom_wood_color_doctype: config.wood_color_doctype,
-    custom_color_sample_data: JSON.stringify({ part_list: partList, headers_initialized: true, rows }),
+    custom_color_sample_data: JSON.stringify({ part_list: partList, rows }),
   };
-  if (!matching || !item.custom_wood_color_doctype) {
-    values.custom_wood = config.wood_color || null;
-    values.custom_metal = config.metal_color || null;
-  } else if (item.custom_wood_color_doctype && item.custom_wood_color_doctype !== config.wood_color_doctype) {
-    values.custom_wood = config.wood_color || null;
+  if (cdt === 'Color Sample Item') {
+    values.custom_wood_color_doctype = config.wood_color_doctype;
+    if (!matching || !item.custom_wood_color_doctype) {
+      values.custom_wood = config.wood_color || null;
+      values.custom_metal = config.metal_color || null;
+    } else if (item.custom_wood_color_doctype && item.custom_wood_color_doctype !== config.wood_color_doctype) {
+      values.custom_wood = config.wood_color || null;
+    }
+    // A previously initialized payload can still have empty header fields.
+    // Always use the source default for an empty header, preserving nonempty overrides.
+    if (!item.custom_wood) values.custom_wood = config.wood_color || null;
+    if (!item.custom_metal) values.custom_metal = config.metal_color || null;
   }
-  // A previously initialized payload can still have empty header fields.
-  // Always use the source default for an empty header, preserving nonempty overrides.
-  if (!item.custom_wood) values.custom_wood = config.wood_color || null;
-  if (!item.custom_metal) values.custom_metal = config.metal_color || null;
   // Python's JSON includes spaces. Formatting alone must not dirty a saved form
   // when an item is opened or its colors are refreshed.
   if (JSON.stringify(saved) === values.custom_color_sample_data) {
@@ -95,7 +98,7 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   try { await frappe.model.set_value(cdt, cdn, values); }
   finally { salesOrderColorInitializing.delete(item); }
   const gridForm = salesOrderColorGridForm(frm, cdn);
-  for (const field of ['custom_wood_color_doctype', 'custom_wood', 'custom_metal']) {
+  for (const field of cdt === 'Color Sample Item' ? ['custom_wood_color_doctype', 'custom_wood', 'custom_metal'] : []) {
     gridForm?.fields_dict[field]?.refresh();
   }
   renderSalesOrderColors(frm, cdt, cdn);
@@ -189,11 +192,15 @@ for (const colorItemType of ['Sales Order Item', 'Color Sample Item']) {
     form_render: syncSalesOrderColors,
     custom_part_list: syncSalesOrderColors,
     part_list: syncSalesOrderColors,
-    custom_wood(frm, cdt, cdn) {
-      return applySalesOrderHeaderColor(frm, cdt, cdn, 'panel_materials', 'custom_wood');
-    },
-    custom_metal(frm, cdt, cdn) {
-      return applySalesOrderHeaderColor(frm, cdt, cdn, 'metal_material', 'custom_metal');
-    },
   });
 }
+
+// Header color choices belong to Color Samples, not Sales Order items.
+frappe.ui.form.on('Color Sample Item', {
+  custom_wood(frm, cdt, cdn) {
+    return applySalesOrderHeaderColor(frm, cdt, cdn, 'panel_materials', 'custom_wood');
+  },
+  custom_metal(frm, cdt, cdn) {
+    return applySalesOrderHeaderColor(frm, cdt, cdn, 'metal_material', 'custom_metal');
+  },
+});

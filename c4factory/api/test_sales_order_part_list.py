@@ -27,7 +27,7 @@ class TestSalesOrderPartList(unittest.TestCase):
 
 	def test_update_rebuilds_colors_only_for_changed_row(self):
 		old = Doc(name="ROW-1", custom_part_list="OLD")
-		row = Doc(name="ROW-1", idx=1, item_code="ITEM", custom_part_list="NEW", custom_color_sample_data="old", custom_wood_color_doctype="P-Wood")
+		row = Doc(name="ROW-1", idx=1, item_code="ITEM", custom_part_list="NEW", custom_color_sample_data="old")
 		doc = Mock(name="order")
 		doc.name = "SO-1"
 		doc.items = [row]
@@ -41,7 +41,7 @@ class TestSalesOrderPartList(unittest.TestCase):
 			api.before_update_after_submit(doc)
 		check.assert_called_once_with("SO-1", "ROW-1")
 		self.assertIsNone(row.custom_color_sample_data)
-		self.assertIsNone(row.custom_wood_color_doctype)
+		self.assertNotIn("custom_wood_color_doctype", row)
 		self.assertEqual(validate.call_args.args[0].items, [row])
 
 	def test_unchanged_part_list_does_not_check_samples(self):

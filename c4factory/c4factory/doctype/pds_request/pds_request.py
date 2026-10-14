@@ -67,8 +67,6 @@ def create_part_list_for_item(item, qty=1, pds_request=None, pds_request_item=No
 		"width": item_doc.get("custom_width"),
 		"hight": item_doc.get("custom_hight"),
 		"depth": item_doc.get("custom_depth"),
-		"wood_color": row.get("wood"),
-		"metal_color": row.get("metal"),
 	}
 	for field in PDS_ITEM_SPCS_FIELDS:
 		part_list_values[field] = row.get(field)

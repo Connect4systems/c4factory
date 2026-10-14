@@ -40,7 +40,6 @@ def before_update_after_submit(doc, method=None):
 					frappe.throw(_("Row {0}: Select an enabled, submitted Part List for item {1}.").format(row.idx, row.item_code))
 			# Rebuild defaults rather than retaining colors from the previous Part List.
 			row.custom_color_sample_data = None
-			row.custom_wood_color_doctype = None
 			changed.append(row)
 	if changed:
 		from c4factory.api.sales_order_colors import validate_colors
