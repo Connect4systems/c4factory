@@ -46,6 +46,8 @@ class TestMaterialPalettes(unittest.TestCase):
         self.frappe.db.get_value.assert_called_once_with('Part Material', 'HPL', 'color_palette')
         self.assertEqual(self.frappe.get_list.call_args.args, ('Material Color',))
         self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL'})
+        self.assertEqual(self.frappe.get_list.call_args.kwargs['fields'], ['name'])
+        self.assertEqual(set(self.frappe.get_list.call_args.kwargs['or_filters']), {'name'})
 
     def test_search_without_palette_returns_no_colors(self):
         self.frappe.get_list = Mock()
@@ -58,6 +60,8 @@ class TestMaterialPalettes(unittest.TestCase):
                                       {'palette': 'HPL', 'material': 'Panel'})
         self.frappe.db.get_value.assert_not_called()
         self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL'})
+        self.assertEqual(self.frappe.get_list.call_args.kwargs['fields'], ['name'])
+        self.assertEqual(set(self.frappe.get_list.call_args.kwargs['or_filters']), {'name'})
 
     def test_retired_migration_never_imports_legacy_records(self):
         migration = load_module('c4factory/patches/v1_0/migrate_material_color_palettes.py', 'retired_colors')

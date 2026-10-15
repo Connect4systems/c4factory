@@ -48,5 +48,5 @@ def material_color_query(doctype, txt, searchfield, start, page_len, filters):
 	if not palette:
 		return []
 	return frappe.get_list("Material Color", filters={"palette": palette},
-		or_filters={"name": ["like", "%" + txt + "%"], "color": ["like", "%" + txt + "%"]},
-		fields=["name", "color"], order_by="name", start=start, page_length=page_len, as_list=True)
+		or_filters={"name": ["like", "%" + txt + "%"]},
+		fields=["name"], order_by="name", start=start, page_length=page_len, as_list=True)

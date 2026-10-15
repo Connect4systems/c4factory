@@ -34,7 +34,7 @@ for (const path of ['c4factory/public/js/doctype/part_list_versions.js', 'c4fact
   await handlers['Part List Materials'][0].material(frm, row.doctype, row.name);
   assert.equal(row.color_doctype, 'Material Color');
   assert.equal(row.color_palette, 'Wood');
-  assert.equal(row.basic_color, 'Oak');
+  assert.equal(row.basic_color, null, 'Material selection sets its palette and leaves color for the user');
   await handlers['Part List Materials'][0].color_palette(frm, row.doctype, row.name);
   assert.equal(row.basic_color, null, 'Changing palette clears the previous color');
   assert.ok(writes > 0, 'User edits must still update row values');
