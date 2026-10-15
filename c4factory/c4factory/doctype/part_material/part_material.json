@@ -7,7 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "material",
-  "material_table",
+  "color_palette",
   "color"
  ],
  "fields": [
@@ -24,18 +24,16 @@
    "options": "DocType"
   },
   {
-   "fieldname": "material_table",
-   "fieldtype": "Select",
-   "label": "Material Table",
-   "options": "\nPanel Material\nMetal Material\nOther Material",
-   "in_list_view": 1,
-   "in_standard_filter": 1
+   "fieldname": "color_palette",
+   "fieldtype": "Link",
+   "label": "Color Palette",
+   "options": "Color Palette"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-06 18:10:26.445254",
+ "modified": "2026-10-15 08:45:51.229021",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part Material",
