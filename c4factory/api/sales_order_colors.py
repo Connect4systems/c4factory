@@ -3,7 +3,7 @@ import json
 import frappe
 from frappe import _
 
-from c4factory.api.part_list_material_colors import material_color_target, material_table_fields
+from c4factory.api.part_list_material_colors import material_color_target, material_table_fields, material_palette, validate_palette_color
 
 
 @frappe.whitelist()
@@ -16,6 +16,7 @@ def get_color_rows(part_list):
 			"material": row.material,
 			"part_name": row.part_name,
 			"color_doctype": material_color_target(part, field, row),
+			"color_palette": material_palette(row),
 			"color": row.basic_color,
 		}
 		for field in material_table_fields(part)
@@ -33,6 +34,7 @@ def get_part_list_colors(part_list):
 				"source_row": row.name, "source_table": field,
 				"material": row.material, "part_name": row.part_name,
 				"color_doctype": material_color_target(part, field, row),
+				"color_palette": material_palette(row),
 				"color": row.basic_color, "has_source_color": bool(row.basic_color), "edite_color": row.edite_color,
 			}
 			for field in ("panel_materials", "metal_material", "other_material")
@@ -66,13 +68,10 @@ def validate_colors(doc, method=None):
 			row = dict(source)
 			choice = selected.get(row["source_row"], {}) if matching else {}
 			target = row["color_doctype"]
-			if choice.get("color_doctype") == target:
+			if choice.get("color_doctype") == target and choice.get("color_palette") == row.get("color_palette"):
 				row["color"] = choice.get("color")
 			if not target:
 				row["color"] = None
-			elif frappe.get_meta(target).istable or frappe.get_meta(target).issingle:
-				frappe.throw(_("Material Color must reference a regular DocType."))
-			if row["color"] and not frappe.db.exists(target, row["color"]):
-				frappe.throw(_("Row {0}: Color must be an existing record in {1}.").format(item.idx, target))
+			validate_palette_color(row.get("color_palette"), row["color"])
 			rows.append(row)
 		item.custom_color_sample_data = json.dumps({"part_list": part_list, "rows": rows})

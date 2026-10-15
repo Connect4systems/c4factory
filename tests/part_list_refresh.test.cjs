@@ -15,7 +15,7 @@ const context = vm.createContext({
   frappe: {
     ui: {form: {on(type, events) {(handlers[type] ||= []).push(events);}}},
     utils: {escape_html: x => x},
-    db: {async get_value(type) {lookups++; return {message: type === 'Item' ? {image: 'new.png'} : {color: 'P-Natural'}};}},
+    db: {async get_value(type) {lookups++; return {message: type === 'Item' ? {image: 'new.png'} : {color_palette: 'Wood', color: 'Oak'}};}},
     model: {can_create: () => false, async set_value(type, name, field, value) {writes++; Object.assign(row, typeof field === 'object' ? field : {[field]: value});}},
   },
 });
@@ -32,7 +32,11 @@ for (const path of ['c4factory/public/js/doctype/part_list_versions.js', 'c4fact
   assert.equal(writes, 0);
   assert.equal(lookups, 0, 'Refresh must not start asynchronous data updates after save');
   await handlers['Part List Materials'][0].material(frm, row.doctype, row.name);
-  assert.equal(row.color_doctype, 'P-Natural', 'Panels must use the selected Part Material color type');
+  assert.equal(row.color_doctype, 'Material Color');
+  assert.equal(row.color_palette, 'Wood');
+  assert.equal(row.basic_color, 'Oak');
+  await handlers['Part List Materials'][0].color_palette(frm, row.doctype, row.name);
+  assert.equal(row.basic_color, null, 'Changing palette clears the previous color');
   assert.ok(writes > 0, 'User edits must still update row values');
   await handlers['Part List'][0].product(frm);
   assert.equal(frm.doc.product_image, 'new.png');

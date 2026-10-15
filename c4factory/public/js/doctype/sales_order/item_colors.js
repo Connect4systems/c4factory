@@ -63,7 +63,7 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   const rows = (config.rows || []).map(source => {
     const choice = choices.get(source.source_row);
     return { ...source, color: !source.color_doctype ? null :
-      choice?.color_doctype === source.color_doctype ? choice.color : source.color };
+      choice?.color_doctype === source.color_doctype && choice?.color_palette === source.color_palette ? choice.color : source.color };
   });
   const values = {
     custom_color_sample_data: JSON.stringify({ part_list: partList, rows }),
@@ -116,7 +116,8 @@ function renderSalesOrderColors(frm, cdt, cdn) {
         parent: tr.find('td').last(),
         df: {
           fieldname: 'color', fieldtype: 'Link', options: row.color_doctype,
-          label: __('Color'), read_only: !editable || !row.color_doctype,
+          label: __('Color'), read_only: !editable || !row.color_palette,
+          get_query: () => ({filters: {palette: row.color_palette || ''}}),
           onchange: async () => {
             if (!editable || (item.custom_part_list || item.part_list) !== partList) return;
             const current = salesOrderStoredColors(item);

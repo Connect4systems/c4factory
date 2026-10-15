@@ -26,11 +26,11 @@ class TestSalesOrderColorCleanup(TestPartListSave):
 		api = self.load_colors()
 		item = Doc(doctype="Sales Order Item", idx=1, custom_part_list="PL", meta=Mock())
 		item.custom_color_sample_data = json.dumps({"part_list": "PL", "rows": [
-			{"source_row": "M", "color_doctype": "P-Natural", "color": "Walnut"},
+			{"source_row": "M", "color_doctype": "Material Color", "color_palette": "Wood", "color": "Walnut"},
 		]})
 		self.frappe.get_meta = Mock(return_value=SimpleNamespace(istable=False, issingle=False))
 		self.frappe.db.exists.return_value = True
-		config = {"rows": [{"source_row": "M", "color_doctype": "P-Natural", "color": "Oak"}]}
+		config = {"rows": [{"source_row": "M", "color_doctype": "Material Color", "color_palette": "Wood", "color": "Oak"}]}
 		with patch.object(api, "get_part_list_colors", return_value=config):
 			api.validate_colors(SimpleNamespace(items=[item]))
 			item.doctype = "Color Sample Item"

@@ -80,11 +80,11 @@ class TestPartListSave(unittest.TestCase):
 
 	def test_all_tables_use_part_material_color_configuration(self):
 		api = load_module("c4factory/api/part_list_material_colors.py", "material_colors_test")
-		self.frappe.db.get_value.return_value = "P-Natural"
+		self.frappe.db.get_value.return_value = "Wood"
 		for table in ("panel_materials", "metal_material", "other_material"):
 			self.assertEqual(api.material_color_target(
-				SimpleNamespace(doctype="Part List"), table, SimpleNamespace(material="Natural Wood")
-			), "P-Natural")
+				SimpleNamespace(doctype="Part List"), table, SimpleNamespace(material="Natural Wood", get=lambda key: None)
+			), "Material Color")
 
 	def test_submit_still_updates_originating_sales_order(self):
 		api = ModuleType("c4factory.api.pds_request")

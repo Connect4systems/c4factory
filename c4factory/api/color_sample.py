@@ -68,7 +68,7 @@ def source_colors(row):
 	} if matching and isinstance(stored.get("rows"), list) else {}
 	for material in config["rows"]:
 		choice = choices.get(material["source_row"], {})
-		if choice.get("color_doctype") == material["color_doctype"]:
+		if choice.get("color_doctype") == material["color_doctype"] and choice.get("color_palette") == material.get("color_palette"):
 			material["color"] = choice.get("color")
 	return {
 		"custom_part_list": part_list,

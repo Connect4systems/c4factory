@@ -65,7 +65,7 @@ def snapshot_values(row):
 		for source, copied in zip(part.get(field) or [], values.get(field) or []):
 			choice = choices.get(source.name)
 			if choice:
-				if choice.get("color_doctype") != source.color_doctype:
+				if choice.get("color_doctype") != source.color_doctype or choice.get("color_palette") != source.get("color_palette"):
 					frappe.throw(_("The Part List colors have changed since the sample was approved. Review the sample first."))
 				copied["basic_color"] = choice.get("color")
 	return {field: values.get(field) for field in SNAPSHOT_FIELDS}

@@ -21,7 +21,7 @@
    "fieldname": "color",
    "fieldtype": "Link",
    "label": "Color",
-   "options": "DocType"
+   "options": "Material Color"
   },
   {
    "fieldname": "color_palette",
