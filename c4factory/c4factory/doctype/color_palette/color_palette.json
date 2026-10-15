@@ -45,14 +45,17 @@
    "fieldname": "old_parent",
    "fieldtype": "Link",
    "label": "Old Parent",
-   "options": "Color Palette Group"
+   "options": "Color Palette",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "parent_color_palette_group",
    "fieldtype": "Link",
    "ignore_user_permissions": 1,
-   "label": "Parent Color Palette Group",
-   "options": "Color Palette Group"
+   "label": "Parent Color Palette",
+   "options": "Color Palette"
   },
   {
    "fieldname": "color_palette",

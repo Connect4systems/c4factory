@@ -104,5 +104,15 @@ class TestMaterialPalettes(unittest.TestCase):
         self.frappe.db.exists.assert_called_once_with('Material Color', {'name': 'White', 'palette': 'HPL'})
 
 
+    def test_palette_tree_links_reference_the_existing_palette_doctype(self):
+        import json
+        from test_part_list_save import ROOT
+        meta = json.loads((ROOT / 'c4factory/c4factory/doctype/color_palette/color_palette.json').read_text())
+        fields = {field['fieldname']: field for field in meta['fields']}
+        self.assertEqual(fields['old_parent']['options'], 'Color Palette')
+        self.assertEqual(fields[meta['nsm_parent_field']]['options'], 'Color Palette')
+        self.assertEqual(meta['nsm_parent_field'], 'parent_color_palette_group')
+
+
 if __name__ == '__main__':
     unittest.main()
