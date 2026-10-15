@@ -68,5 +68,37 @@ class TestMaterialPalettes(unittest.TestCase):
         self.frappe.get_doc.assert_not_called()
 
 
+    def part_material(self, **values):
+        document = ModuleType('frappe.model.document')
+        document.Document = type('Document', (), {'get': lambda doc, key: getattr(doc, key, None)})
+        with patch.dict(sys.modules, {
+            'frappe.model': ModuleType('frappe.model'),
+            'frappe.model.document': document,
+            'c4factory.api.part_list_material_colors': self.api,
+        }):
+            controller = load_module('c4factory/c4factory/doctype/part_material/part_material.py', 'part_material_optional_color')
+        doc = controller.PartMaterial()
+        for key, value in values.items():
+            setattr(doc, key, value)
+        return doc
+
+    def test_part_material_saves_with_palette_and_no_color_attribute(self):
+        doc = self.part_material(material='HPL', color_palette='HPL')
+        self.assertFalse(hasattr(doc, 'color'))
+        doc.validate()
+        self.frappe.db.exists.assert_not_called()
+
+    def test_part_material_still_rejects_default_color_in_another_palette(self):
+        self.frappe.db.exists.return_value = False
+        doc = self.part_material(material='HPL', color_palette='HPL', color='Oak')
+        with self.assertRaises(ValueError):
+            doc.validate()
+
+    def test_part_material_accepts_default_color_in_its_palette(self):
+        self.frappe.db.exists.return_value = True
+        self.part_material(material='HPL', color_palette='HPL', color='White').validate()
+        self.frappe.db.exists.assert_called_once_with('Material Color', {'name': 'White', 'palette': 'HPL'})
+
+
 if __name__ == '__main__':
     unittest.main()
