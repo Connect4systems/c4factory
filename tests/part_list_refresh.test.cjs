@@ -15,7 +15,7 @@ const context = vm.createContext({
   frappe: {
     ui: {form: {on(type, events) {(handlers[type] ||= []).push(events);}}},
     utils: {escape_html: x => x},
-    db: {async get_value(type) {lookups++; return {message: type === 'Item' ? {image: 'new.png'} : {color_palette: 'Wood', color: 'Oak'}};}},
+    db: {async get_value(type) {lookups++; return {message: type === 'Item' ? {image: 'new.png'} : type === 'Material Color' ? {palette: 'Wood'} : {color_palette: 'Wood', color: 'Oak'}};}},
     model: {can_create: () => false, async set_value(type, name, field, value) {writes++; Object.assign(row, typeof field === 'object' ? field : {[field]: value});}},
   },
 });

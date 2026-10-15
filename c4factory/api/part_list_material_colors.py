@@ -35,3 +35,18 @@ def validate_material_colors(doc, method=None):
 			row.color_palette = material_palette(row)
 			row.color_doctype = "Material Color" if row.color_palette else None
 			validate_palette_color(row.color_palette, row.basic_color)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def material_color_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Search only the new catalog; never interpret a material as a DocType."""
+	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
+	palette = filters.get("palette")
+	if not palette and filters.get("material"):
+		palette = frappe.db.get_value("Part Material", filters["material"], "color_palette")
+	if not palette:
+		return []
+	return frappe.get_list("Material Color", filters={"palette": palette},
+		or_filters={"name": ["like", "%" + txt + "%"], "color": ["like", "%" + txt + "%"]},
+		fields=["name", "color"], order_by="name", start=start, page_length=page_len, as_list=True)

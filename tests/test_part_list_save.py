@@ -20,6 +20,8 @@ def load_module(path, name):
 class TestPartListSave(unittest.TestCase):
 	def setUp(self):
 		self.frappe = ModuleType("frappe")
+		self.frappe.whitelist = lambda: lambda fn: fn
+		self.frappe.validate_and_sanitize_search_inputs = lambda fn: fn
 		self.frappe.db = Mock()
 		self.frappe._ = lambda value: value
 		document = ModuleType("frappe.model.document")

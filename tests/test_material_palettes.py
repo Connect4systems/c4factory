@@ -9,6 +9,8 @@ from test_part_list_save import load_module
 class TestMaterialPalettes(unittest.TestCase):
     def setUp(self):
         self.frappe = ModuleType('frappe')
+        self.frappe.whitelist = lambda: lambda fn: fn
+        self.frappe.validate_and_sanitize_search_inputs = lambda fn: fn
         self.frappe._ = lambda message: message
         self.frappe.db = Mock()
         self.frappe.throw = Mock(side_effect=ValueError)
@@ -34,6 +36,36 @@ class TestMaterialPalettes(unittest.TestCase):
     def test_empty_color_allowed(self):
         self.api.validate_palette_color('Wood', None)
         self.frappe.db.exists.assert_not_called()
+
+
+    def test_search_uses_material_palette_when_row_palette_is_missing(self):
+        self.frappe.db.get_value.return_value = 'HPL'
+        self.frappe.get_list = Mock(return_value=[['White', 'White']])
+        result = self.api.material_color_query('P-Wood', '', 'name', 0, 20, {'material': 'HPL'})
+        self.assertEqual(result, [['White', 'White']])
+        self.frappe.db.get_value.assert_called_once_with('Part Material', 'HPL', 'color_palette')
+        self.assertEqual(self.frappe.get_list.call_args.args, ('Material Color',))
+        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL'})
+
+    def test_search_without_palette_returns_no_colors(self):
+        self.frappe.get_list = Mock()
+        self.assertEqual(self.api.material_color_query('Material Color', '', 'name', 0, 20, {}), [])
+        self.frappe.get_list.assert_not_called()
+
+    def test_explicit_row_palette_takes_precedence(self):
+        self.frappe.get_list = Mock(return_value=[])
+        self.api.material_color_query('Material Color', 'White', 'name', 0, 20,
+                                      {'palette': 'HPL', 'material': 'Panel'})
+        self.frappe.db.get_value.assert_not_called()
+        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL'})
+
+    def test_retired_migration_never_imports_legacy_records(self):
+        migration = load_module('c4factory/patches/v1_0/migrate_material_color_palettes.py', 'retired_colors')
+        self.frappe.get_all = Mock()
+        self.frappe.get_doc = Mock()
+        migration.execute()
+        self.frappe.get_all.assert_not_called()
+        self.frappe.get_doc.assert_not_called()
 
 
 if __name__ == '__main__':
