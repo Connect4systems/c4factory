@@ -7,8 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "material",
-  "color_palette",
-  "color"
+  "color_palette"
  ],
  "fields": [
   {
@@ -16,12 +15,6 @@
    "fieldtype": "Data",
    "label": "Material",
    "unique": 1
-  },
-  {
-   "fieldname": "color",
-   "fieldtype": "Link",
-   "label": "Color",
-   "options": "Material Color"
   },
   {
    "fieldname": "color_palette",
@@ -33,7 +26,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-15 08:45:51.229021",
+ "modified": "2026-10-15 09:14:19.536636",
  "modified_by": "Administrator",
  "module": "C4Factory",
  "name": "Part Material",
