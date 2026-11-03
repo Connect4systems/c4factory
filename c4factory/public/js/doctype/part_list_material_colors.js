@@ -15,7 +15,7 @@ function configurePartMaterialColors(frm) {
     });
   }
 }
-for (const parentType of ['Part List', 'Production Order']) {
+for (const parentType of ['Part List', 'Part Bundle', 'Production Order']) {
   frappe.ui.form.on(parentType, {
     setup: configurePartMaterialColors,
     refresh: configurePartMaterialColors,

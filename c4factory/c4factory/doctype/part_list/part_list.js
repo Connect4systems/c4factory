@@ -33,6 +33,53 @@ frappe.ui.form.on("Part List", {
   },
 });
 
+function openPartBundleSelector(frm) {
+  let adding = false;
+  const dialog = new frappe.ui.Dialog({
+    title: __("Add Part Bundle"),
+    fields: [
+      {fieldname: "part_bundle", fieldtype: "Link", label: __("Part Bundle"), options: "Part Bundle", reqd: 1},
+      {fieldname: "qty", fieldtype: "Float", label: __("Quantity"), default: 1, reqd: 1},
+    ],
+    primary_action_label: __("Add"),
+    async primary_action(values) {
+      if (adding) return;
+      if (!Number.isFinite(Number(values.qty)) || Number(values.qty) <= 0) {
+        frappe.msgprint(__("Quantity must be a positive number."));
+        return;
+      }
+      adding = true;
+      dialog.get_primary_btn().prop("disabled", true);
+      try {
+        const response = await frappe.call({
+          method: "c4factory.api.part_bundle.get_bundle_rows",
+          args: values,
+          freeze: true,
+          freeze_message: __("Loading Part Bundle..."),
+        });
+        if (frm.doc.docstatus !== 0 || frm.read_only) return;
+        const tables = ["panel_materials", "metal_material", "other_material", "accessorise_table"];
+        let count = 0;
+        for (const table of tables) {
+          for (const values of response.message?.[table] || []) {
+            // add_child copies values without triggering material/color change handlers.
+            frm.add_child(table, values);
+            count++;
+          }
+          frm.refresh_field(table);
+        }
+        if (count) frm.dirty();
+        dialog.hide();
+        frappe.show_alert({message: __("Added {0} bundle rows.", [count]), indicator: "green"});
+      } finally {
+        adding = false;
+        dialog.get_primary_btn().prop("disabled", false);
+      }
+    },
+  });
+  dialog.show();
+}
+
 // Part List item selectors use the same filtering API as BOM in c4pricing.
 (() => {
   const SELECTOR_CONFIGS = [
@@ -358,6 +405,7 @@ frappe.ui.form.on("Part List", {
   frappe.ui.form.on("Part List", {
     refresh(frm) {
       if (frm.doc.docstatus !== 0 || frm.read_only) return;
+      frm.add_custom_button(__("Add Part Bundle"), () => openPartBundleSelector(frm), __("Add"));
       SELECTOR_CONFIGS.forEach((config) => {
         frm.add_custom_button(config.label, () => openPartListItemSelector(frm, config), __("Add"));
       });

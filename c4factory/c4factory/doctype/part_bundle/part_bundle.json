@@ -1,0 +1,122 @@
+{
+ "doctype": "DocType",
+ "name": "Part Bundle",
+ "module": "C4Factory",
+ "autoname": "field:bundle_name",
+ "naming_rule": "By fieldname",
+ "allow_rename": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "bundle_name",
+  "panel_materials_tab",
+  "panel_materials",
+  "metal_material_tab",
+  "metal_material",
+  "other_material_tab",
+  "other_material",
+  "accessorise_table_tab",
+  "accessorise_table"
+ ],
+ "fields": [
+  {
+   "fieldname": "bundle_name",
+   "fieldtype": "Data",
+   "label": "Bundle Name",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "panel_materials_tab",
+   "fieldtype": "Tab Break",
+   "label": "Panels"
+  },
+  {
+   "fieldname": "panel_materials",
+   "fieldtype": "Table",
+   "label": "Panel Materials",
+   "options": "Part List Materials"
+  },
+  {
+   "fieldname": "metal_material_tab",
+   "fieldtype": "Tab Break",
+   "label": "Metal"
+  },
+  {
+   "fieldname": "metal_material",
+   "fieldtype": "Table",
+   "label": "Metal Material",
+   "options": "Part List Materials"
+  },
+  {
+   "fieldname": "other_material_tab",
+   "fieldtype": "Tab Break",
+   "label": "Others"
+  },
+  {
+   "fieldname": "other_material",
+   "fieldtype": "Table",
+   "label": "Other Material",
+   "options": "Part List Materials"
+  },
+  {
+   "fieldname": "accessorise_table_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accessories"
+  },
+  {
+   "fieldname": "accessorise_table",
+   "fieldtype": "Table",
+   "label": "Accessorise Table",
+   "options": "Accessorise Table"
+  }
+ ],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales User"
+  },
+  {
+   "read": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Technical",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "PM",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "actions": [],
+ "links": [],
+ "states": []
+}
