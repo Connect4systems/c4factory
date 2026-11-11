@@ -6,6 +6,16 @@ from frappe.model.document import Document
 
 
 class PartList(Document):
+	def validate(self):
+		from c4factory.api.part_list_accessories import validate_requirements
+
+		validate_requirements(self)
+
+	def before_update_after_submit(self):
+		from c4factory.api.part_list_accessories import validate_submitted_update
+
+		validate_submitted_update(self)
+
 	def before_validate(self):
 		previous = self.get_doc_before_save()
 		if not previous and self.get("material_line") is None and not self.get("version_of"):

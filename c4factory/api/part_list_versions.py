@@ -19,14 +19,16 @@ LAYOUT_TYPES = {"Section Break", "Column Break", "Tab Break", "HTML", "Image", "
 COPY_EXCLUSIONS = {"amended_from", "version_of"}
 
 
-def copy_values(doc):
+def copy_values(doc, reset_mapping_audit=False):
 	"""Copy business data, including attachment URLs, without document identities."""
 	values = {}
 	for field in doc.meta.fields:
+		if reset_mapping_audit and field.fieldname in {"mapped_by", "mapped_on"}:
+			continue
 		if field.fieldname in COPY_EXCLUSIONS or field.fieldtype in LAYOUT_TYPES:
 			continue
 		if field.fieldtype in ("Table", "Table MultiSelect"):
-			values[field.fieldname] = [copy_values(row) for row in doc.get(field.fieldname) or []]
+			values[field.fieldname] = [copy_values(row, reset_mapping_audit=reset_mapping_audit) for row in doc.get(field.fieldname) or []]
 		else:
 			values[field.fieldname] = doc.get(field.fieldname)
 	return values
@@ -47,7 +49,7 @@ def get_copy_payload(source, target=None, new_version=False):
 		frappe.throw(_("You do not have permission to create Part Lists."), frappe.PermissionError)
 	if cint(new_version) and part.docstatus != 1:
 		frappe.throw(_("New Version requires a submitted Part List."))
-	values = copy_values(part)
+	values = copy_values(part, reset_mapping_audit=True)
 	if target:
 		# Import design data without replacing the destination product identity.
 		values.pop("product", None)

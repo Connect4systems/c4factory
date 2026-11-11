@@ -29,7 +29,7 @@ def get_bundle_rows(part_bundle, qty=1):
         fields = frappe.get_meta(child_type).get_valid_columns()
         # Only copy declared data fields, never names, parent links or audit fields.
         fields = [field.fieldname for field in frappe.get_meta(child_type).fields
-                  if field.fieldname in fields]
+                  if field.fieldname in fields and not getattr(field, "no_copy", False)]
         result[table] = []
         for row in bundle.get(table) or []:
             values = {field: row.get(field) for field in fields}

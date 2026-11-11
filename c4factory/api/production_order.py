@@ -8,6 +8,7 @@ from frappe import _
 from frappe.utils import flt, today
 
 from c4factory.api.part_list_versions import copy_values
+from c4factory.api.part_list_accessories import require_mapped
 
 SNAPSHOT_FIELDS = (
 	"product", "product_name", "description", "product_image", "width", "hight", "depth",
@@ -49,8 +50,11 @@ def get_available_items(color_sample):
 
 
 def snapshot_values(row):
+	# Serialize snapshot creation with stock mapping edits on the source design.
+	frappe.db.sql("select name from `tabPart List` where name = %s for update", (row.custom_part_list,))
 	part = frappe.get_doc("Part List", row.custom_part_list)
 	part.check_permission("read")
+	require_mapped(part)
 	if part.product != row.item_code or part.docstatus == 2:
 		frappe.throw(_("The sample's Part List must belong to its product and must not be cancelled."))
 	try:
@@ -98,6 +102,7 @@ def prepare_order(doc):
 
 
 def validate_order(doc, lock=False):
+	require_mapped(doc)
 	if lock:
 		# All submissions for a sample share this lock. A locking read of orders
 		# below sees the latest committed reservations under REPEATABLE READ.

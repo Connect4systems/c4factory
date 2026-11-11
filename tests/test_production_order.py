@@ -72,7 +72,8 @@ class TestProductionOrder(unittest.TestCase):
 		modules = {"frappe": self.frappe, "frappe.utils": utils}
 		with patch.dict(sys.modules, modules):
 			versions = load_module("c4factory/api/part_list_versions.py", "production_copy_test")
-			with patch.dict(sys.modules, {"c4factory.api.part_list_versions": versions}):
+			accessories = load_module("c4factory/api/part_list_accessories.py", "production_accessories_test")
+			with patch.dict(sys.modules, {"c4factory.api.part_list_versions": versions, "c4factory.api.part_list_accessories": accessories}):
 				self.api = load_module("c4factory/api/production_order.py", "production_order_test")
 		self.order = Doc(name="PO-DESK-01", color_sample="SAMPLE", color_sample_item="SAMPLE-ROW", product="DESK", qty=4)
 
