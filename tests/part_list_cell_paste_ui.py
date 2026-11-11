@@ -10,7 +10,8 @@ with sync_playwright() as p:
     page.evaluate("""() => {
       window.__ = (text, args=[]) => text.replace(/\{(\d+)\}/g, (_, n) => args[n]);
       window.module = {exports: {}};
-      window.frappe = {utils: {escape_html: String}, ui: {form: {on() {}}}};
+      window.pasteHandlers = {};
+      window.frappe = {utils: {escape_html: String}, ui: {form: {on(type, events) {pasteHandlers[type] = events;}}}};
     }""")
     page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / "c4factory/public/js/doctype/part_list_import.js"))
     page.evaluate("""async () => {
@@ -41,6 +42,40 @@ with sync_playwright() as p:
       frm.doc.docstatus = 1;
       await pasteIntoCells(frm, 'panel_materials', 0, 'width', '99');
       assert(first.width === 30, 'submitted document unchanged');
+    }""")
+    page.evaluate(r"""async () => {
+      const assert = (ok, message) => {if (!ok) throw Error(message);};
+      const root = document.createElement('div');
+      root.innerHTML = '<div class="grid-row" data-name="r2"><div data-fieldname="width"><input></div></div>';
+      document.body.append(root);
+      const rows = [
+        {doctype: 'Part List Materials', name: 'r1', width: 5},
+        {doctype: 'Part List Materials', name: 'r2', width: 6, part_name: 'Keep'},
+      ];
+      const frm = {doc: {docstatus: 0, panel_materials: rows},
+        fields_dict: {panel_materials: {grid: {wrapper: [root], grid_rows: []}}},
+        add_custom_button() {}, dirty() {}, refresh_field() {},
+        add_child(table) {const row = {doctype: rows[0].doctype, name: 'r' + (rows.length + 1)}; rows.push(row); return row;},
+      };
+      frappe.model = {async set_value(type, name, field, value) {rows.find(row => row.name === name)[field] = value;}};
+      frappe.msgprint = message => {throw Error(message);};
+      pasteHandlers['Part List'].refresh(frm);
+      const paste = text => {
+        const clipboardData = new DataTransfer(); clipboardData.setData('text/plain', text);
+        root.querySelector('input').dispatchEvent(new ClipboardEvent('paste', {bubbles: true, cancelable: true, clipboardData}));
+      };
+      paste('10\n20\n');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert(rows[0].width === 5 && rows[1].width === 10 && rows[2].width === 20, 'column paste starts at clicked row and adds rows');
+      assert(rows[1].part_name === 'Keep', 'other columns preserved');
+      let mapped = false;
+      frappe.ui.Dialog = class {constructor() {mapped = true; throw Error('mapping opened');}};
+      const ignoreMapping = event => {if (event.message.includes('mapping opened')) event.preventDefault();};
+      window.addEventListener('error', ignoreMapping);
+      paste('30\t40\n50\t60');
+      window.removeEventListener('error', ignoreMapping);
+      assert(mapped && rows[1].width === 10, 'multiple columns open mapping without changing cells');
+      root.remove();
     }""")
     page.evaluate("""() => {
       window.materialHandlers = {};

@@ -552,9 +552,21 @@
             event.stopImmediatePropagation();
             const grid = frm.fields_dict[table].grid;
             const cell = event.target.closest?.('[data-fieldname]');
-            const gridRow = grid.grid_rows?.find(row => row.wrapper?.[0]?.contains(event.target));
-            const rowIndex = (frm.doc[table] || []).indexOf(gridRow?.doc);
-            if (table !== 'accessorise_table' && cell && rowIndex >= 0 && materialColumns.includes(cell.dataset.fieldname)) {
+            const rowElement = event.target.closest?.('.grid-row[data-name]');
+            const gridRow = grid.grid_rows?.find(row => {
+              const wrapper = row.wrapper || row.$wrapper;
+              return (wrapper?.[0] || wrapper)?.contains?.(event.target);
+            });
+            const rowIndex = (frm.doc[table] || []).findIndex(row =>
+              row === gridRow?.doc || (rowElement?.dataset.name && row.name === rowElement.dataset.name));
+            let singleColumn;
+            try {
+              singleColumn = parsePaste(text).every(row => row.length === 1);
+            } catch (error) {
+              frappe.msgprint(esc(error.message));
+              return;
+            }
+            if (singleColumn && table !== 'accessorise_table' && cell && rowIndex >= 0 && materialColumns.includes(cell.dataset.fieldname)) {
               pasteIntoCells(frm, table, rowIndex, cell.dataset.fieldname, text)
                 .catch(error => frappe.msgprint(esc(error.message)));
               return;
