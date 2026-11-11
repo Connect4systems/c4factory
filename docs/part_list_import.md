@@ -18,6 +18,10 @@ require English and Arabic names. The old Part Name master is retained.
 
 In an editable draft, choose **Import / Paste → table name**. Paste a rectangular
 Excel range or upload `.xls` / `.xlsx` (10 MB maximum). Choose one workbook sheet.
+Uploads populate **Part File** on the Part List. Save the Part List to retain
+that attachment; subsequent imports load it automatically, without another
+upload. A pasted range takes priority over the attached workbook. Uploading a
+replacement workbook updates Part File after the workbook is read successfully.
 The supplied `Part L.` layout has suggested column mappings and section ranges;
 other sheets can be mapped manually. Source contents never execute as code.
 
@@ -38,6 +42,10 @@ dimensions remain blank. Column mappings are remembered in this browser when
 storage is available.
 
 The preview shows source row numbers and errors. Invalid rows cannot be included.
+The selected section material carries through mapping and preview. The preview
+material repair controls appear only when rows still have no material.
+Adding imported rows removes untouched empty starter rows, preserving existing
+rows that contain entered data.
 If no Material column is mapped, a Part Material must be chosen before opening
 the preview. Click a valid row or its checkbox to toggle inclusion, or use
 **Select All Valid Rows** / **Deselect All**. **Back to Mapping** returns to the

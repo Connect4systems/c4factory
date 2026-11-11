@@ -78,6 +78,15 @@
 
   function openImport(frm, table, pastedText = '') {
     let workbook = null, matrix = [], source = 'paste', mappingDialog, sectionDialog;
+    let workbookLoading = null;
+    const loadWorkbook = async fileUrl => {
+      const response = await frappe.call({method: api + 'inspect_workbook', args: {file_url: fileUrl}, freeze: true});
+      workbook = response.message; source = 'workbook';
+      const sheets = Object.keys(workbook);
+      dialog.set_df_property('sheet', 'options', sheets.join('\n'));
+      dialog.set_df_property('sheet', 'hidden', 0);
+      await dialog.set_value('sheet', sheets.includes('Part L.') ? 'Part L.' : sheets[0]);
+    };
     const dialog = new frappe.ui.Dialog({
       title: __('Import / Paste: {0}', [__(tables[table])]), size: 'extra-large',
       fields: [
@@ -88,8 +97,9 @@
         {fieldtype: 'Select', fieldname: 'sheet', label: __('Workbook Sheet'), hidden: 1},
       ],
       primary_action_label: __('Configure Columns'),
-      primary_action: () => {
+      primary_action: async () => {
         try {
+          if (workbookLoading) await workbookLoading;
           if (source === 'paste') matrix = parsePaste(dialog.get_value('paste') || '');
           else matrix = workbook[dialog.get_value('sheet')] || [];
           if (!matrix.length) return frappe.msgprint(__('Paste cells or upload a workbook first.'));
@@ -102,19 +112,21 @@
     dialog.fields_dict.upload.df.click = () => new frappe.ui.FileUploader({
       restrictions: {allowed_file_types: ['.xls', '.xlsx'], max_file_size: 10 * 1024 * 1024},
       make_attachments_public: false, is_private: true, allow_toggle_private: false,
+      doctype: frm.doc.doctype || 'Part List', docname: frm.doc.name, fieldname: 'part_file',
       on_success: async file => {
-        const response = await frappe.call({method: api + 'inspect_workbook', args: {file_url: file.file_url}, freeze: true});
-        workbook = response.message; source = 'workbook';
-        const sheets = Object.keys(workbook);
-        dialog.set_df_property('sheet', 'options', sheets.join('\n'));
-        dialog.set_df_property('sheet', 'hidden', 0);
-        await dialog.set_value('sheet', sheets.includes('Part L.') ? 'Part L.' : sheets[0]);
-        frappe.show_alert(__('Workbook loaded. Choose one source sheet to avoid duplicates.'));
+        await loadWorkbook(file.file_url);
+        await frm.set_value('part_file', file.file_url);
+        frappe.show_alert(__('Workbook linked in Part File. Save the Part List to keep it for future imports.'));
       },
     });
     dialog.fields_dict.template.df.click = () => window.open('/api/method/' + api + 'download_template?table=' + encodeURIComponent(table));
     dialog.show();
     if (pastedText) dialog.set_value('paste', pastedText);
+    else if (frm.doc.part_file) {
+      workbookLoading = loadWorkbook(frm.doc.part_file).catch(error => {
+        frappe.msgprint(esc(error.message));
+      }).finally(() => { workbookLoading = null; });
+    }
 
     function chooseSection() {
       const sections = detectSections(matrix);
@@ -213,13 +225,13 @@
             }, freeze: true});
             return refreshed.message;
           };
-          preview(response.message, values.mode, fields, accessories, table, refreshMaterial);
+          preview(response.message, values.mode, fields, accessories, table, refreshMaterial, values.default_material || '');
         },
       });
       mappingDialog.show();
     }
 
-    function preview(rows, mode, fields, accessories, table, refreshMaterial) {
+    function preview(rows, mode, fields, accessories, table, refreshMaterial, material = '') {
       if (!rows.length) return frappe.msgprint(__('No data rows found.'));
       let adding = false;
       const content = rows.map((r, i) => {
@@ -229,8 +241,9 @@
       const p = new frappe.ui.Dialog({
         title: __('Review Import: {0}', [__(tables[table])]), size: 'extra-large',
         fields: [
-          ...(!accessories ? [
+          ...(!accessories && rows.some(r => !r.values.material) ? [
             {fieldtype: 'Link', fieldname: 'review_material', label: __('Part Material for Rows Missing a Material'), options: 'Part Material',
+              default: material,
               description: __('Choose a material and apply it to enable rows with a missing material.')},
             {fieldtype: 'Button', fieldname: 'apply_material', label: __('Apply Material'), click: async () => {
               const material = p.get_value('review_material');
@@ -240,7 +253,7 @@
               try {
                 const refreshed = await refreshMaterial(material);
                 p.hide();
-                preview(refreshed, mode, fields, accessories, table, refreshMaterial);
+                preview(refreshed, mode, fields, accessories, table, refreshMaterial, material);
               } finally { adding = false; }
             }},
           ] : []),
@@ -278,6 +291,15 @@
             // Finish fallible lookups before changing any draft rows.
             if (frm.doc.docstatus !== 0 || frm.read_only) return frappe.msgprint(__('Import requires an editable draft.'));
             if (mode === 'Replace Table Rows') frm.clear_table(table);
+            else {
+              // Discard only untouched starter rows; retain all meaningful input.
+              const empty = (frm.doc[table] || []).filter(isEmptyImportRow);
+              empty.forEach(row => {
+                if (row.doctype && row.name) frappe.model.clear_doc(row.doctype, row.name);
+              });
+              frm.doc[table] = (frm.doc[table] || []).filter(row => !empty.includes(row));
+              frm.doc[table].forEach((row, index) => { row.idx = index + 1; });
+            }
             prepared.forEach(values => frm.add_child(table, values));
             frm.refresh_field(table); frm.dirty();
             p.hide(); mappingDialog.hide(); sectionDialog?.hide(); dialog.hide();
@@ -295,6 +317,12 @@
         });
       }
     }
+  }
+
+  function isEmptyImportRow(row) {
+    const text = ['material', 'part_name', 'part_name_ar', 'note', 'requested_name', 'item', 'basic_color', 'color_palette', 'color_doctype', 'requested_uom', 'stock_uom'];
+    const numbers = ['qty', 'lenght', 'width', 'hight', 'thickness', 'edite_color', 'stock_qty', 'conversion_factor'];
+    return text.every(key => !String(row[key] ?? '').trim()) && numbers.every(key => !Number(row[key] || 0));
   }
 
   function openMapping(frm) {
@@ -348,5 +376,5 @@
       }
     },
   });
-  if (typeof module !== 'undefined') module.exports = {parsePaste, column, sectionType, detectSections, sectionRange};
+  if (typeof module !== 'undefined') module.exports = {parsePaste, column, sectionType, detectSections, sectionRange, isEmptyImportRow};
 })();

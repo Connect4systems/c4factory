@@ -80,7 +80,8 @@ window.frm = {
   dashboard:{add_indicator(){}},buttons:{},
   add_custom_button(label, callback) {this.buttons[label]=callback;},
   add_child(table, values) {const row={...values};this.doc[table].push(row);return row;},
-  clear_table(table) {this.doc[table]=[];},refresh_field(){},dirty(){this.changed=true;},async reload_doc(){this.reloaded=true;}
+  clear_table(table) {this.doc[table]=[];},refresh_field(){},dirty(){this.changed=true;},async reload_doc(){this.reloaded=true;},
+  async set_value(key, value) {this.doc[key]=value;this.changed=true;}
 };
 }"""
 
@@ -265,6 +266,25 @@ def main():
         review.locator('[data-primary]').click()
         page.wait_for_function('frm.doc.metal_material.length === 2')
         assert page.evaluate('frm.doc.metal_material[1].material') == 'Steel'
+        # Reopen using the saved attachment, without uploading it again.
+        assert page.evaluate('frm.doc.part_file') == '/private/files/test.xls'
+        page.evaluate("frm.buttons['Metal Material']()")
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Map Excel Section'")
+        page.locator('.dialog').last.locator('[data-field=section_material]').fill('Steel')
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        assert page.locator('.dialog').last.locator('[data-field=default_material]').input_value() == 'Steel'
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
+        review = page.locator('.dialog').last
+        assert review.locator('[data-field=review_material]').count() == 0, 'Material must not be requested twice'
+        assert review.locator('input[type=checkbox]:checked').count() == 1
+        page.evaluate("frm.doc.metal_material.unshift({qty:0,lenght:0,width:0,hight:0,thickness:0});frm.doc.metal_material.push({part_name:'Keep me',qty:0})")
+        review.locator('[data-primary]').click()
+        page.wait_for_function('dialogs[dialogs.length-1].element.hidden === true')
+        assert page.evaluate('frm.doc.metal_material.length') == 4
+        assert page.evaluate("frm.doc.metal_material.some(r=>r.part_name==='Keep me')")
+        assert not page.evaluate('frm.doc.metal_material.some(module.exports.isEmptyImportRow)')
         # Capture spreadsheet paste before the cell's Data control clips it.
         page.evaluate("""() => {
           const grid = document.createElement('div');
