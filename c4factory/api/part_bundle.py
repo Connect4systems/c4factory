@@ -13,7 +13,7 @@ BUNDLE_TABLES = {
 
 
 @frappe.whitelist()
-def get_bundle_rows(part_bundle, qty=1):
+def get_bundle_rows(part_bundle, qty=1, bundle_group=None):
     """Return a permitted bundle's data rows, without child document identities."""
     try:
         multiplier = float(qty)
@@ -24,6 +24,8 @@ def get_bundle_rows(part_bundle, qty=1):
 
     bundle = frappe.get_doc("Part Bundle", part_bundle)
     bundle.check_permission("read")
+    if bundle_group and bundle.get("bundle_group") != bundle_group:
+        frappe.throw(_("The selected Part Bundle does not belong to the selected Bundle Group."))
     result = {}
     for table, child_type in BUNDLE_TABLES.items():
         fields = frappe.get_meta(child_type).get_valid_columns()

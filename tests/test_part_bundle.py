@@ -62,6 +62,17 @@ class TestPartBundle(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.api.get_bundle_rows("Private bundle", 1)
 
+    def test_selected_group_must_match_bundle(self):
+        bundle = Mock()
+        bundle.get.side_effect = {"bundle_group": "Doors"}.get
+        self.frappe.get_doc.return_value = bundle
+        with self.assertRaises(ValueError):
+            self.api.get_bundle_rows("Example", 1, bundle_group="Cabinets")
+        self.assertEqual(
+            self.api.get_bundle_rows("Example", 1, bundle_group="Doors"),
+            {table: [] for table in self.api.BUNDLE_TABLES},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

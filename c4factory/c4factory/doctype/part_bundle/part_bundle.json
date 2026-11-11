@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "bundle_name",
+  "bundle_group",
   "panel_materials_tab",
   "panel_materials",
   "metal_material_tab",
@@ -18,6 +19,15 @@
   "accessorise_table"
  ],
  "fields": [
+  {
+   "fieldname": "bundle_group",
+   "fieldtype": "Link",
+   "label": "Bundle Group",
+   "options": "Bundle Group",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
   {
    "fieldname": "bundle_name",
    "fieldtype": "Data",

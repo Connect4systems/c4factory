@@ -94,7 +94,17 @@ function openPartBundleSelector(frm) {
   const dialog = new frappe.ui.Dialog({
     title: __("Add Part Bundle"),
     fields: [
-      {fieldname: "part_bundle", fieldtype: "Link", label: __("Part Bundle"), options: "Part Bundle", reqd: 1},
+      {
+        fieldname: "bundle_group", fieldtype: "Link", label: __("Bundle Group"),
+        options: "Bundle Group", reqd: 1,
+        onchange() { dialog.set_value("part_bundle", null); },
+      },
+      {
+        fieldname: "part_bundle", fieldtype: "Link", label: __("Part Bundle"),
+        options: "Part Bundle", reqd: 1,
+        depends_on: "eval:doc.bundle_group",
+        get_query() { return {filters: {bundle_group: dialog.get_value("bundle_group") || ""}}; },
+      },
       {fieldname: "qty", fieldtype: "Float", label: __("Quantity"), default: 1, reqd: 1},
     ],
     primary_action_label: __("Add"),
