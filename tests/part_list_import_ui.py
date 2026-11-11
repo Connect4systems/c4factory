@@ -134,7 +134,12 @@ def main():
         page.locator('[data-field=default_material]').fill('MDF')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('dialogs.length === 3')
-        assert page.locator('.dialog').last.locator('input:checked').count() == 1, 'Assembly should require explicit inclusion'
+        assert page.locator('.dialog').last.locator('input:checked').count() == 2, 'Valid assemblies are included by default'
+        assembly = page.locator('.dialog').last.locator('tr.c4-possible-assembly')
+        assert assembly.count() == 1
+        assert assembly.locator('td').first.evaluate('(cell) => getComputedStyle(cell).backgroundColor') == 'rgb(255, 243, 205)'
+        assert 'counted alongside its components' in assembly.inner_text()
+        assembly.locator('input').uncheck()
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('frm.doc.panel_materials.length === 1')
         part = page.evaluate('frm.doc.panel_materials[0]')
