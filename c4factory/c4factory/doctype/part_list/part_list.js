@@ -25,7 +25,7 @@ function configurePartListMaterialColumns(frm) {
   ];
   for (const table of ["panel_materials", "metal_material", "other_material"]) {
     const grid = frm.fields_dict[table]?.grid;
-    if (!grid) continue;
+    if (!grid || grid.__c4_columns) continue;
     const visible = columns.map(([name, width]) => {
       const field = grid.docfields.find(df => df.fieldname === name);
       return field ? [Object.assign(field, {columns: width, in_list_view: 1}), width] : null;
