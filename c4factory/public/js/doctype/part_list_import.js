@@ -215,7 +215,9 @@
         const prefix = `section_${i}_`;
         fields.push(
           {fieldtype: 'Section Break', label: esc(section.label)},
-          {fieldtype: 'Select', fieldname: prefix + 'table', label: __('Excel Header → Table'), options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[section.table],
+          {fieldtype: 'Data', fieldname: prefix + 'header', label: __('Excel Header'), default: section.label, read_only: 1},
+          {fieldtype: 'Column Break'},
+          {fieldtype: 'Select', fieldname: prefix + 'table', label: __('System Table'), options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[section.table],
             onchange: () => {
               if (!setup) return;
               const accessories = setup.get_value(prefix + 'table') === tables.accessorise_table;
@@ -224,9 +226,13 @@
                 setup.set_df_property(prefix + field, 'hidden', hidden);
               });
             }},
+          {fieldtype: 'Column Break'},
+          {fieldtype: 'Link', fieldname: prefix + 'default_material', label: __('Part Material'), options: 'Part Material', hidden: section.table === 'accessorise_table'},
+          {fieldtype: 'Section Break', label: __('Data Row Range')},
           {fieldtype: 'Int', fieldname: prefix + 'start', label: __('First Data Row'), default: range.start, reqd: 1},
+          {fieldtype: 'Column Break'},
           {fieldtype: 'Int', fieldname: prefix + 'end', label: __('Last Data Row'), default: range.end, reqd: 1},
-          {fieldtype: 'Link', fieldname: prefix + 'default_material', label: __('Part Material for this Section'), options: 'Part Material', hidden: section.table === 'accessorise_table'},
+          {fieldtype: 'Section Break', label: __('Column Mapping')},
           {fieldtype: 'HTML', options: `<div style="overflow:auto;max-height:160px"><table class="table table-bordered"><thead><tr>${columns.map((col, c) => `<th>${col}: ${esc(headers[c])}</th>`).join('')}</tr></thead><tbody>${matrix.slice(range.start - 1, Math.min(range.start + 2, range.end)).map(row => `<tr>${columns.map((_, c) => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
           ...[...materialFields, 'requested_name'].map(field => ({fieldtype: 'Select', fieldname: prefix + field, label: __(labels[field]), options: columnOptions, default: defaults[field],
             hidden: section.table === 'accessorise_table' ? !['requested_name', 'qty', 'note'].includes(field) : field === 'requested_name'})),
