@@ -26,11 +26,26 @@ function configurePartListMaterialColumns(frm) {
   for (const table of ["panel_materials", "metal_material", "other_material"]) {
     const grid = frm.fields_dict[table]?.grid;
     if (!grid) continue;
-    // Set all columns explicitly: automatic grid sizing can omit trailing fields.
-    grid.visible_columns = columns.map(([name, width]) => {
+    const visible = columns.map(([name, width]) => {
       const field = grid.docfields.find(df => df.fieldname === name);
       return field ? [Object.assign(field, {columns: width, in_list_view: 1}), width] : null;
     }).filter(Boolean);
+    const signature = list => JSON.stringify((list || []).map(([df, width]) => [df.fieldname, width]));
+    const changed = signature(grid.visible_columns) !== signature(visible) ||
+      JSON.stringify((grid.user_defined_columns || []).map(df => df.fieldname)) !==
+      JSON.stringify(visible.map(([df]) => df.fieldname));
+    // GridRow resolves cells against saved column definitions. Keep those in sync
+    // too, otherwise newly added fields can break headings and existing cells.
+    grid.user_defined_columns = visible.map(([df]) => df);
+    grid.visible_columns = visible;
+    if (!changed) continue;
+    grid.grid_rows?.forEach(row => {
+      if (row.grid_form?.wrapper?.is(':visible')) row.toggle_view(false);
+    });
+    // Refresh reuses cached GridRows, including their old cell order.
+    grid.wrapper?.find('.grid-body .grid-row').remove();
+    grid.grid_rows = [];
+    grid.grid_rows_by_docname = {};
     grid.refresh();
   }
 }
@@ -49,6 +64,28 @@ frappe.ui.form.on("Part List", {
   metal_material_line(frm) {
     if (!frm._applyingPartListCopy && frm.doc.material_line !== frm.doc.metal_material_line)
       return frm.set_value("material_line", frm.doc.metal_material_line);
+  },
+});
+
+frappe.ui.form.on("Part List Materials", {
+  form_render(frm, cdt, cdn) {
+    if (frm.doctype !== "Part List" && frm.doc.doctype !== "Part List") return;
+    const doc = locals[cdt]?.[cdn];
+    const row = frm.fields_dict[doc?.parentfield]?.grid?.grid_rows_by_docname?.[cdn];
+    const wrapper = row?.grid_form?.wrapper;
+    if (!wrapper) return;
+    const close = event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      row.toggle_view(false);
+    };
+    wrapper.find('.grid-collapse-row').off('click.c4Close').on('click.c4Close', close)
+      .attr('title', __('Close row'));
+    if (!wrapper.find('.c4-close-material-row').length) {
+      $('<button type="button" class="btn btn-primary btn-sm c4-close-material-row"></button>')
+        .text(__('Done')).on('click.c4Close', close)
+        .appendTo(wrapper.find('.grid-footer-toolbar'));
+    }
   },
 });
 

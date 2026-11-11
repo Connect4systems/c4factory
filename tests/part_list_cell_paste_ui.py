@@ -42,5 +42,53 @@ with sync_playwright() as p:
       await pasteIntoCells(frm, 'panel_materials', 0, 'width', '99');
       assert(first.width === 30, 'submitted document unchanged');
     }""")
+    page.evaluate("""() => {
+      window.materialHandlers = {};
+      frappe.ui.form.on = (type, events) => Object.assign(materialHandlers[type] ||= {}, events);
+      window.locals = {'Part List Materials': {row1: {parentfield: 'panel_materials'}}};
+      window.$ = html => wrap([document.createElement('button')]);
+      window.wrap = nodes => ({
+        length: nodes.length,
+        find(selector) {return wrap(nodes.flatMap(n => [...n.querySelectorAll(selector)]));},
+        remove() {nodes.forEach(n => n.remove());return this;},
+        is() {return true;},
+        off() {return this;},
+        on(type, fn) {nodes.forEach(n => n.addEventListener(type.split('.')[0], fn));return this;},
+        attr(key, value) {nodes.forEach(n => n.setAttribute(key, value));return this;},
+        text(value) {nodes.forEach(n => n.textContent = value);return this;},
+        appendTo(target) {target.append(nodes);return this;},
+        append(children) {children.forEach(n => nodes[0].append(n));}
+      });
+    }""")
+    page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / "c4factory/c4factory/doctype/part_list/part_list.js"))
+    page.evaluate("""() => {
+      const names = ['part_name','part_name_ar','lenght','width','hight','thickness','qty','material','note','edite_color','basic_color'];
+      const assert = (ok, message) => {if (!ok) throw Error(message);};
+      const root = document.createElement('div');
+      root.innerHTML = '<div class="grid-body"><div class="grid-row">old cells</div></div>';
+      const grid = {docfields: names.map(fieldname => ({fieldname})),
+        visible_columns: [[{fieldname: 'material'}, 1]],
+        user_defined_columns: [{fieldname: 'material'}],
+        grid_rows: [{}], wrapper: wrap([root]), refresh() {this.refreshes = (this.refreshes || 0)+1;}};
+      const frm = {doc: {doctype: 'Part List'}, fields_dict: {panel_materials: {grid}}};
+      configurePartListMaterialColumns(frm);
+      assert(JSON.stringify(grid.visible_columns.map(([df]) => df.fieldname)) === JSON.stringify(names), 'visible order');
+      assert(JSON.stringify(grid.user_defined_columns.map(df => df.fieldname)) === JSON.stringify(names), 'saved definitions synchronized');
+      assert(grid.grid_rows.length === 0 && !root.querySelector('.grid-row'), 'cached cells removed');
+      configurePartListMaterialColumns(frm);
+      assert(grid.refreshes === 1, 'unchanged refresh preserves editor');
+      const form = document.createElement('div');
+      form.innerHTML = '<button class="grid-collapse-row"></button><div class="grid-footer-toolbar"></div>';
+      const row = {grid_form: {wrapper: wrap([form])}, toggle_view(show) {this.closed = show === false;}};
+      grid.grid_rows_by_docname.row1 = row;
+      materialHandlers['Part List Materials'].form_render(frm, 'Part List Materials', 'row1');
+      assert(form.querySelector('.grid-footer-toolbar button').textContent === 'Done', 'Done button');
+      form.querySelector('.grid-footer-toolbar button').click();
+      assert(row.closed, 'Done closes editor');
+      row.closed = false;
+      form.querySelector('.grid-collapse-row').click();
+      assert(row.closed, 'collapse closes editor');
+    }""")
     browser.close()
 print("PASS: column paste, rectangular paste, validation, row extension, and draft guard")
+print("PASS: grid order, saved definitions, cached cells, and row editor close buttons")
