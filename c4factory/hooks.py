@@ -17,8 +17,8 @@ after_migrate = [
 ]
 
 app_include_js = [
-    "/assets/c4factory/js/doctype/part_list_columns.js",
-    "/assets/c4factory/js/doctype/part_list_table_fullscreen.js",
+    "/assets/c4factory/js/doctype/part_list_columns.js?v=20261111-scoped-init",
+    "/assets/c4factory/js/doctype/part_list_table_fullscreen.js?v=20261111-scoped-init",
     "/assets/c4factory/js/doctype/part_list_import.js?v=20261111-all-tables-shared-mapping",
     "/assets/c4factory/js/doctype/item_uom.js",
     "/assets/c4factory/js/doctype/part_list_versions.js",

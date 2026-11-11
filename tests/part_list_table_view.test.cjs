@@ -10,7 +10,6 @@ const wrapper = new Proxy({length: 0}, {get(target, key) {
 const context = vm.createContext({
   __: value => value, $: () => wrapper,
   document: {getElementById: () => true},
-  configurePartListMaterialColumns() {},
   frappe: {
     ui: {form: {on(type, events) {assert.equal(type, 'Part List'); handlers.push(events);}}},
     get_user_settings: (type, key) => preferences[key],
@@ -30,8 +29,20 @@ function grid(fieldname) {
       {fieldname: 'qty', fieldtype: 'Float', in_list_view: 1, columns: 1},
       {fieldname: 'secret', fieldtype: 'Data', hidden: 1, columns: 2},
     ],
-    reset_grid() {this.setup_visible_columns();},
-    make_head() {},
+    reset_grid() {this.make_head(); this.setup_visible_columns();},
+    make_head() {
+      this.header_row = {
+        validate_columns_width() {throw new Error('The total column width cannot be more than 10.');},
+        prepare_columns_for_dialog() {return [];},
+        configure_dialog_for_columns_selector() {
+          this.grid_settings_dialog = {
+            set_primary_action(label, callback) {this.primary = callback;},
+            set_secondary_action(callback) {this.secondary = callback;},
+            hide() {this.hidden = true;},
+          };
+        },
+      };
+    },
   };
 }
 (async () => {
@@ -41,7 +52,7 @@ function grid(fieldname) {
     fields_dict: {panel: {grid: panel}, metal: {grid: metal}}};
   const before = JSON.stringify(frm.doc);
   handlers[0].refresh(frm);
-  assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['material', 'qty']);
+  assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['qty', 'material']);
   preferences.C4TableColumns = {panel_materials: [
     {fieldname: 'qty', columns: 8}, {fieldname: 'material', columns: 7},
     {fieldname: 'secret', columns: 1}, {fieldname: 'removed', columns: 1},
@@ -50,8 +61,17 @@ function grid(fieldname) {
   assert.equal(panel.visible_columns.reduce((sum, [, width]) => sum + width, 0), 15,
     'Extended columns can exceed the native ten-column limit');
   assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['qty', 'material']);
-  assert.deepEqual(Array.from(metal.visible_columns, ([df]) => df.fieldname), ['material', 'qty'],
+  assert.deepEqual(Array.from(metal.visible_columns, ([df]) => df.fieldname), ['qty', 'material'],
     'Material tables retain separate preferences despite sharing a child DocType');
+  const header = panel.header_row;
+  header.selected_columns_for_grid = [{fieldname: 'qty', columns: 8}, {fieldname: 'material', columns: 7}];
+  header.configure_dialog_for_columns_selector();
+  const dialog = header.grid_settings_dialog;
+  await dialog.primary();
+  assert.equal(dialog.hidden, true, 'Update saves and closes the actual column picker above ten units');
+  assert.equal(preferences.C4TableColumns.panel_materials.length, 2);
+  assert.equal(panel.visible_columns.reduce((sum, [, width]) => sum + width, 0), 15);
+  assert.equal(preferences.C4TableColumns.metal_material, undefined);
   const setup = panel.setup_visible_columns;
   handlers[0].refresh(frm);
   assert.equal(panel.setup_visible_columns, setup, 'Repeated refresh does not wrap methods again');

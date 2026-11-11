@@ -4,6 +4,11 @@
   const settings_key = () => "C4TableColumns";
   const is_picture = (df) => ["picture", "image", "image_view", "image_preview"].includes(df.fieldname);
   const width = (value) => Math.min(10, Math.max(1, Math.trunc(Number(value) || 2)));
+  const material_columns = [
+    ["part_name", 1], ["part_name_ar", 1], ["lenght", 1], ["width", 1], ["hight", 1],
+    ["thickness", 1], ["qty", 1], ["material", 1], ["note", 2],
+    ["edite_color", 1], ["basic_color", 1],
+  ];
   function contain_table(grid) {
     if (!grid.wrapper) return;
     grid.wrapper.addClass("c4-table-columns");
@@ -26,7 +31,14 @@
     if (grid.__c4_columns) return;
     grid.__c4_columns = true;
     grid.docfields = (grid.docfields || []).map((df) => ({ ...df }));
-    const defaults = (grid.docfields || []).map((df) => ({ ...df }));
+    // Doctype script functions are scoped by Frappe's ScriptManager; this Desk
+    // asset must initialize defaults without calling functions from that script.
+    const defaults = grid.doctype === "Part List Materials"
+      ? material_columns.map(([name, columns]) => {
+        const df = grid.docfields.find(field => field.fieldname === name);
+        return df && { ...df, columns, in_list_view: 1 };
+      }).filter(Boolean)
+      : grid.docfields.map(df => ({ ...df }));
 
     grid.setup_visible_columns = function () {
       // setup_fields can replace grid.docfields on subsequent refreshes.
@@ -110,7 +122,6 @@
 
   const events = {
     refresh(frm) {
-      configurePartListMaterialColumns(frm);
       if (!document.getElementById("c4-table-columns-style")) {
         const style = document.createElement("style");
         style.id = "c4-table-columns-style";
