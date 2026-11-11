@@ -18,8 +18,8 @@ with sync_playwright() as p:
       const assert = (ok, message) => {if (!ok) throw Error(message);};
       const parsed = prepareCellPaste('10\\n20\\n', 'width');
       assert(parsed.length === 2 && parsed[1].width === 20, 'single column');
-      const full = prepareCellPaste('Panel A\\t100\\t50\\t20\\t18\\t2\\tMDF\\tTest note\\t1\\tOak', 'part_name')[0];
-      assert(full.part_name === 'Panel A' && full.lenght === 100 && full.qty === 2 && full.material === 'MDF' && full.note === 'Test note' && full.edite_color === 1 && full.basic_color === 'Oak', 'standard Excel sequence');
+      const full = prepareCellPaste('Panel A\\tلوح\\t100\\t50\\t20\\t18\\t2\\tMDF\\tTest note\\t1\\tOak', 'part_name')[0];
+      assert(full.part_name === 'Panel A' && full.part_name_ar === 'لوح' && full.lenght === 100 && full.qty === 2 && full.material === 'MDF' && full.note === 'Test note' && full.edite_color === 1 && full.basic_color === 'Oak', 'standard Excel sequence');
       assert(prepareCellPaste('"a\\nb"', 'note')[0].note === 'a\\nb', 'quoted cell');
       for (const [text, field] of [['abc', 'width'], ['x\\ty', 'basic_color'], ['maybe', 'edite_color']]) {
         let rejected = false;

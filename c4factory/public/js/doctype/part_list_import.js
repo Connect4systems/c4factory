@@ -11,7 +11,7 @@
     note: 'Notes', requested_name: 'Requested Item Name',
   };
   const esc = value => frappe.utils.escape_html(String(value ?? ''));
-  const materialColumns = ['part_name', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note', 'edite_color', 'basic_color'];
+  const materialColumns = ['part_name', 'part_name_ar', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note', 'edite_color', 'basic_color'];
   function prepareCellPaste(text, fieldname) {
     const start = materialColumns.indexOf(fieldname);
     if (start < 0) throw new Error(__('Choose a material table cell first.'));

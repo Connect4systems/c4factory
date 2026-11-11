@@ -19,14 +19,14 @@ async function refreshPartListProductImage(frm) {
 
 function configurePartListMaterialColumns(frm) {
   const columns = [
-    ["part_name", 1], ["lenght", 1], ["width", 1], ["hight", 1],
+    ["part_name", 1], ["part_name_ar", 1], ["lenght", 1], ["width", 1], ["hight", 1],
     ["thickness", 1], ["qty", 1], ["material", 1], ["note", 2],
     ["edite_color", 1], ["basic_color", 1],
   ];
   for (const table of ["panel_materials", "metal_material", "other_material"]) {
     const grid = frm.fields_dict[table]?.grid;
     if (!grid) continue;
-    // Set all ten columns explicitly: automatic grid sizing can omit Color.
+    // Set all columns explicitly: automatic grid sizing can omit trailing fields.
     grid.visible_columns = columns.map(([name, width]) => {
       const field = grid.docfields.find(df => df.fieldname === name);
       return field ? [Object.assign(field, {columns: width, in_list_view: 1}), width] : null;

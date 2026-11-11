@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "part_name",
+  "part_name_ar",
   "lenght",
   "width",
   "hight",
@@ -16,7 +17,6 @@
   "note",
   "edite_color",
   "basic_color",
-  "part_name_ar",
   "color_doctype",
   "color_palette"
  ],
@@ -129,8 +129,8 @@
    "fieldname": "part_name_ar",
    "fieldtype": "Data",
    "label": "Part Name Arabic",
-   "in_list_view": 0,
-   "columns": 0
+   "in_list_view": 1,
+   "columns": 1
   }
  ],
  "grid_page_length": 50,
