@@ -265,6 +265,24 @@ def main():
         review.locator('[data-primary]').click()
         page.wait_for_function('frm.doc.metal_material.length === 2')
         assert page.evaluate('frm.doc.metal_material[1].material') == 'Steel'
+        # Capture spreadsheet paste before the cell's Data control clips it.
+        page.evaluate("""() => {
+          const grid = document.createElement('div');
+          grid.innerHTML = '<input id="grid-paste-cell">';document.body.append(grid);
+          frm.fields_dict = {panel_materials:{grid:{wrapper:[grid]}}};
+          handlers['Part List'].refresh(frm);
+          const clipboardData = new DataTransfer();
+          clipboardData.setData('text/plain', 'Top\\tالقرصة\\t\\t\\t428\\t700\\t\\t18\\t1');
+          const event = new ClipboardEvent('paste', {clipboardData, bubbles:true, cancelable:true});
+          document.querySelector('#grid-paste-cell').dispatchEvent(event);
+          window.pastePrevented = event.defaultPrevented;
+        }""")
+        assert page.evaluate('pastePrevented')
+        assert page.locator('.dialog').last.locator('[data-field=paste]').input_value().startswith('Top\t')
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        config = page.locator('.dialog').last
+        for field, col in [('lenght', 'E'), ('width', 'F'), ('hight', 'G'), ('thickness', 'H'), ('qty', 'I')]:
+            assert config.locator(f'[data-field={field}]').input_value() == col
         assert not errors, errors
         assert not page.evaluate('window.lastError'), page.evaluate('window.lastError')
         browser.close()

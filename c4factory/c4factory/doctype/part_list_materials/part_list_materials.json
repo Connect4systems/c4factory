@@ -8,17 +8,17 @@
  "field_order": [
   "material",
   "part_name",
-  "part_name_ar",
-  "edite_color",
-  "qty",
   "lenght",
   "width",
   "hight",
   "thickness",
+  "qty",
+  "note",
+  "edite_color",
+  "part_name_ar",
   "color_doctype",
   "color_palette",
-  "basic_color",
-  "note"
+  "basic_color"
  ],
  "fields": [
   {
@@ -26,37 +26,42 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "QTY"
+   "label": "QTY",
+   "columns": 1
   },
   {
    "fieldname": "width",
    "fieldtype": "Float",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Width"
+   "label": "Width",
+   "columns": 1
   },
   {
    "fieldname": "hight",
    "fieldtype": "Float",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Hight"
+   "label": "Hight",
+   "columns": 1
   },
   {
    "fieldname": "thickness",
    "fieldtype": "Float",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Thickness "
+   "label": "Thickness ",
+   "columns": 1
   },
   {
    "fieldname": "basic_color",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "in_list_view": 0,
    "in_preview": 1,
    "label": "Color",
    "options": "Material Color",
-   "read_only_depends_on": "eval:!doc.color_palette"
+   "read_only_depends_on": "eval:!doc.color_palette",
+   "columns": 0
   },
   {
    "fieldname": "color_doctype",
@@ -64,7 +69,9 @@
    "hidden": 1,
    "label": "Color DocType",
    "options": "DocType",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 0,
+   "columns": 0
   },
   {
    "fieldname": "material",
@@ -73,7 +80,8 @@
    "in_preview": 1,
    "label": "Material",
    "options": "Part Material",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 1
   },
   {
    "default": "0",
@@ -81,7 +89,8 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Edite Color"
+   "label": "Edite Color",
+   "columns": 1
   },
   {
    "fieldname": "part_name",
@@ -89,33 +98,39 @@
    "in_list_view": 1,
    "in_preview": 1,
    "label": "Part Name English",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 1
   },
   {
    "fieldname": "note",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Note"
+   "label": "Note",
+   "columns": 2
   },
   {
    "fieldname": "color_palette",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "in_list_view": 0,
    "label": "Color Palette",
-   "options": "Color Palette"
+   "options": "Color Palette",
+   "columns": 0
   },
   {
    "fieldname": "lenght",
    "fieldtype": "Float",
    "label": "Lenght",
-   "precision": "0"
+   "precision": "0",
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "fieldname": "part_name_ar",
    "fieldtype": "Data",
    "label": "Part Name Arabic",
-   "in_list_view": 1
+   "in_list_view": 0,
+   "columns": 0
   }
  ],
  "grid_page_length": 50,

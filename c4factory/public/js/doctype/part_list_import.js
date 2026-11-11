@@ -76,7 +76,7 @@
     return {start, end};
   }
 
-  function openImport(frm, table) {
+  function openImport(frm, table, pastedText = '') {
     let workbook = null, matrix = [], source = 'paste', mappingDialog, sectionDialog;
     const dialog = new frappe.ui.Dialog({
       title: __('Import / Paste: {0}', [__(tables[table])]), size: 'extra-large',
@@ -114,6 +114,7 @@
     });
     dialog.fields_dict.template.df.click = () => window.open('/api/method/' + api + 'download_template?table=' + encodeURIComponent(table));
     dialog.show();
+    if (pastedText) dialog.set_value('paste', pastedText);
 
     function chooseSection() {
       const sections = detectSections(matrix);
@@ -161,7 +162,10 @@
       try { saved = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) { /* fresh mapping */ }
       let start = 1, end = matrix.length;
       let defaults = Object.fromEntries(fields.map((f, i) => [f, i < count ? column(i) : 'Skip']));
-      if (sheetName === 'Part L.' || (section && count >= 11)) {
+      if (!accessories && count === 9 && matrix.every(r => !String(r[2] ?? '').trim() && !String(r[3] ?? '').trim())) {
+        // The customer's C:K range includes the two blank columns E and F.
+        defaults = {part_name: 'A', part_name_ar: 'B', lenght: 'E', width: 'F', hight: 'G', thickness: 'H', qty: 'I', material: 'Skip', note: 'Skip'};
+      } else if (sheetName === 'Part L.' || (section && count >= 11)) {
         defaults = accessories ? {requested_name: 'C', qty: 'K', note: 'G'} :
           {part_name: 'C', part_name_ar: 'D', lenght: 'G', width: 'H', hight: 'I', thickness: 'J', qty: 'K', material: 'Skip', note: 'Skip'};
       } else {
@@ -322,6 +326,19 @@
     refresh(frm) {
       if (frm.doc.docstatus === 0 && !frm.read_only) {
         Object.entries(tables).forEach(([table, label]) => frm.add_custom_button(__(label), () => openImport(frm, table), __('Import / Paste')));
+        Object.keys(tables).forEach(table => {
+          const wrapper = frm.fields_dict?.[table]?.grid?.wrapper?.[0];
+          if (!wrapper || wrapper._partImportPaste) return;
+          wrapper._partImportPaste = true;
+          wrapper.addEventListener('paste', event => {
+            if (frm.doc.docstatus !== 0 || frm.read_only) return;
+            const text = event.clipboardData?.getData('text/plain') || '';
+            if (!/[\t\r\n]/.test(text)) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openImport(frm, table, text);
+          }, true);
+        });
       }
       const rows = frm.doc.accessorise_table || [];
       const matched = rows.filter(r => r.item).length;
