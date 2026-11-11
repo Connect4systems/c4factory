@@ -23,13 +23,20 @@ require English and Arabic names. The old Part Name master is retained.
 
 ## Importing
 
-Choose **Import / Paste → Import All** to import all sections from one Excel sheet
-or pasted range together. The setup popup lists each detected section header next
-to its destination table. Confirm or change the table, choose **Skip** to exclude
-a section, and review its row range, material, and column mappings. Standard
-column headers are mapped automatically; the supplied `Part L.` layout also has
-suggested mappings. A range without section headers can be mapped as one section.
-**Download Template** in this flow provides all four section headers and columns.
+Choose **Import / Paste > All Tables** to import sections from one sheet or
+pasted range together. One section contains four rows for Panel Materials,
+Metal Material, Other Material, and Accessories. Each row has an editable Excel
+Header selector and System Table selector, with detected matches selected by
+default. The first three rows also provide Part Material. Choose Skip to exclude
+a row. Each source header can be selected only once, and its data range is detected
+automatically.
+
+**Shared Column Mapping** appears once and applies to all selected sections.
+The English name column supplies Requested Item Name for accessories; Qty and
+Notes use the same source columns across all four tables. Standard column headers
+and the supplied `Part L.` layout have suggested mappings. The All Tables template
+uses the same columns in every section. A plain range without section headers can
+be selected as a whole range in one row.
 
 **Preview All Tables** shows all sections together with row checkboxes and errors.
 Use **Back to Mapping** to correct settings, then **Import All Selected Rows** to

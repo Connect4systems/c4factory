@@ -311,15 +311,32 @@ def main():
             'Panel Materials', material_header, 'Top\tقرصة\t100\t80\t\t18\t2\tMDF\t',
             'Metal Material', material_header, 'Leg\tرجل\t\t\t700\t2\t4\tSteel\t',
             'Other Material', material_header, 'Foam\tفوم\t\t\t\t10\t1\tFoam\t',
-            'Accessories', 'Requested Item Name\tQty\tNotes', 'Screw\t8\t', 'Bad screw\t-1\t',
+            'Accessories', material_header, 'Screw\t\t\t\t\t\t8\t\t', 'Bad screw\t\t\t\t\t\t-1\t\t',
         ])
         page.locator('.dialog').last.locator('[data-field=paste]').fill(combined)
         page.locator('.dialog').last.locator('[data-primary]').click()
-        setup = page.locator('.dialog').last
+        setup = page.locator('.dialog').nth(page.locator('.dialog').count() - 1)
         assert setup.locator('[data-field=section_0_table]').input_value() == 'Panel Materials'
         assert setup.locator('[data-field=section_3_table]').input_value() == 'Accessories'
-        assert setup.locator('[data-field=section_0_part_name]').input_value() == 'A'
-        assert setup.locator('[data-field=section_0_material]').input_value() == 'H'
+        assert setup.locator('[data-field=map_part_name]').input_value() == 'A'
+        assert setup.locator('[data-field=map_material]').input_value() == 'H'
+        assert setup.locator('select[data-field$="_header"]').count() == 4
+        assert setup.locator('select[data-field^="map_"]').count() == 9
+        # Header choices are editable; switching them changes the section ranges.
+        panel_header = setup.locator('[data-field=section_0_header]').input_value()
+        metal_header = setup.locator('[data-field=section_1_header]').input_value()
+        setup.locator('[data-field=section_0_header]').select_option(metal_header)
+        setup.locator('[data-field=section_1_header]').select_option(panel_header)
+        setup.locator('[data-primary]').click()
+        page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Review Import: All Tables'")
+        preview_calls = page.evaluate("calls.filter(call=>call.method.endsWith('preview_import')).slice(-4).map(call=>call.args)")
+        assert preview_calls[0]['start_row'] == 6
+        assert preview_calls[1]['start_row'] == 3
+        assert all(json.loads(call['mapping'])['qty'] == 6 for call in preview_calls)
+        assert json.loads(preview_calls[3]['mapping'])['requested_name'] == 0
+        page.locator('.dialog').last.locator('[data-field=back]').click()
+        setup.locator('[data-field=section_0_header]').select_option(panel_header)
+        setup.locator('[data-field=section_1_header]').select_option(metal_header)
         setup.locator('[data-field=mode]').select_option('Replace Table Rows')
         before = page.evaluate('JSON.stringify(frm.doc)')
         setup.locator('[data-primary]').click()

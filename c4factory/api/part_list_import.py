@@ -29,7 +29,7 @@ def download_template(table):
     for target in targets:
         if table == "all":
             sheet.append([titles[target]])
-        sheet.append(["Requested Item Name", "Qty", "Notes"] if target == "accessorise_table" else
+        sheet.append(["Requested Item Name", "Qty", "Notes"] if target == "accessorise_table" and table != "all" else
             ["Part Name English", "Part Name Arabic", "Length", "Width", "Height", "Thickness", "Qty", "Material", "Notes"])
         if table == "all":
             sheet.append([])

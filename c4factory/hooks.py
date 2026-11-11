@@ -17,7 +17,7 @@ after_migrate = [
 ]
 
 app_include_js = [
-    "/assets/c4factory/js/doctype/part_list_import.js?v=20261111-all-tables-columns",
+    "/assets/c4factory/js/doctype/part_list_import.js?v=20261111-all-tables-shared-mapping",
     "/assets/c4factory/js/doctype/item_uom.js",
     "/assets/c4factory/js/doctype/part_list_versions.js",
     "/assets/c4factory/js/doctype/part_list_material_colors.js",

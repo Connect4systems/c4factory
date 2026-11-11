@@ -85,7 +85,7 @@ class ImportTests(unittest.TestCase):
         titles = ['Panel Materials', 'Metal Material', 'Other Material', 'Accessories']
         self.assertEqual([rows[index][0] for index in (0, 3, 6, 9)], titles)
         self.assertEqual(rows[1][0], 'Part Name English')
-        self.assertEqual(rows[10][:3], ['Requested Item Name', 'Qty', 'Notes'])
+        self.assertEqual(rows[10], rows[1], 'All sections use the same column layout')
 
     def test_invalid_numbers_and_missing_arabic_are_preview_errors(self):
         for qty in ('0', '-1', 'nan', 'inf', 'abc'):

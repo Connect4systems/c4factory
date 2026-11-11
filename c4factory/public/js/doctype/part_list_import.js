@@ -205,64 +205,67 @@
         }));
         return {section, range, headers, defaults};
       });
+      const choices = sources.map(section => section.index < 0 ? section.label : `${section.index + 1}: ${section.label}`);
+      const slots = Object.keys(tables).map(table => ({table, source: sources.findIndex(section => section.table === table)}));
+      const common = configs.find(config => config.section.table !== 'accessorise_table') || configs[0];
+      const defaults = {...common.defaults};
+      if (defaults.part_name === 'Skip') defaults.part_name = common.defaults.requested_name;
       let setup;
       const fields = [
-        {fieldtype: 'HTML', options: `<p>${__('Confirm each Excel section and its destination table. Review column mappings and row ranges before importing all selected sections together.')}</p>`},
+        {fieldtype: 'HTML', options: `<p>${__('Confirm the four section rows below. Select an Excel header, its system table, and a Part Material where needed. Column mapping is shared by all selected sections, including accessories.')}</p>`},
         {fieldtype: 'Select', fieldname: 'mode', label: __('Import Mode'), options: 'Add Rows\nReplace Table Rows', default: 'Add Rows'},
+        {fieldtype: 'Section Break', label: __('Excel Sections and System Tables')},
+        ...slots.map((slot, i) => ({fieldtype: 'Select', fieldname: `section_${i}_header`, label: __('Excel Header'),
+          options: ['Skip', ...choices].join('\n'), default: slot.source < 0 ? 'Skip' : choices[slot.source]})),
+        {fieldtype: 'Column Break'},
+        ...slots.map((slot, i) => ({fieldtype: 'Select', fieldname: `section_${i}_table`, label: __('System Table'),
+          options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[slot.table],
+          onchange: () => {
+            if (!setup) return;
+            const target = setup.get_value(`section_${i}_table`);
+            setup.set_df_property(`section_${i}_default_material`, 'hidden', target === tables.accessorise_table || target === 'Skip');
+          }})),
+        {fieldtype: 'Column Break'},
+        ...slots.map((slot, i) => ({fieldtype: 'Link', fieldname: `section_${i}_default_material`, label: __('Part Material'),
+          options: 'Part Material', hidden: slot.table === 'accessorise_table'})),
+        {fieldtype: 'Section Break', label: __('Shared Column Mapping')},
+        {fieldtype: 'HTML', options: `<p>${__('Map columns once for all tables. The name column also supplies Requested Item Name for accessories. Data ranges are detected from the selected section headers.')}</p><div style="overflow:auto;max-height:240px"><table class="table table-bordered"><thead><tr><th>#</th>${columns.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody>${matrix.slice(0, 12).map((row, i) => `<tr><td>${i + 1}</td>${columns.map((_, c) => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
+        ...materialFields.map(field => ({fieldtype: 'Select', fieldname: 'map_' + field,
+          label: field === 'part_name' ? __('Part Name English / Requested Item Name') : __(labels[field]),
+          options: columnOptions, default: defaults[field]})),
       ];
-      configs.forEach((config, i) => {
-        const {section, range, headers, defaults} = config;
-        const prefix = `section_${i}_`;
-        fields.push(
-          {fieldtype: 'Section Break', label: esc(section.label)},
-          {fieldtype: 'Data', fieldname: prefix + 'header', label: __('Excel Header'), default: section.label, read_only: 1},
-          {fieldtype: 'Column Break'},
-          {fieldtype: 'Select', fieldname: prefix + 'table', label: __('System Table'), options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[section.table],
-            onchange: () => {
-              if (!setup) return;
-              const accessories = setup.get_value(prefix + 'table') === tables.accessorise_table;
-              [...materialFields, 'requested_name', 'default_material'].forEach(field => {
-                const hidden = field === 'requested_name' ? !accessories : !['qty', 'note'].includes(field) && accessories;
-                setup.set_df_property(prefix + field, 'hidden', hidden);
-              });
-            }},
-          {fieldtype: 'Column Break'},
-          {fieldtype: 'Link', fieldname: prefix + 'default_material', label: __('Part Material'), options: 'Part Material', hidden: section.table === 'accessorise_table'},
-          {fieldtype: 'Section Break', label: __('Data Row Range')},
-          {fieldtype: 'Int', fieldname: prefix + 'start', label: __('First Data Row'), default: range.start, reqd: 1},
-          {fieldtype: 'Column Break'},
-          {fieldtype: 'Int', fieldname: prefix + 'end', label: __('Last Data Row'), default: range.end, reqd: 1},
-          {fieldtype: 'Section Break', label: __('Column Mapping')},
-          {fieldtype: 'HTML', options: `<div style="overflow:auto;max-height:160px"><table class="table table-bordered"><thead><tr>${columns.map((col, c) => `<th>${col}: ${esc(headers[c])}</th>`).join('')}</tr></thead><tbody>${matrix.slice(range.start - 1, Math.min(range.start + 2, range.end)).map(row => `<tr>${columns.map((_, c) => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
-          ...[...materialFields, 'requested_name'].map(field => ({fieldtype: 'Select', fieldname: prefix + field, label: __(labels[field]), options: columnOptions, default: defaults[field],
-            hidden: section.table === 'accessorise_table' ? !['requested_name', 'qty', 'note'].includes(field) : field === 'requested_name'})),
-        );
-      });
       setup = new frappe.ui.Dialog({title: __('Import All: Confirm Headers and Columns'), size: 'extra-large', fields,
         primary_action_label: __('Preview All Tables'),
         primary_action: async values => {
           setup.get_primary_btn().prop('disabled', true);
           try {
             const batches = [];
-            for (let i = 0; i < configs.length; i++) {
+            const selectedSections = new Set();
+            for (let i = 0; i < slots.length; i++) {
               const prefix = `section_${i}_`;
               const target = values[prefix + 'table'];
-              if (target === 'Skip') continue;
+              const choice = values[prefix + 'header'];
+              if (target === 'Skip' || choice === 'Skip') continue;
+              if (selectedSections.has(choice)) return frappe.msgprint(__('Select each Excel header only once.'));
+              selectedSections.add(choice);
+              const config = configs[choices.indexOf(choice)];
+              if (!config) return frappe.msgprint(__('Choose an Excel header for each included row.'));
               const table = Object.keys(tables).find(key => tables[key] === target);
               const mappedFields = table === 'accessorise_table' ? ['requested_name', 'qty', 'note'] : materialFields;
               const mapping = {};
               mappedFields.forEach(field => {
-                const index = columns.indexOf(values[prefix + field]);
+                const index = columns.indexOf(values['map_' + (field === 'requested_name' ? 'part_name' : field)]);
                 if (index >= 0) mapping[field] = index;
               });
               if (table !== 'accessorise_table' && !values[prefix + 'default_material'] && mapping.material === undefined) {
-                return frappe.msgprint(__('Choose a Part Material or map the Material column for {0}.', [esc(configs[i].section.label)]));
+                return frappe.msgprint(__('Choose a Part Material or map the Material column for {0}.', [esc(config.section.label)]));
               }
+              if (config.range.start > config.range.end) continue;
               const response = await frappe.call({method: api + 'preview_import', args: {
                 matrix: JSON.stringify(matrix), mapping: JSON.stringify(mapping), table,
-                material: values[prefix + 'default_material'] || '', start_row: values[prefix + 'start'], end_row: values[prefix + 'end'],
+                material: values[prefix + 'default_material'] || '', start_row: config.range.start, end_row: config.range.end,
               }, freeze: true});
-              batches.push({table, label: configs[i].section.label, rows: response.message});
+              batches.push({table, label: config.section.label, rows: response.message});
             }
             if (!batches.some(batch => batch.rows.length)) return frappe.msgprint(__('No data rows found.'));
             const entries = batches.flatMap(batch => batch.rows.map(row => ({...row, table: batch.table, section: batch.label})));
