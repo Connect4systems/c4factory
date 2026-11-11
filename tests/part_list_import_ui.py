@@ -76,7 +76,7 @@ frappe.ui.Dialog = class {
 };
 frappe.ui.FileUploader = class {constructor(options){window.uploadOptions=options;}};
 window.frm = {
-  doc:{name:'PL',modified:'STAMP',docstatus:0,panel_materials:[],metal_material:[],other_material:[],accessorise_table:[]},
+  doc:{name:'PL',modified:'STAMP',docstatus:0,pds_table:[],panel_materials:[],metal_material:[],other_material:[],accessorise_table:[]},
   dashboard:{add_indicator(){}},buttons:{},
   add_custom_button(label, callback) {this.buttons[label]=callback;},
   add_child(table, values) {const row={...values};this.doc[table].push(row);return row;},
@@ -267,7 +267,8 @@ def main():
         page.wait_for_function('frm.doc.metal_material.length === 2')
         assert page.evaluate('frm.doc.metal_material[1].material') == 'Steel'
         # Reopen using the saved attachment, without uploading it again.
-        assert page.evaluate('frm.doc.part_file') == '/private/files/test.xls'
+        assert page.evaluate('frm.doc.pds_table') == [{'title':'Part File', 'arttach':'/private/files/test.xls'}]
+        assert page.evaluate('uploadOptions.fieldname') == 'pds_table'
         page.evaluate("frm.buttons['Metal Material']()")
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Map Excel Section'")

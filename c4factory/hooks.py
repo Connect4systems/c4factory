@@ -12,10 +12,11 @@ after_migrate = [
     "c4factory.patches.v1_0.setup_part_list_import.execute",
     "c4factory.patches.v1_0.remove_sales_order_header_colors.execute",
     "c4factory.patches.v1_0.allow_sales_order_part_list_after_submit.execute",
+    "c4factory.patches.v1_0.move_part_file_to_pds_table.execute",
 ]
 
 app_include_js = [
-    "/assets/c4factory/js/doctype/part_list_import.js?v=20261111-saved-workbook",
+    "/assets/c4factory/js/doctype/part_list_import.js?v=20261111-pds-workbook",
     "/assets/c4factory/js/doctype/item_uom.js",
     "/assets/c4factory/js/doctype/part_list_versions.js",
     "/assets/c4factory/js/doctype/part_list_material_colors.js",

@@ -22,7 +22,6 @@
   "column_break_iptf",
   "depth",
   "section_break_iuan",
-  "part_file",
   "pds_table",
   "part_list_tab",
   "material_line",
@@ -207,12 +206,6 @@
    "no_copy": 1,
    "options": "Part List",
    "read_only": 1
-  },
-  {
-   "fieldname": "part_file",
-   "fieldtype": "Attach",
-   "label": "Part File",
-   "description": "Excel workbook reused by Import / Paste. Save after attaching."
   }
  ],
  "grid_page_length": 50,

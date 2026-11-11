@@ -112,18 +112,21 @@
     dialog.fields_dict.upload.df.click = () => new frappe.ui.FileUploader({
       restrictions: {allowed_file_types: ['.xls', '.xlsx'], max_file_size: 10 * 1024 * 1024},
       make_attachments_public: false, is_private: true, allow_toggle_private: false,
-      doctype: frm.doc.doctype || 'Part List', docname: frm.doc.name, fieldname: 'part_file',
+      doctype: frm.doc.doctype || 'Part List', docname: frm.doc.name, fieldname: 'pds_table',
       on_success: async file => {
         await loadWorkbook(file.file_url);
-        await frm.set_value('part_file', file.file_url);
-        frappe.show_alert(__('Workbook linked in Part File. Save the Part List to keep it for future imports.'));
+        const existing = (frm.doc.pds_table || []).find(row => row.title === 'Part File');
+        if (existing) existing.arttach = file.file_url;
+        else frm.add_child('pds_table', {title: 'Part File', arttach: file.file_url});
+        frm.refresh_field('pds_table'); frm.dirty();
+        frappe.show_alert(__('Workbook linked in PDS Table as Part File. Save the Part List to keep it for future imports.'));
       },
     });
     dialog.fields_dict.template.df.click = () => window.open('/api/method/' + api + 'download_template?table=' + encodeURIComponent(table));
     dialog.show();
     if (pastedText) dialog.set_value('paste', pastedText);
-    else if (frm.doc.part_file) {
-      workbookLoading = loadWorkbook(frm.doc.part_file).catch(error => {
+    else if (getPartWorkbook(frm.doc)) {
+      workbookLoading = loadWorkbook(getPartWorkbook(frm.doc)).catch(error => {
         frappe.msgprint(esc(error.message));
       }).finally(() => { workbookLoading = null; });
     }
@@ -323,6 +326,11 @@
     const text = ['material', 'part_name', 'part_name_ar', 'note', 'requested_name', 'item', 'basic_color', 'color_palette', 'color_doctype', 'requested_uom', 'stock_uom'];
     const numbers = ['qty', 'lenght', 'width', 'hight', 'thickness', 'edite_color', 'stock_qty', 'conversion_factor'];
     return text.every(key => !String(row[key] ?? '').trim()) && numbers.every(key => !Number(row[key] || 0));
+  }
+
+  function getPartWorkbook(doc) {
+    const rows = (doc.pds_table || []).filter(row => /\.xlsx?(?:[?#]|$)/i.test(row.arttach || ''));
+    return (rows.find(row => row.title === 'Part File') || rows[0])?.arttach || '';
   }
 
   function openMapping(frm) {

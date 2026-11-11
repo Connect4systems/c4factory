@@ -18,10 +18,14 @@ require English and Arabic names. The old Part Name master is retained.
 
 In an editable draft, choose **Import / Paste → table name**. Paste a rectangular
 Excel range or upload `.xls` / `.xlsx` (10 MB maximum). Choose one workbook sheet.
-Uploads populate **Part File** on the Part List. Save the Part List to retain
+Uploads populate an attachment row titled **Part File** in **PDS Table**. Save the Part List to retain
 that attachment; subsequent imports load it automatically, without another
 upload. A pasted range takes priority over the attached workbook. Uploading a
-replacement workbook updates Part File after the workbook is read successfully.
+replacement workbook updates that row after the workbook is read successfully.
+Import prefers the Excel attachment titled Part File, or uses the first Excel
+attachment in PDS Table. Migration moves legacy separate Part File attachments
+into this table without duplicating existing attachments. The title column is
+labeled Title, including sites with a Customer label override.
 The supplied `Part L.` layout has suggested column mappings and section ranges;
 other sheets can be mapped manually. Source contents never execute as code.
 
