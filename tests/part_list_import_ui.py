@@ -305,7 +305,7 @@ def main():
         for field, col in [('lenght', 'E'), ('width', 'F'), ('hight', 'G'), ('thickness', 'H'), ('qty', 'I')]:
             assert config.locator(f'[data-field={field}]').input_value() == col
         # Import every section in one operation, with a combined preview.
-        page.evaluate("frm.doc.pds_table=[];frm.buttons['Import All']()")
+        page.evaluate("frm.doc.pds_table=[];frm.buttons['All Tables']()")
         material_header = 'Part Name English\tPart Name Arabic\tLength\tWidth\tHeight\tThickness\tQty\tMaterial\tNotes'
         combined = '\n'.join([
             'Panel Materials', material_header, 'Top\tقرصة\t100\t80\t\t18\t2\tMDF\t',

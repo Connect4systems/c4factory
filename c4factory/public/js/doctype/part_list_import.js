@@ -132,7 +132,7 @@
       await dialog.set_value('sheet', sheets.includes('Part L.') ? 'Part L.' : sheets[0]);
     };
     const dialog = new frappe.ui.Dialog({
-      title: __('Import / Paste: {0}', [__(importAll ? 'Import All' : tables[table])]), size: 'extra-large',
+      title: __('Import / Paste: {0}', [__(importAll ? 'All Tables' : tables[table])]), size: 'extra-large',
       fields: [
         {fieldtype: 'HTML', options: `<p>${__('Paste a rectangular Excel range, including blank columns. Or upload a workbook and choose one sheet.')}</p>`},
         {fieldtype: 'Small Text', fieldname: 'paste', label: __('Excel cells'), description: __('Multiple rows and columns are supported. Names are stored as text.')},
@@ -529,7 +529,7 @@
   frappe.ui.form.on('Part List', {
     refresh(frm) {
       if (frm.doc.docstatus === 0 && !frm.read_only) {
-        frm.add_custom_button(__('Import All'), () => openImport(frm, 'all'), __('Import / Paste'));
+        frm.add_custom_button(__('All Tables'), () => openImport(frm, 'all'), __('Import / Paste'));
         Object.entries(tables).forEach(([table, label]) => frm.add_custom_button(__(label), () => openImport(frm, table), __('Import / Paste')));
         Object.keys(tables).forEach(table => {
           const wrapper = frm.fields_dict?.[table]?.grid?.wrapper?.[0];

@@ -6,7 +6,14 @@ Deploy the app with its Python dependencies, then run:
 bench setup requirements --python
 bench --site <site> migrate
 bench build --app c4factory
+bench --site <site> clear-cache
+bench restart
 ```
+
+After deploying, run the commands above and reload the browser. The import script
+URL is versioned so browsers fetch the All Tables action. Description uses a Text
+Editor to render and edit the existing Item HTML without displaying raw tags;
+migration also repairs any field-type customization overriding that editor.
 
 Migration syncs the new child fields, changes `part_name` from Link to Data while
 retaining its English text, grants stock roles read access to Part Lists, and
