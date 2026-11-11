@@ -21,6 +21,15 @@ Excel range or upload `.xls` / `.xlsx` (10 MB maximum). Choose one workbook shee
 The supplied `Part L.` layout has suggested column mappings and section ranges;
 other sheets can be mapped manually. Source contents never execute as code.
 
+When the sheet or pasted range contains section headers, first select **Excel
+Section Header**, then **Import into Table**, then **Part Material for this
+Section**. Wooden Panel / Panel / Material suggest Panel Materials; Metal, Other,
+and Accessories suggest their corresponding tables. The destination is editable.
+The section's row range is filled automatically, stopping at the next section;
+accessory column headings and document footers are excluded. Column mappings are
+shown vertically in the next step. Choose Whole sheet / pasted rows to set the
+range manually instead.
+
 The template download provides a plain `.xlsx` header row. Pasted names are text;
 no Part Name masters or Item masters are created. Material defaults can be applied
 to a whole import and overridden through a mapped Material column. These values
@@ -29,6 +38,10 @@ dimensions remain blank. Column mappings are remembered in this browser when
 storage is available.
 
 The preview shows source row numbers and errors. Invalid rows cannot be included.
+If no Material column is mapped, a Part Material must be chosen before opening
+the preview. Click a valid row or its checkbox to toggle inclusion, or use
+**Select All Valid Rows** / **Deselect All**. **Back to Mapping** returns to the
+column and material settings to correct errors.
 Possible `Drawer Unit` assembly rows start unchecked so the user can decide
 whether to count the assembly alongside its components. **Add Rows** is the
 default; **Replace Table Rows** must be explicitly selected. Nothing is persisted

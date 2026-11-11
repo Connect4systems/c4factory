@@ -33,6 +33,7 @@ window.frappe = {
   async call(request) {
     calls.push(request);
     if(request.method.endsWith('preview_import')) return {message:await previewServer(request.args)};
+    if(request.method.endsWith('inspect_workbook')) return {message:window.testWorkbook};
     if(request.method.endsWith('map_accessories')) return {message:{matched:1,total:1}};
     throw Error('Unexpected API: '+request.method);
   }
@@ -43,7 +44,7 @@ frappe.ui.Dialog = class {
     this.element=document.createElement('div');this.element.className='dialog';document.body.append(this.element);
     const heading=document.createElement('h3');heading.textContent=options.title;this.element.append(heading);
     for(const f of options.fields) {
-      const field={df:f}; const area=document.createElement('div');this.element.append(area);field.$wrapper=wrap(area);
+      const field={df:f}; const area=document.createElement('div');this.element.append(area);field.$wrapper=wrap(area);field.area=area;
       if(f.hidden)area.hidden=true;
       if(f.fieldtype==='HTML') area.innerHTML=f.options||'';
       else if(f.fieldtype==='Section Break') {const h=document.createElement('h4');h.textContent=f.label;area.append(h);}
@@ -63,13 +64,19 @@ frappe.ui.Dialog = class {
   }
   get_values() {return Object.fromEntries(Object.entries(this.fields_dict).filter(([k,f])=>f.input).map(([k,f])=>[k,f.input.value]));}
   get_value(key) {return this.fields_dict[key].input.value;}
-  async set_value(key,value) {this.fields_dict[key].input.value=value;}
+  async set_value(key,value) {const f=this.fields_dict[key];f.input.value=value;await f.df.onchange?.();}
+  set_df_property(key, property, value) {
+    const field=this.fields_dict[key];field.df[property]=value;
+    if(property==='hidden')field.area.hidden=Boolean(value);
+    if(property==='options') {field.input.innerHTML='';for(const v of value.split('\n')) {const option=document.createElement('option');option.value=v;option.textContent=v;field.input.append(option);}}
+  }
   get_primary_btn() {return wrap(this.primary);}
   show() {this.element.hidden=false;}
   hide() {this.element.hidden=true;}
 };
+frappe.ui.FileUploader = class {constructor(options){window.uploadOptions=options;}};
 window.frm = {
-  doc:{name:'PL',modified:'STAMP',docstatus:0,panel_materials:[],accessorise_table:[]},
+  doc:{name:'PL',modified:'STAMP',docstatus:0,panel_materials:[],metal_material:[],other_material:[],accessorise_table:[]},
   dashboard:{add_indicator(){}},buttons:{},
   add_custom_button(label, callback) {this.buttons[label]=callback;},
   add_child(table, values) {const row={...values};this.doc[table].push(row);return row;},
@@ -165,10 +172,87 @@ def main():
         page.wait_for_function('frm.reloaded === true')
         mappings = json.loads(page.evaluate('calls[calls.length-1].args.mappings'))
         assert mappings == [{'row':'ACC', 'item':'SCREW', 'requested_uom':'Box', 'conversion_factor':'10'}]
+        # A source sheet's name and the originally clicked table do not determine
+        # the import: the user selects a section header and its destination.
+        worksheet = [
+            ['SN', 'Code', 'Materials', '', '', 'U.O.M', 'Dim.', '', '', '', 'Qty.'],
+            ['Wooden Panel'],
+            [1, '', 'Top', 'القرصة', '', 'Sheet', 1200, 1200, '', 25, 3],
+            ['Metal'],
+            [1, '', 'Leg', 'رجل', '', 'Unit', 1200, 48, 715, 1.8, 2],
+            ['Other'],
+            [1, '', 'Foam', 'فوم', '', 'Unit', 10, 20, '', 5, 1],
+            ['Accessories'],
+            ['', 'Code', 'Items', 'Supplier', '', '', 'Notes', '', '', '', 'Qty.'],
+            [1, '', 'Screw', '', '', '', '', '', '', '', 8],
+            ['Drawn By'],
+        ]
+        page.evaluate('window.testWorkbook=' + json.dumps({'Customer layout': worksheet}))
+        detected = page.evaluate('module.exports.detectSections(testWorkbook["Customer layout"])')
+        assert [s['table'] for s in detected] == ['panel_materials', 'metal_material', 'other_material', 'accessorise_table']
+        for label in ['Material', 'Materials', 'Wooden Panel', 'Woodin Panel', 'Panel']:
+            assert page.evaluate('module.exports.sectionType(' + json.dumps(label) + ')') == 'panel_materials'
+        for header, target, material, expected_row in [
+            ('2: Wooden Panel', 'Panel Materials', 'MDF', 3),
+            ('4: Metal', 'Metal Material', 'Steel', 5),
+            ('6: Other', 'Other Material', 'Foam', 7),
+            ('8: Accessories', 'Accessories', '', 10),
+        ]:
+            page.evaluate("frm.doc.docstatus=0;handlers['Part List'].refresh(frm);frm.buttons['Panel Materials']()")
+            page.locator('.dialog').last.locator('[data-field=upload]').click()
+            page.evaluate("async()=>await uploadOptions.on_success({file_url:'/private/files/test.xls'})")
+            page.locator('.dialog').last.locator('[data-primary]').click()
+            chooser = page.locator('.dialog').last
+            chooser.locator('[data-field=source_section]').select_option(header)
+            assert chooser.locator('[data-field=target_table]').input_value() == target
+            # Explicitly override the destination for Other to prove it is selectable.
+            if header == '6: Other':
+                chooser.locator('[data-field=target_table]').select_option('Panel Materials')
+            if material and header != '2: Wooden Panel':
+                chooser.locator('[data-field=section_material]').fill(material)
+            chooser.locator('[data-primary]').click()
+            config = page.locator('.dialog').nth(page.locator('.dialog').count() - 1)
+            assert config.locator('[data-field=start]').input_value() == str(expected_row)
+            assert config.locator('[data-field=end]').input_value() == str(expected_row)
+            if header == '2: Wooden Panel':
+                before = page.evaluate('dialogs.length')
+                config.locator('[data-primary]').click()
+                assert page.evaluate('dialogs.length') == before, 'Missing material must be resolved before review'
+                assert 'Choose a Part Material' in page.evaluate('alerts[alerts.length-1]')
+                config.locator('[data-field=default_material]').fill(material)
+            if material:
+                assert config.locator('[data-field=default_material]').input_value() == material
+            config.locator('[data-primary]').click()
+            page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
+            review = page.locator('.dialog').last
+            if header == '2: Wooden Panel':
+                review.locator('[data-field=back_to_mapping]').click()
+                assert config.is_visible()
+                assert config.locator('[data-field=default_material]').input_value() == material
+                config.locator('[data-primary]').click()
+                page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
+                review = page.locator('.dialog').last
+            assert review.locator('input:checked').count() == 1
+            assert review.locator('input:disabled').count() == 0
+            review.locator('[data-field=deselect_all]').click()
+            assert review.locator('input:checked').count() == 0
+            review.locator('tbody tr td').nth(1).click()
+            assert review.locator('input:checked').count() == 1, 'Clicking the row must select it'
+            review.locator('input[type=checkbox]').uncheck()
+            review.locator('[data-field=select_all]').click()
+            assert review.locator('input:checked').count() == 1
+            review.locator('[data-primary]').click()
+            page.wait_for_function('dialogs[dialogs.length-1].element.hidden === true')
+        assert page.evaluate('frm.doc.panel_materials.length') == 3
+        assert page.evaluate('frm.doc.panel_materials[2].part_name') == 'Foam'
+        assert page.evaluate('frm.doc.metal_material.length') == 1
+        assert page.evaluate('frm.doc.metal_material[0].hight') == 715
+        assert page.evaluate('frm.doc.metal_material[0].thickness') == 1.8
+        assert page.evaluate('frm.doc.accessorise_table.length') == 2
         assert not errors, errors
         assert not page.evaluate('window.lastError'), page.evaluate('window.lastError')
         browser.close()
-    print('Browser passed: multi-column paste, Arabic, blank dimensions, assembly exclusion, invalid quantity, multiline accessory names, stock mapping.')
+    print('Browser passed: paste/upload, section-header selection, destination override, vertical mapping, material requirement, checkbox/row/bulk selection, Arabic, dimensions, assemblies, invalid quantity, stock mapping.')
 
 
 if __name__ == '__main__':

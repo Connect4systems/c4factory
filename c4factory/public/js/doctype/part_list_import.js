@@ -37,11 +37,47 @@
     return rows;
   }
 
+  function sectionType(label) {
+    const text = String(label || '').trim().toLowerCase().replace(/[._-]+/g, ' ').replace(/\s+/g, ' ');
+    if (/^(wood(en|in)? panels?|panels?|panel materials?|materials?|wood|خشب|الخشب|ألواح خشبية)$/.test(text)) return 'panel_materials';
+    if (/^(metal(s| materials?)?|steel|معدن|المعدن|معادن)$/.test(text)) return 'metal_material';
+    if (/^(other(s| materials?)?|أخرى|اخرى)$/.test(text)) return 'other_material';
+    if (/^(accessor(y|ies|ise)( materials?)?|اكسسوارات|إكسسوارات)$/.test(text)) return 'accessorise_table';
+    return null;
+  }
+
+  function detectSections(matrix) {
+    const sections = [];
+    matrix.forEach((row, index) => {
+      const cells = row.slice(0, 11);
+      const first = cells.find(v => String(v ?? '').trim());
+      if (typeof first !== 'string') return;
+      if (cells.some(v => String(v ?? '').trim() && Number.isFinite(Number(v)))) return;
+      if (cells.filter(v => /^(sn|code|materials?|qty\.?|u\.?o\.?m\.?|dim\.?)$/i.test(String(v || '').trim())).length >= 2) return;
+      const table = sectionType(first);
+      if (table) sections.push({index, label: first.trim(), table});
+    });
+    return sections;
+  }
+
+  function sectionRange(matrix, section, sections) {
+    let start = section.index + 2;
+    const next = sections.find(s => s.index > section.index);
+    let end = next ? next.index : matrix.length;
+    const footer = matrix.findIndex((r, i) => i > section.index && /^(drawn by|draw by|checked by|revision no\.?)$/i.test(String(r.find(v => String(v ?? '').trim()) || '').trim()));
+    if (footer >= 0) end = Math.min(end, footer);
+    // Accessories commonly have a second header row: Code / Items / Supplier / Qty.
+    while (start <= end) {
+      const cells = matrix[start - 1].map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean);
+      const header = cells.filter(v => /^(sn|s n|code|items?|materials?|qty\.?|quantity|supplier|notes|u\.?o\.?m\.?)$/.test(v)).length >= 2;
+      if (cells.length && !header) break;
+      start++;
+    }
+    return {start, end};
+  }
+
   function openImport(frm, table) {
-    let workbook = null, matrix = [], source = 'paste', mappingDialog;
-    const accessories = table === 'accessorise_table';
-    const fields = accessories ? ['requested_name', 'qty', 'note'] :
-      ['part_name', 'part_name_ar', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note'];
+    let workbook = null, matrix = [], source = 'paste', mappingDialog, sectionDialog;
     const dialog = new frappe.ui.Dialog({
       title: __('Import / Paste: {0}', [__(tables[table])]), size: 'extra-large',
       fields: [
@@ -58,7 +94,7 @@
           else matrix = workbook[dialog.get_value('sheet')] || [];
           if (!matrix.length) return frappe.msgprint(__('Paste cells or upload a workbook first.'));
           if (matrix.length > 3000 || matrix.some(r => r.length > 60)) return frappe.msgprint(__('Maximum 3,000 rows and 60 columns.'));
-          configure();
+          chooseSection();
         } catch (error) { frappe.msgprint(esc(error.message)); }
       },
     });
@@ -79,7 +115,43 @@
     dialog.fields_dict.template.df.click = () => window.open('/api/method/' + api + 'download_template?table=' + encodeURIComponent(table));
     dialog.show();
 
-    function configure() {
+    function chooseSection() {
+      const sections = detectSections(matrix);
+      if (!sections.length) return configure();
+      const choices = sections.map(s => `${s.index + 1}: ${s.label}`);
+      const initial = sections.find(s => s.table === table) || sections[0];
+      const selected = () => sections[choices.indexOf(sectionDialog.get_value('source_section'))];
+      sectionDialog = new frappe.ui.Dialog({
+        title: __('Map Excel Section'), size: 'large',
+        fields: [
+          {fieldtype: 'HTML', options: `<p>${__('Choose an Excel section header, then the table and material for its rows. The range ends at the next section header.')}</p>`},
+          {fieldtype: 'Select', fieldname: 'source_section', label: __('Excel Section Header'), options: ['Whole sheet / pasted rows', ...choices].join('\n'), default: `${initial.index + 1}: ${initial.label}`,
+            onchange: async () => {
+              if (!sectionDialog) return;
+              const section = selected();
+              if (section) await sectionDialog.set_value('target_table', tables[section.table]);
+            }},
+          {fieldtype: 'Select', fieldname: 'target_table', label: __('Import into Table'), options: Object.values(tables).join('\n'), default: tables[initial.table], reqd: 1,
+            onchange: () => {
+              if (sectionDialog) sectionDialog.set_df_property('section_material', 'hidden', sectionDialog.get_value('target_table') === tables.accessorise_table);
+            }},
+          {fieldtype: 'Link', fieldname: 'section_material', label: __('Part Material for this Section'), options: 'Part Material', hidden: initial.table === 'accessorise_table', description: __('Applied to the imported rows. You can also map a Material column in the next step.')},
+        ],
+        primary_action_label: __('Map Columns'),
+        primary_action: values => {
+          table = Object.keys(tables).find(key => tables[key] === values.target_table);
+          const section = selected();
+          configure(section, sections, values.section_material || '');
+        },
+      });
+      sectionDialog.show();
+    }
+
+    function configure(section = null, sections = [], sectionMaterial = '', targetTable = table) {
+      const table = targetTable;
+      const accessories = table === 'accessorise_table';
+      const fields = accessories ? ['requested_name', 'qty', 'note'] :
+        ['part_name', 'part_name_ar', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note'];
       const count = Math.max(...matrix.map(r => r.length));
       const options = ['Skip', ...Array.from({length: count}, (_, i) => column(i))].join('\n');
       const sheetName = source === 'workbook' ? dialog.get_value('sheet') : 'paste';
@@ -89,16 +161,9 @@
       try { saved = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) { /* fresh mapping */ }
       let start = 1, end = matrix.length;
       let defaults = Object.fromEntries(fields.map((f, i) => [f, i < count ? column(i) : 'Skip']));
-      if (sheetName === 'Part L.') {
+      if (sheetName === 'Part L.' || (section && count >= 11)) {
         defaults = accessories ? {requested_name: 'C', qty: 'K', note: 'G'} :
           {part_name: 'C', part_name_ar: 'D', lenght: 'G', width: 'H', hight: 'I', thickness: 'J', qty: 'K', material: 'Skip', note: 'Skip'};
-        const marker = table === 'panel_materials' ? /^(wooden panel|panel)$/i : table === 'metal_material' ? /^metal$/i : table === 'accessorise_table' ? /^accessories$/i : /^other(s| material)?$/i;
-        const section = matrix.findIndex(r => marker.test(String(r[0] || '').trim()));
-        if (section >= 0) {
-          start = section + (accessories ? 3 : 2);
-          const next = matrix.findIndex((r, i) => i >= start - 1 && /^(metal|accessories|other(s| material)?|drawn by)$/i.test(String(r[0] || '').trim()));
-          end = next >= 0 ? next : matrix.length;
-        }
       } else {
         const header = matrix[0].map(v => String(v).trim().toLowerCase());
         const aliases = {part_name: ['part name english', 'bom lines/component/name'], part_name_ar: ['part name arabic'], requested_name: ['requested item name'], qty: ['qty', 'bom lines/quantity'], lenght: ['length', 'bom lines/length'], width: ['width', 'bom lines/width'], hight: ['height'], thickness: ['thickness', 'bom lines/thickness'], material: ['material'], note: ['notes']};
@@ -107,19 +172,28 @@
           start = 2;
         }
       }
-      const sample = matrix.slice(0, 12).map((r, i) => `<tr><td>${i + 1}</td>${Array.from({length: count}, (_, c) => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('');
+      if (section) ({start, end} = sectionRange(matrix, section, sections));
+      if (start > end) return frappe.msgprint(__('The selected section has no data rows. Choose another section.'));
+      const sampleStart = section ? section.index : 0;
+      const sample = matrix.slice(sampleStart, sampleStart + 12).map((r, i) => `<tr><td>${sampleStart + i + 1}</td>${Array.from({length: count}, (_, c) => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('');
       mappingDialog = new frappe.ui.Dialog({
         title: __('Map Columns: {0}', [__(tables[table])]), size: 'extra-large',
         fields: [
           {fieldtype: 'HTML', options: `<div style="max-height:240px;overflow:auto"><table class="table table-bordered"><thead><tr><th>#</th>${Array.from({length: count}, (_, i) => `<th>${column(i)}</th>`).join('')}</tr></thead><tbody>${sample}</tbody></table></div><p>${__('Choose the data row range. Check Height and Thickness carefully; source headings can be incorrect.')}</p>`},
           {fieldtype: 'Int', fieldname: 'start', label: __('First Data Row'), default: start, reqd: 1},
           {fieldtype: 'Int', fieldname: 'end', label: __('Last Data Row'), default: end, reqd: 1},
+          {fieldtype: 'Link', fieldname: 'default_material', label: __('Part Material for Imported Rows'), options: 'Part Material', hidden: accessories, default: sectionMaterial,
+            description: __('Select a Part Material here, or map the Material column below. This is required before reviewing rows.')},
+          {fieldtype: 'Section Break', label: __('Column Mapping')},
           ...fields.map(f => ({fieldtype: 'Select', fieldname: f, label: __(labels[f]), options, default: saved[f] || defaults[f] || 'Skip'})),
-          {fieldtype: 'Link', fieldname: 'default_material', label: __('Default Material for Imported Rows'), options: 'Part Material', hidden: accessories},
           {fieldtype: 'Select', fieldname: 'mode', label: __('Import Mode'), options: 'Add Rows\nReplace Table Rows', default: 'Add Rows'},
         ],
         primary_action_label: __('Preview Rows'),
         primary_action: async values => {
+          if (!accessories && !values.default_material && values.material === 'Skip') {
+            frappe.msgprint(__('Choose a Part Material for this section, or map an Excel Material column, before reviewing rows.'));
+            return;
+          }
           const mapping = {};
           fields.forEach(f => { if (values[f] !== 'Skip') mapping[f] = Array.from({length: count}, (_, i) => column(i)).indexOf(values[f]); });
           const response = await frappe.call({method: api + 'preview_import', args: {
@@ -127,13 +201,13 @@
             material: values.default_material || '', start_row: values.start, end_row: values.end,
           }, freeze: true});
           try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(fields.map(f => [f, values[f]])))); } catch (_) { /* storage is optional */ }
-          preview(response.message, values.mode);
+          preview(response.message, values.mode, fields, accessories, table);
         },
       });
       mappingDialog.show();
     }
 
-    function preview(rows, mode) {
+    function preview(rows, mode, fields, accessories, table) {
       if (!rows.length) return frappe.msgprint(__('No data rows found.'));
       let adding = false;
       const content = rows.map((r, i) => {
@@ -142,7 +216,16 @@
       }).join('');
       const p = new frappe.ui.Dialog({
         title: __('Review Import: {0}', [__(tables[table])]), size: 'extra-large',
-        fields: [{fieldtype: 'HTML', fieldname: 'rows', options: `<p>${esc(mode)} — ${__('Only checked rows will be imported. Invalid rows must be corrected in the source or mapping.')}</p><div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Source Row')}</th>${fields.map(f => `<th>${__(labels[f])}</th>`).join('')}<th>${__('Review')}</th></tr></thead><tbody>${content}</tbody></table></div>`}],
+        fields: [
+          {fieldtype: 'Button', fieldname: 'select_all', label: __('Select All Valid Rows'), click: () => {
+            for (const input of p.fields_dict.rows.$wrapper.find('input:not(:disabled)')) input.checked = true;
+          }},
+          {fieldtype: 'Button', fieldname: 'deselect_all', label: __('Deselect All'), click: () => {
+            for (const input of p.fields_dict.rows.$wrapper.find('input')) input.checked = false;
+          }},
+          {fieldtype: 'Button', fieldname: 'back_to_mapping', label: __('Back to Mapping'), click: () => {p.hide(); mappingDialog.show();}},
+          {fieldtype: 'HTML', fieldname: 'rows', options: `<p>${esc(mode)} — ${__('Click a row or its checkbox to include it. Rows with errors are disabled; use Back to Mapping to correct them.')}</p><div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Source Row')}</th>${fields.map(f => `<th>${__(labels[f])}</th>`).join('')}<th>${__('Review')}</th></tr></thead><tbody>${content}</tbody></table></div>`},
+        ],
         primary_action_label: __('Add Selected Rows'),
         primary_action: async () => {
           if (adding) return;
@@ -170,12 +253,20 @@
             if (mode === 'Replace Table Rows') frm.clear_table(table);
             prepared.forEach(values => frm.add_child(table, values));
             frm.refresh_field(table); frm.dirty();
-            p.hide(); mappingDialog.hide(); dialog.hide();
+            p.hide(); mappingDialog.hide(); sectionDialog?.hide(); dialog.hide();
             frappe.show_alert(__('Added {0} rows. Save the Part List to validate and store them.', [selected.length]));
           } finally { adding = false; }
         },
       });
       p.show();
+      for (const tr of p.fields_dict.rows.$wrapper.find('tbody tr')) {
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', event => {
+          if (event.target.closest('input, button, a, select')) return;
+          const input = tr.querySelector('input');
+          if (input && !input.disabled) input.checked = !input.checked;
+        });
+      }
     }
   }
 
@@ -217,5 +308,5 @@
       }
     },
   });
-  if (typeof module !== 'undefined') module.exports = {parsePaste, column};
+  if (typeof module !== 'undefined') module.exports = {parsePaste, column, sectionType, detectSections, sectionRange};
 })();
