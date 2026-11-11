@@ -249,6 +249,22 @@ def main():
         assert page.evaluate('frm.doc.metal_material[0].hight') == 715
         assert page.evaluate('frm.doc.metal_material[0].thickness') == 1.8
         assert page.evaluate('frm.doc.accessorise_table.length') == 2
+        # A mapped Material column can contain blanks. Repair these in review.
+        page.evaluate("frm.buttons['Metal Material']()")
+        page.locator('.dialog').last.locator('[data-field=paste]').fill('Leg\tرجل\t1200\t48\t715\t1.8\t2\t\t')
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
+        review = page.locator('.dialog').last
+        assert review.locator('input[type=checkbox]:disabled').count() == 1
+        review.locator('[data-field=review_material]').fill('Steel')
+        review.locator('[data-field=apply_material]').click()
+        page.wait_for_function("dialogs[dialogs.length-1].element.querySelector('input[type=checkbox]:checked') !== null")
+        review = page.locator('.dialog').last
+        assert review.locator('input[type=checkbox]:disabled').count() == 0
+        review.locator('[data-primary]').click()
+        page.wait_for_function('frm.doc.metal_material.length === 2')
+        assert page.evaluate('frm.doc.metal_material[1].material') == 'Steel'
         assert not errors, errors
         assert not page.evaluate('window.lastError'), page.evaluate('window.lastError')
         browser.close()

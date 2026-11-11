@@ -201,13 +201,21 @@
             material: values.default_material || '', start_row: values.start, end_row: values.end,
           }, freeze: true});
           try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(fields.map(f => [f, values[f]])))); } catch (_) { /* storage is optional */ }
-          preview(response.message, values.mode, fields, accessories, table);
+          const refreshMaterial = async material => {
+            await mappingDialog.set_value('default_material', material);
+            const refreshed = await frappe.call({method: api + 'preview_import', args: {
+              matrix: JSON.stringify(matrix), mapping: JSON.stringify(mapping), table,
+              material, start_row: values.start, end_row: values.end,
+            }, freeze: true});
+            return refreshed.message;
+          };
+          preview(response.message, values.mode, fields, accessories, table, refreshMaterial);
         },
       });
       mappingDialog.show();
     }
 
-    function preview(rows, mode, fields, accessories, table) {
+    function preview(rows, mode, fields, accessories, table, refreshMaterial) {
       if (!rows.length) return frappe.msgprint(__('No data rows found.'));
       let adding = false;
       const content = rows.map((r, i) => {
@@ -217,6 +225,21 @@
       const p = new frappe.ui.Dialog({
         title: __('Review Import: {0}', [__(tables[table])]), size: 'extra-large',
         fields: [
+          ...(!accessories ? [
+            {fieldtype: 'Link', fieldname: 'review_material', label: __('Part Material for Rows Missing a Material'), options: 'Part Material',
+              description: __('Choose a material and apply it to enable rows with a missing material.')},
+            {fieldtype: 'Button', fieldname: 'apply_material', label: __('Apply Material'), click: async () => {
+              const material = p.get_value('review_material');
+              if (!material) return frappe.msgprint(__('Select a material first.'));
+              if (adding) return;
+              adding = true;
+              try {
+                const refreshed = await refreshMaterial(material);
+                p.hide();
+                preview(refreshed, mode, fields, accessories, table, refreshMaterial);
+              } finally { adding = false; }
+            }},
+          ] : []),
           {fieldtype: 'Button', fieldname: 'select_all', label: __('Select All Valid Rows'), click: () => {
             for (const input of p.fields_dict.rows.$wrapper.find('input:not(:disabled)')) input.checked = true;
           }},
