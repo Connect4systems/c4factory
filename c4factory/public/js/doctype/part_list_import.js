@@ -11,6 +11,49 @@
     note: 'Notes', requested_name: 'Requested Item Name',
   };
   const esc = value => frappe.utils.escape_html(String(value ?? ''));
+  const materialColumns = ['part_name', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note', 'edite_color', 'basic_color'];
+  function prepareCellPaste(text, fieldname) {
+    const start = materialColumns.indexOf(fieldname);
+    if (start < 0) throw new Error(__('Choose a material table cell first.'));
+    const matrix = parsePaste(text);
+    if (matrix.length > 3000 || matrix.some(row => row.length + start > materialColumns.length)) {
+      throw new Error(__('Paste up to 3,000 rows and keep columns within the table.'));
+    }
+    return matrix.map(row => Object.fromEntries(row.map((value, index) => {
+      const field = materialColumns[start + index];
+      if (['lenght', 'width', 'hight', 'thickness', 'qty'].includes(field)) {
+        const number = value.trim() === '' ? 0 : Number(value);
+        if (!Number.isFinite(number)) throw new Error(__('Invalid number in {0}: {1}', [field, value]));
+        return [field, number];
+      }
+      if (field === 'edite_color') {
+        const check = value.trim().toLowerCase();
+        if (!['', '0', '1', 'true', 'false', 'yes', 'no'].includes(check)) throw new Error(__('Edite Color accepts 1/0, Yes/No, or True/False.'));
+        return [field, ['1', 'true', 'yes'].includes(check) ? 1 : 0];
+      }
+      return [field, value];
+    })));
+  }
+
+  async function pasteIntoCells(frm, table, rowIndex, fieldname, text) {
+    const values = prepareCellPaste(text, fieldname);
+    if (frm.doc.docstatus !== 0 || frm.read_only || frm._partCellPaste) return;
+    frm._partCellPaste = true;
+    try {
+      for (let index = 0; index < values.length; index++) {
+        const row = frm.doc[table]?.[rowIndex + index] || frm.add_child(table);
+        // Run normal change handlers, including material/palette dependencies,
+        // before applying a pasted Color later in the same row.
+        for (const [field, value] of Object.entries(values[index])) {
+          await frappe.model.set_value(row.doctype, row.name, field, value);
+        }
+      }
+      frm.dirty();
+    } finally {
+      frm._partCellPaste = false;
+      frm.refresh_field(table);
+    }
+  }
   const column = index => {
     let result = '';
     for (let n = index + 1; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + (n - 1) % 26) + result;
@@ -372,6 +415,15 @@
             if (!/[\t\r\n]/.test(text)) return;
             event.preventDefault();
             event.stopImmediatePropagation();
+            const grid = frm.fields_dict[table].grid;
+            const cell = event.target.closest?.('[data-fieldname]');
+            const gridRow = grid.grid_rows?.find(row => row.wrapper?.[0]?.contains(event.target));
+            const rowIndex = (frm.doc[table] || []).indexOf(gridRow?.doc);
+            if (table !== 'accessorise_table' && cell && rowIndex >= 0 && materialColumns.includes(cell.dataset.fieldname)) {
+              pasteIntoCells(frm, table, rowIndex, cell.dataset.fieldname, text)
+                .catch(error => frappe.msgprint(esc(error.message)));
+              return;
+            }
             openImport(frm, table, text);
           }, true);
         });
@@ -384,5 +436,5 @@
       }
     },
   });
-  if (typeof module !== 'undefined') module.exports = {parsePaste, column, sectionType, detectSections, sectionRange, isEmptyImportRow};
+  if (typeof module !== 'undefined') module.exports = {parsePaste, column, sectionType, detectSections, sectionRange, isEmptyImportRow, prepareCellPaste, pasteIntoCells};
 })();

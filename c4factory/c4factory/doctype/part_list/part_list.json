@@ -190,12 +190,14 @@
   {
    "fieldname": "material_line",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Material Line",
    "options": "Material Line"
   },
   {
    "fieldname": "metal_material_line",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Material Line",
    "options": "Material Line"
   },

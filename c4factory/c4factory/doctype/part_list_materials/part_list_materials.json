@@ -6,19 +6,19 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "material",
   "part_name",
   "lenght",
   "width",
   "hight",
   "thickness",
   "qty",
+  "material",
   "note",
   "edite_color",
+  "basic_color",
   "part_name_ar",
   "color_doctype",
-  "color_palette",
-  "basic_color"
+  "color_palette"
  ],
  "fields": [
   {
@@ -56,12 +56,12 @@
   {
    "fieldname": "basic_color",
    "fieldtype": "Link",
-   "in_list_view": 0,
+   "in_list_view": 1,
    "in_preview": 1,
    "label": "Color",
    "options": "Material Color",
    "read_only_depends_on": "eval:!doc.color_palette",
-   "columns": 0
+   "columns": 1
   },
   {
    "fieldname": "color_doctype",
