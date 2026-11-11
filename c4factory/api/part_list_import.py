@@ -18,14 +18,21 @@ MAX_COLUMNS = 60
 
 @frappe.whitelist()
 def download_template(table):
-    if table not in TABLES or not frappe.has_permission("Part List", "create"):
+    if table not in (*TABLES, "all") or not frappe.has_permission("Part List", "create"):
         frappe.throw(_("Invalid table or insufficient permissions."))
     from openpyxl import Workbook
     book = Workbook()
     sheet = book.active
     sheet.title = "Import"
-    sheet.append(["Requested Item Name", "Qty", "Notes"] if table == "accessorise_table" else
-        ["Part Name English", "Part Name Arabic", "Length", "Width", "Height", "Thickness", "Qty", "Material", "Notes"])
+    targets = TABLES if table == "all" else (table,)
+    titles = dict(zip(TABLES, ("Panel Materials", "Metal Material", "Other Material", "Accessories")))
+    for target in targets:
+        if table == "all":
+            sheet.append([titles[target]])
+        sheet.append(["Requested Item Name", "Qty", "Notes"] if target == "accessorise_table" else
+            ["Part Name English", "Part Name Arabic", "Length", "Width", "Height", "Thickness", "Qty", "Material", "Notes"])
+        if table == "all":
+            sheet.append([])
     output = io.BytesIO()
     book.save(output)
     frappe.response["filename"] = f"{table}_template.xlsx"

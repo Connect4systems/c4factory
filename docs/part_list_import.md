@@ -16,6 +16,22 @@ require English and Arabic names. The old Part Name master is retained.
 
 ## Importing
 
+Choose **Import / Paste → Import All** to import all sections from one Excel sheet
+or pasted range together. The setup popup lists each detected section header next
+to its destination table. Confirm or change the table, choose **Skip** to exclude
+a section, and review its row range, material, and column mappings. Standard
+column headers are mapped automatically; the supplied `Part L.` layout also has
+suggested mappings. A range without section headers can be mapped as one section.
+**Download Template** in this flow provides all four section headers and columns.
+
+**Preview All Tables** shows all sections together with row checkboxes and errors.
+Use **Back to Mapping** to correct settings, then **Import All Selected Rows** to
+populate all destination tables in one operation. Material lookups finish before
+any table changes. Replace mode clears each destination table once, combining
+selected rows from sections mapped to the same table. Tables with no selected rows
+are preserved. Save the Part List to store the result. Import All uses the selected
+sheet; it does not combine workbook sheets that may repeat the same components.
+
 In an editable draft, choose **Import / Paste → table name**. Paste a rectangular
 Excel range or upload `.xls` / `.xlsx` (10 MB maximum). Choose one workbook sheet.
 Uploads populate an attachment row titled **Part File** in **PDS Table**. Save the Part List to retain

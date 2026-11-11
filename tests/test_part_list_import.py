@@ -77,6 +77,16 @@ class ImportTests(unittest.TestCase):
         pasted = self.api.parse_paste('"Screw\nlong"\t8\n')
         self.assertEqual(pasted, [['Screw\nlong', '8']])
 
+    def test_all_template_has_four_sections_and_their_columns(self):
+        self.frappe.response = {}
+        self.api.download_template('all')
+        workbook = self.api.read_workbook(self.frappe.response['filecontent'], 'all.xlsx')
+        rows = workbook['Import']
+        titles = ['Panel Materials', 'Metal Material', 'Other Material', 'Accessories']
+        self.assertEqual([rows[index][0] for index in (0, 3, 6, 9)], titles)
+        self.assertEqual(rows[1][0], 'Part Name English')
+        self.assertEqual(rows[10][:3], ['Requested Item Name', 'Qty', 'Notes'])
+
     def test_invalid_numbers_and_missing_arabic_are_preview_errors(self):
         for qty in ('0', '-1', 'nan', 'inf', 'abc'):
             preview = self.api.build_preview([['Top', '', qty]], {'part_name': 0, 'part_name_ar': 1, 'qty': 2}, 'metal_material', 'Steel')

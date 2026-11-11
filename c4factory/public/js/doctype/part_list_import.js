@@ -120,6 +120,7 @@
   }
 
   function openImport(frm, table, pastedText = '') {
+    const importAll = table === 'all';
     let workbook = null, matrix = [], source = 'paste', mappingDialog, sectionDialog;
     let workbookLoading = null;
     const loadWorkbook = async fileUrl => {
@@ -131,7 +132,7 @@
       await dialog.set_value('sheet', sheets.includes('Part L.') ? 'Part L.' : sheets[0]);
     };
     const dialog = new frappe.ui.Dialog({
-      title: __('Import / Paste: {0}', [__(tables[table])]), size: 'extra-large',
+      title: __('Import / Paste: {0}', [__(importAll ? 'Import All' : tables[table])]), size: 'extra-large',
       fields: [
         {fieldtype: 'HTML', options: `<p>${__('Paste a rectangular Excel range, including blank columns. Or upload a workbook and choose one sheet.')}</p>`},
         {fieldtype: 'Small Text', fieldname: 'paste', label: __('Excel cells'), description: __('Multiple rows and columns are supported. Names are stored as text.')},
@@ -147,7 +148,8 @@
           else matrix = workbook[dialog.get_value('sheet')] || [];
           if (!matrix.length) return frappe.msgprint(__('Paste cells or upload a workbook first.'));
           if (matrix.length > 3000 || matrix.some(r => r.length > 60)) return frappe.msgprint(__('Maximum 3,000 rows and 60 columns.'));
-          chooseSection();
+          if (importAll) configureAll();
+          else chooseSection();
         } catch (error) { frappe.msgprint(esc(error.message)); }
       },
     });
@@ -172,6 +174,114 @@
       workbookLoading = loadWorkbook(getPartWorkbook(frm.doc)).catch(error => {
         frappe.msgprint(esc(error.message));
       }).finally(() => { workbookLoading = null; });
+    }
+
+    function configureAll() {
+      const sections = detectSections(matrix);
+      // A plain sheet can still be imported by confirming its destination and range.
+      const sources = sections.length ? sections : [{index: -1, label: __('Whole sheet / pasted rows'), table: 'panel_materials'}];
+      const count = Math.max(...matrix.map(row => row.length));
+      const columns = Array.from({length: count}, (_, i) => column(i));
+      const columnOptions = ['Skip', ...columns].join('\n');
+      const materialFields = ['part_name', 'part_name_ar', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note'];
+      const aliases = {
+        part_name: ['part name english', 'part name', 'bom lines/component/name'], part_name_ar: ['part name arabic'],
+        requested_name: ['requested item name', 'items', 'item'], qty: ['qty', 'qty.', 'quantity', 'bom lines/quantity'],
+        lenght: ['length', 'bom lines/length'], width: ['width', 'bom lines/width'], hight: ['height'],
+        thickness: ['thickness', 'bom lines/thickness'], material: ['material'], note: ['notes', 'note'],
+      };
+      const configs = sources.map(section => {
+        const range = section.index < 0 ? {start: 1, end: matrix.length} : sectionRange(matrix, section, sections);
+        const headerIndex = section.index < 0 ? 0 : Math.max(section.index + 1, range.start - 2);
+        const headers = matrix[headerIndex] || [];
+        const normalized = headers.map(value => String(value ?? '').trim().toLowerCase());
+        const recognized = Object.values(aliases).some(names => names.some(name => normalized.includes(name)));
+        if (section.index < 0 && recognized) range.start = 2;
+        const legacy = count >= 11 && section.index >= 0;
+        const fallback = legacy ? {part_name: 'C', part_name_ar: 'D', lenght: 'G', width: 'H', hight: 'I', thickness: 'J', qty: 'K', requested_name: 'C', note: section.table === 'accessorise_table' ? 'G' : 'Skip'} : {};
+        const defaults = Object.fromEntries([...materialFields, 'requested_name'].map(field => {
+          const index = normalized.findIndex(header => (aliases[field] || []).includes(header));
+          return [field, index >= 0 ? column(index) : fallback[field] || 'Skip'];
+        }));
+        return {section, range, headers, defaults};
+      });
+      let setup;
+      const fields = [
+        {fieldtype: 'HTML', options: `<p>${__('Confirm each Excel section and its destination table. Review column mappings and row ranges before importing all selected sections together.')}</p>`},
+        {fieldtype: 'Select', fieldname: 'mode', label: __('Import Mode'), options: 'Add Rows\nReplace Table Rows', default: 'Add Rows'},
+      ];
+      configs.forEach((config, i) => {
+        const {section, range, headers, defaults} = config;
+        const prefix = `section_${i}_`;
+        fields.push(
+          {fieldtype: 'Section Break', label: esc(section.label)},
+          {fieldtype: 'Select', fieldname: prefix + 'table', label: __('Excel Header → Table'), options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[section.table],
+            onchange: () => {
+              if (!setup) return;
+              const accessories = setup.get_value(prefix + 'table') === tables.accessorise_table;
+              [...materialFields, 'requested_name', 'default_material'].forEach(field => {
+                const hidden = field === 'requested_name' ? !accessories : !['qty', 'note'].includes(field) && accessories;
+                setup.set_df_property(prefix + field, 'hidden', hidden);
+              });
+            }},
+          {fieldtype: 'Int', fieldname: prefix + 'start', label: __('First Data Row'), default: range.start, reqd: 1},
+          {fieldtype: 'Int', fieldname: prefix + 'end', label: __('Last Data Row'), default: range.end, reqd: 1},
+          {fieldtype: 'Link', fieldname: prefix + 'default_material', label: __('Part Material for this Section'), options: 'Part Material', hidden: section.table === 'accessorise_table'},
+          {fieldtype: 'HTML', options: `<div style="overflow:auto;max-height:160px"><table class="table table-bordered"><thead><tr>${columns.map((col, c) => `<th>${col}: ${esc(headers[c])}</th>`).join('')}</tr></thead><tbody>${matrix.slice(range.start - 1, Math.min(range.start + 2, range.end)).map(row => `<tr>${columns.map((_, c) => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
+          ...[...materialFields, 'requested_name'].map(field => ({fieldtype: 'Select', fieldname: prefix + field, label: __(labels[field]), options: columnOptions, default: defaults[field],
+            hidden: section.table === 'accessorise_table' ? !['requested_name', 'qty', 'note'].includes(field) : field === 'requested_name'})),
+        );
+      });
+      setup = new frappe.ui.Dialog({title: __('Import All: Confirm Headers and Columns'), size: 'extra-large', fields,
+        primary_action_label: __('Preview All Tables'),
+        primary_action: async values => {
+          setup.get_primary_btn().prop('disabled', true);
+          try {
+            const batches = [];
+            for (let i = 0; i < configs.length; i++) {
+              const prefix = `section_${i}_`;
+              const target = values[prefix + 'table'];
+              if (target === 'Skip') continue;
+              const table = Object.keys(tables).find(key => tables[key] === target);
+              const mappedFields = table === 'accessorise_table' ? ['requested_name', 'qty', 'note'] : materialFields;
+              const mapping = {};
+              mappedFields.forEach(field => {
+                const index = columns.indexOf(values[prefix + field]);
+                if (index >= 0) mapping[field] = index;
+              });
+              if (table !== 'accessorise_table' && !values[prefix + 'default_material'] && mapping.material === undefined) {
+                return frappe.msgprint(__('Choose a Part Material or map the Material column for {0}.', [esc(configs[i].section.label)]));
+              }
+              const response = await frappe.call({method: api + 'preview_import', args: {
+                matrix: JSON.stringify(matrix), mapping: JSON.stringify(mapping), table,
+                material: values[prefix + 'default_material'] || '', start_row: values[prefix + 'start'], end_row: values[prefix + 'end'],
+              }, freeze: true});
+              batches.push({table, label: configs[i].section.label, rows: response.message});
+            }
+            if (!batches.some(batch => batch.rows.length)) return frappe.msgprint(__('No data rows found.'));
+            const entries = batches.flatMap(batch => batch.rows.map(row => ({...row, table: batch.table, section: batch.label})));
+            let importing = false;
+            const review = new frappe.ui.Dialog({title: __('Review Import: All Tables'), size: 'extra-large', fields: [
+              {fieldtype: 'HTML', options: `<p>${esc(values.mode)}. ${__('Rows with errors are disabled. Return to mapping to correct them. Possible assembly rows start unchecked.')}</p>`},
+              {fieldtype: 'Button', fieldname: 'back', label: __('Back to Mapping'), click: () => {review.hide(); setup.show();}},
+              {fieldtype: 'HTML', fieldname: 'rows', options: `<div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Excel Section')}</th><th>${__('Table')}</th><th>${__('Source Row')}</th><th>${__('Name')}</th><th>${__('Material')}</th><th>${__('Qty')}</th><th>${__('Review')}</th></tr></thead><tbody>${entries.map((row, i) => `<tr><td><input type="checkbox" data-row="${i}" ${row.errors.length ? 'disabled' : /drawer unit/i.test(row.values.part_name || '') ? '' : 'checked'}></td><td>${esc(row.section)}</td><td>${esc(tables[row.table])}</td><td>${row.source_row}</td><td>${esc(row.values.part_name || row.values.requested_name)}</td><td>${esc(row.values.material)}</td><td>${esc(row.values.qty)}</td><td>${row.errors.map(esc).join('<br>')}</td></tr>`).join('')}</tbody></table></div>`},
+            ], primary_action_label: __('Import All Selected Rows'), primary_action: async () => {
+              if (importing) return;
+              const selected = [...review.fields_dict.rows.$wrapper.find('input:checked')].map(input => entries[Number(input.dataset.row)]).filter(row => !row.errors.length);
+              if (!selected.length) return frappe.msgprint(__('Select at least one valid row.'));
+              importing = true;
+              review.get_primary_btn().prop('disabled', true);
+              try {
+                await applyImportBatches(frm, Object.keys(tables).map(table => ({table, rows: selected.filter(row => row.table === table)})).filter(batch => batch.rows.length), values.mode);
+                review.hide(); setup.hide(); dialog.hide();
+                frappe.show_alert(__('Added {0} rows. Save the Part List to validate and store them.', [selected.length]));
+              } finally {importing = false; review.get_primary_btn().prop('disabled', false);}
+            }});
+            review.show();
+          } finally {setup.get_primary_btn().prop('disabled', false);}
+        },
+      });
+      setup.show();
     }
 
     function chooseSection() {
@@ -320,34 +430,7 @@
           if (!selected.length) return frappe.msgprint(__('Select at least one valid row.'));
           adding = true;
           try {
-            const palettes = {};
-            const prepared = [];
-            for (const entry of selected) {
-              const values = {...entry.values};
-              if (!accessories) {
-                if (!(values.material in palettes)) {
-                  const result = await frappe.db.get_value('Part Material', values.material, 'color_palette');
-                  palettes[values.material] = result.message?.color_palette || null;
-                }
-                values.color_palette = palettes[values.material];
-                values.color_doctype = values.color_palette ? 'Material Color' : null;
-              } else values.mapping_status = 'Pending';
-              prepared.push(values);
-            }
-            // Finish fallible lookups before changing any draft rows.
-            if (frm.doc.docstatus !== 0 || frm.read_only) return frappe.msgprint(__('Import requires an editable draft.'));
-            if (mode === 'Replace Table Rows') frm.clear_table(table);
-            else {
-              // Discard only untouched starter rows; retain all meaningful input.
-              const empty = (frm.doc[table] || []).filter(isEmptyImportRow);
-              empty.forEach(row => {
-                if (row.doctype && row.name) frappe.model.clear_doc(row.doctype, row.name);
-              });
-              frm.doc[table] = (frm.doc[table] || []).filter(row => !empty.includes(row));
-              frm.doc[table].forEach((row, index) => { row.idx = index + 1; });
-            }
-            prepared.forEach(values => frm.add_child(table, values));
-            frm.refresh_field(table); frm.dirty();
+            await applyImportBatches(frm, [{table, rows: selected}], mode);
             p.hide(); mappingDialog.hide(); sectionDialog?.hide(); dialog.hide();
             frappe.show_alert(__('Added {0} rows. Save the Part List to validate and store them.', [selected.length]));
           } finally { adding = false; }
@@ -363,6 +446,48 @@
         });
       }
     }
+  }
+
+  async function applyImportBatches(frm, batches, mode) {
+    const assertEditable = () => {
+      if (frm.doc.docstatus !== 0 || frm.read_only) throw new Error(__('Import requires an editable draft.'));
+    };
+    assertEditable();
+    const palettes = {};
+    const prepared = [];
+    // Resolve every material before changing any of the destination tables.
+    for (const batch of batches) {
+      const rows = [];
+      for (const entry of batch.rows) {
+        const values = {...entry.values};
+        if (batch.table === 'accessorise_table') values.mapping_status = 'Pending';
+        else {
+          if (!(values.material in palettes)) {
+            const result = await frappe.db.get_value('Part Material', values.material, 'color_palette');
+            palettes[values.material] = result.message?.color_palette || null;
+          }
+          values.color_palette = palettes[values.material];
+          values.color_doctype = values.color_palette ? 'Material Color' : null;
+        }
+        rows.push(values);
+      }
+      prepared.push({table: batch.table, rows});
+    }
+    assertEditable();
+    for (const {table, rows} of prepared) {
+      if (mode === 'Replace Table Rows') frm.clear_table(table);
+      else {
+        const empty = (frm.doc[table] || []).filter(isEmptyImportRow);
+        empty.forEach(row => {
+          if (row.doctype && row.name) frappe.model.clear_doc(row.doctype, row.name);
+        });
+        frm.doc[table] = (frm.doc[table] || []).filter(row => !empty.includes(row));
+        frm.doc[table].forEach((row, index) => {row.idx = index + 1;});
+      }
+      rows.forEach(values => frm.add_child(table, values));
+      frm.refresh_field(table);
+    }
+    frm.dirty();
   }
 
   function isEmptyImportRow(row) {
@@ -404,6 +529,7 @@
   frappe.ui.form.on('Part List', {
     refresh(frm) {
       if (frm.doc.docstatus === 0 && !frm.read_only) {
+        frm.add_custom_button(__('Import All'), () => openImport(frm, 'all'), __('Import / Paste'));
         Object.entries(tables).forEach(([table, label]) => frm.add_custom_button(__(label), () => openImport(frm, table), __('Import / Paste')));
         Object.keys(tables).forEach(table => {
           const wrapper = frm.fields_dict?.[table]?.grid?.wrapper?.[0];

@@ -304,6 +304,43 @@ def main():
         config = page.locator('.dialog').last
         for field, col in [('lenght', 'E'), ('width', 'F'), ('hight', 'G'), ('thickness', 'H'), ('qty', 'I')]:
             assert config.locator(f'[data-field={field}]').input_value() == col
+        # Import every section in one operation, with a combined preview.
+        page.evaluate("frm.doc.pds_table=[];frm.buttons['Import All']()")
+        material_header = 'Part Name English\tPart Name Arabic\tLength\tWidth\tHeight\tThickness\tQty\tMaterial\tNotes'
+        combined = '\n'.join([
+            'Panel Materials', material_header, 'Top\tقرصة\t100\t80\t\t18\t2\tMDF\t',
+            'Metal Material', material_header, 'Leg\tرجل\t\t\t700\t2\t4\tSteel\t',
+            'Other Material', material_header, 'Foam\tفوم\t\t\t\t10\t1\tFoam\t',
+            'Accessories', 'Requested Item Name\tQty\tNotes', 'Screw\t8\t', 'Bad screw\t-1\t',
+        ])
+        page.locator('.dialog').last.locator('[data-field=paste]').fill(combined)
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        setup = page.locator('.dialog').last
+        assert setup.locator('[data-field=section_0_table]').input_value() == 'Panel Materials'
+        assert setup.locator('[data-field=section_3_table]').input_value() == 'Accessories'
+        assert setup.locator('[data-field=section_0_part_name]').input_value() == 'A'
+        assert setup.locator('[data-field=section_0_material]').input_value() == 'H'
+        setup.locator('[data-field=mode]').select_option('Replace Table Rows')
+        before = page.evaluate('JSON.stringify(frm.doc)')
+        setup.locator('[data-primary]').click()
+        page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Review Import: All Tables'")
+        review = page.locator('.dialog').last
+        assert review.locator('input:checked').count() == 4
+        assert review.locator('input:disabled').count() == 1
+        assert page.evaluate('JSON.stringify(frm.doc)') == before, 'Preview must not change tables'
+        # Failure in a later table must leave every table intact, including in Replace mode.
+        page.evaluate("window.originalLookup=frappe.db.get_value;frappe.db.get_value=async(type,name)=>{if(name==='Steel')throw Error('Batch lookup failed');return originalLookup(type,name)}")
+        review.locator('[data-primary]').click()
+        page.wait_for_function("window.lastError === 'Batch lookup failed'")
+        assert page.evaluate('JSON.stringify(frm.doc)') == before
+        page.evaluate('frappe.db.get_value=window.originalLookup;window.lastError=null')
+        review.locator('[data-primary]').click()
+        page.wait_for_function('dialogs[dialogs.length-1].element.hidden === true')
+        for table in ['panel_materials', 'metal_material', 'other_material', 'accessorise_table']:
+            assert page.evaluate(f'frm.doc.{table}.length') == 1
+        assert page.evaluate('frm.doc.metal_material[0].color_palette') == 'Wood'
+        assert page.evaluate('frm.doc.accessorise_table[0].mapping_status') == 'Pending'
+        assert page.evaluate('frm.doc.accessorise_table[0].qty') == 8
         assert not errors, errors
         assert not page.evaluate('window.lastError'), page.evaluate('window.lastError')
         browser.close()
