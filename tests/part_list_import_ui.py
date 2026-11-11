@@ -252,7 +252,7 @@ def main():
         assert page.evaluate('frm.doc.accessorise_table.length') == 2
         # A mapped Material column can contain blanks. Repair these in review.
         page.evaluate("frm.buttons['Metal Material']()")
-        page.locator('.dialog').last.locator('[data-field=paste]').fill('Leg\tرجل\t1200\t48\t715\t1.8\t2\t\t')
+        page.locator('.dialog').last.locator('[data-field=paste]').fill('Part Name English\tPart Name Arabic\tLength\tWidth\tHeight\tThickness\tQty\tMaterial\tNotes\nLeg\tرجل\t1200\t48\t715\t1.8\t2\t\t')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
@@ -302,7 +302,10 @@ def main():
         assert page.locator('.dialog').last.locator('[data-field=paste]').input_value().startswith('Top\t')
         page.locator('.dialog').last.locator('[data-primary]').click()
         config = page.locator('.dialog').last
-        for field, col in [('lenght', 'E'), ('width', 'F'), ('hight', 'G'), ('thickness', 'H'), ('qty', 'I')]:
+        choices = config.locator('[data-field=lenght] option').all_text_contents()
+        assert 'C' not in choices and 'D' not in choices, 'Empty source columns are excluded'
+        assert 'E' in choices, 'Original source letters are preserved'
+        for field, col in [('lenght', 'E'), ('width', 'F'), ('hight', 'Skip'), ('thickness', 'H'), ('qty', 'I')]:
             assert config.locator(f'[data-field={field}]').input_value() == col
         # Import every section in one operation, with a combined preview.
         page.evaluate("frm.doc.pds_table=[];frm.buttons['All Tables']()")

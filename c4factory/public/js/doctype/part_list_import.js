@@ -59,6 +59,11 @@
     for (let n = index + 1; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + (n - 1) % 26) + result;
     return result;
   };
+  function populatedColumns(matrix) {
+    const count = Math.max(0, ...matrix.map(row => row.length));
+    return Array.from({length: count}, (_, index) => index)
+      .filter(index => matrix.some(row => String(row[index] ?? '').trim() !== ''));
+  }
   function parsePaste(text) {
     // Excel quotes cells containing tabs, newlines or quotes.
     const rows = []; let row = [], cell = '', quoted = false;
@@ -181,7 +186,7 @@
       // A plain sheet can still be imported by confirming its destination and range.
       const sources = sections.length ? sections : [{index: -1, label: __('Whole sheet / pasted rows'), table: 'panel_materials'}];
       const count = Math.max(...matrix.map(row => row.length));
-      const columns = Array.from({length: count}, (_, i) => column(i));
+      const columns = populatedColumns(matrix).map(column);
       const columnOptions = ['Skip', ...columns].join('\n');
       const materialFields = ['part_name', 'part_name_ar', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note'];
       const aliases = {
@@ -232,7 +237,7 @@
         {fieldtype: 'HTML', options: `<p>${__('Map columns once for all tables. The name column also supplies Requested Item Name for accessories. Data ranges are detected from the selected section headers.')}</p><div style="overflow:auto;max-height:240px"><table class="table table-bordered"><thead><tr><th>#</th>${columns.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody>${matrix.slice(0, 12).map((row, i) => `<tr><td>${i + 1}</td>${columns.map((_, c) => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
         ...materialFields.map(field => ({fieldtype: 'Select', fieldname: 'map_' + field,
           label: field === 'part_name' ? __('Part Name English / Requested Item Name') : __(labels[field]),
-          options: columnOptions, default: defaults[field]})),
+          options: columnOptions, default: columns.includes(defaults[field]) ? defaults[field] : 'Skip'})),
       ];
       setup = new frappe.ui.Dialog({title: __('Import All: Confirm Headers and Columns'), size: 'extra-large', fields,
         primary_action_label: __('Preview All Tables'),
@@ -331,7 +336,8 @@
       const fields = accessories ? ['requested_name', 'qty', 'note'] :
         ['part_name', 'part_name_ar', 'lenght', 'width', 'hight', 'thickness', 'qty', 'material', 'note'];
       const count = Math.max(...matrix.map(r => r.length));
-      const options = ['Skip', ...Array.from({length: count}, (_, i) => column(i))].join('\n');
+      const columns = populatedColumns(matrix).map(column);
+      const options = ['Skip', ...columns].join('\n');
       const sheetName = source === 'workbook' ? dialog.get_value('sheet') : 'paste';
       const signature = JSON.stringify(matrix.slice(0, 10).map(r => r.filter(v => typeof v === 'string').slice(0, 8)));
       const key = 'c4-part-import:' + table + ':' + sheetName + ':' + signature;
@@ -366,7 +372,11 @@
           {fieldtype: 'Link', fieldname: 'default_material', label: __('Part Material for Imported Rows'), options: 'Part Material', hidden: accessories, default: sectionMaterial,
             description: __('Select a Part Material here, or map the Material column below. This is required before reviewing rows.')},
           {fieldtype: 'Section Break', label: __('Column Mapping')},
-          ...fields.map(f => ({fieldtype: 'Select', fieldname: f, label: __(labels[f]), options, default: saved[f] || defaults[f] || 'Skip'})),
+          ...fields.map(f => {
+            const selected = saved[f] || defaults[f];
+            return {fieldtype: 'Select', fieldname: f, label: __(labels[f]), options,
+              default: columns.includes(selected) ? selected : 'Skip'};
+          }),
           {fieldtype: 'Select', fieldname: 'mode', label: __('Import Mode'), options: 'Add Rows\nReplace Table Rows', default: 'Add Rows'},
         ],
         primary_action_label: __('Preview Rows'),
@@ -583,5 +593,5 @@
       }
     },
   });
-  if (typeof module !== 'undefined') module.exports = {parsePaste, column, sectionType, detectSections, sectionRange, isEmptyImportRow, prepareCellPaste, pasteIntoCells};
+  if (typeof module !== 'undefined') module.exports = {parsePaste, column, populatedColumns, sectionType, detectSections, sectionRange, isEmptyImportRow, prepareCellPaste, pasteIntoCells};
 })();
