@@ -21,7 +21,7 @@ function configurePartListMaterialColumns(frm) {
   const columns = [
     ["part_name", 1], ["part_name_ar", 1], ["lenght", 1], ["width", 1], ["hight", 1],
     ["thickness", 1], ["qty", 1], ["material", 1], ["note", 2],
-    ["edite_color", 1], ["basic_color", 1],
+    ["is_assembly", 1], ["edite_color", 1], ["basic_color", 1],
   ];
   for (const table of ["panel_materials", "metal_material", "other_material"]) {
     const grid = frm.fields_dict[table]?.grid;

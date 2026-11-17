@@ -22,6 +22,9 @@ window.module = {exports:{}};
 window.handlers = {}; window.dialogs = []; window.alerts = []; window.calls = [];
 function wrap(element) { return {
   find: selector => [...element.querySelectorAll(selector)],
+  on(event, selector, handler) {element.addEventListener(event, e => {
+    if (e.target.matches(selector)) handler.call(e.target, e);
+  });},
   prop(name, value) {element[name] = value; return this;}
 }; }
 window.frappe = {
@@ -127,6 +130,25 @@ def main():
         page.evaluate(ADAPTER)
         page.add_script_tag(path=str(ROOT / 'c4factory/public/js/doctype/part_list_import.js'))
         assert page.evaluate("module.exports.column(26)") == 'AA'
+        page.evaluate(r"""async () => {
+          const {sectionType, detectSections, sectionRange, possibleAssembly, applyImportBatches} = module.exports;
+          const assert = (ok, message) => {if (!ok) throw Error(message);};
+          for (const name of ['Other Material', 'Other Materials', 'Marble', 'Glass', 'Corian', 'Plexi'])
+            assert(sectionType(name) === 'other_material', name);
+          const matrix = [['Custom Finish'], ['Part Name English', 'Part Name Arabic', 'Qty'],
+            ['Door', 'Arabic', 1], ['Glass'], ['Part Name English', 'Part Name Arabic', 'Qty'], ['Pane', 'Arabic', 2]];
+          const sections = detectSections(matrix);
+          assert(sections.length === 2 && sections[0].table === null, 'Unknown title remains manually mappable');
+          const range = sectionRange(matrix, sections[0], sections);
+          assert(range.start === 3 && range.end === 3, 'Skip column headings and stop at next section');
+          assert(possibleAssembly({values:{part_name:'Sub-assembly'}}), 'Detect assembly');
+          assert(possibleAssembly({values:{part_name:'Door',part_name_ar:'\u062a\u062c\u0645\u064a\u0639'}}), 'Detect Arabic assembly');
+          assert(!possibleAssembly({values:{part_name:'Assembly',is_assembly:0}}), 'Honor manual override');
+          const target = {doc:{docstatus:0}, add_child(table, values) {(this.doc[table] ||= []).push(values);},
+            refresh_field() {}, dirty() {}};
+          await applyImportBatches(target, [{table:'accessorise_table',rows:[{values:{requested_name:'Assembly',qty:1,is_assembly:1}}]}], 'Add Rows');
+          assert(target.doc.accessorise_table[0].is_assembly === 1, 'Import preserves confirmed flag');
+        }""")
         assert page.evaluate('module.exports.parsePaste(' + json.dumps('"Long\nScrew"\t8\r\n') + ')') == [['Long\nScrew', '8']]
         page.evaluate("handlers['Part List'].refresh(frm);frm.buttons['Panel Materials']()")
         page.locator('[data-field=paste]').fill('Top\tقرصة\t1200\t800\t\t25\t3\nDrawer Unit\tوحدة أدراج\t428\t700\t627\t\t1')
@@ -134,12 +156,17 @@ def main():
         page.locator('[data-field=default_material]').fill('MDF')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('dialogs.length === 3')
-        assert page.locator('.dialog').last.locator('input:checked').count() == 2, 'Valid assemblies are included by default'
+        assert page.locator('.dialog').last.locator('input:checked').count() == 3, 'Valid assemblies are included by default'
         assembly = page.locator('.dialog').last.locator('tr.c4-possible-assembly')
         assert assembly.count() == 1
-        assert assembly.locator('td').first.evaluate('(cell) => getComputedStyle(cell).backgroundColor') == 'rgb(255, 243, 205)'
-        assert 'counted alongside its components' in assembly.inner_text()
-        assembly.locator('input').uncheck()
+        assert assembly.locator('td').first.evaluate('(cell) => getComputedStyle(cell).backgroundColor') == 'rgb(248, 215, 218)'
+        assert 'Assembly parent' in assembly.inner_text()
+        assembly.locator('input[data-assembly]').uncheck()
+        assert page.locator('.dialog').last.locator('input[data-row="1"]').is_checked(), 'Assembly does not change Include'
+        assert page.locator('.dialog').last.locator('tr.c4-possible-assembly').count() == 0
+        page.locator('.dialog').last.locator('input[data-assembly="1"]').check()
+        assembly = page.locator('.dialog').last.locator('tr.c4-possible-assembly')
+        assembly.locator('input[data-row]').uncheck()
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('frm.doc.panel_materials.length === 1')
         part = page.evaluate('frm.doc.panel_materials[0]')
@@ -201,7 +228,7 @@ def main():
         for header, target, material, expected_row in [
             ('2: Wooden Panel', 'Panel Materials', 'MDF', 3),
             ('4: Metal', 'Metal Material', 'Steel', 5),
-            ('6: Other', 'Other Material', 'Foam', 7),
+            ('6: Other', 'Other Materials', 'Foam', 7),
             ('8: Accessories', 'Accessories', '', 10),
         ]:
             page.evaluate("frm.doc.docstatus=0;handlers['Part List'].refresh(frm);frm.buttons['Panel Materials']()")
@@ -244,7 +271,7 @@ def main():
             assert review.locator('input:checked').count() == 0
             review.locator('tbody tr td').nth(1).click()
             assert review.locator('input:checked').count() == 1, 'Clicking the row must select it'
-            review.locator('input[type=checkbox]').uncheck()
+            review.locator('input[data-row]').uncheck()
             review.locator('[data-field=select_all]').click()
             assert review.locator('input:checked').count() == 1
             review.locator('[data-primary]').click()
@@ -366,6 +393,23 @@ def main():
         assert page.evaluate('frm.doc.metal_material[0].color_palette') == 'Wood'
         assert page.evaluate('frm.doc.accessorise_table[0].mapping_status') == 'Pending'
         assert page.evaluate('frm.doc.accessorise_table[0].qty') == 8
+        # Empty spacer columns must retain their original Excel indices.
+        page.evaluate("frm.doc.pds_table=[];frm.buttons['All Tables']()")
+        sparse = 'Glass\nPart Name English\tPart Name Arabic\t\tQty\tMaterial\nAssembly\tArabic\t\t2\tGlass'
+        page.locator('.dialog').last.locator('[data-field=paste]').fill(sparse)
+        page.locator('.dialog').last.locator('[data-primary]').click()
+        setup = page.locator('.dialog').last
+        assert setup.locator('[data-field=section_0_table]').input_value() == 'Other Materials'
+        assert setup.locator('[data-field=map_qty]').input_value() == 'D'
+        setup.locator('[data-field=mode]').select_option('Replace Table Rows')
+        setup.locator('[data-primary]').click()
+        review = page.locator('.dialog').last
+        assert review.locator('input[data-assembly]').is_checked()
+        assert review.locator('input[data-row]').is_checked()
+        review.locator('[data-primary]').click()
+        page.wait_for_function('dialogs[dialogs.length-1].element.hidden === true')
+        assert page.evaluate('frm.doc.other_material[0].qty') == 2
+        assert page.evaluate('frm.doc.other_material[0].is_assembly') == 1
         assert not errors, errors
         assert not page.evaluate('window.lastError'), page.evaluate('window.lastError')
         browser.close()

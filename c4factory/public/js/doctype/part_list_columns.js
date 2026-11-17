@@ -99,20 +99,7 @@
         preferences[grid.df.fieldname] = columns;
         const response = await frappe.model.user_settings.save(frm.doctype, settings_key(frm), preferences);
         frappe.model.user_settings[frm.doctype] = response.message || response;
-        const paintAssembly = (row) => {
-      const wrapper = row.wrapper || row.$wrapper;
-      if (wrapper) wrapper.toggleClass("c4-assembly-row", Boolean(Number(row.doc.is_assembly)));
-    };
-    const render = grid.refresh;
-    grid.refresh = function (...args) {
-      const result = render.apply(this, args);
-      (this.grid_rows || []).forEach(paintAssembly);
-      return result;
-    };
-    $(frm.wrapper).on("grid-row-render", (event, row) => {
-      if (row.grid === grid) paintAssembly(row);
-    });
-    grid.reset_grid();
+        grid.reset_grid();
       }
       // Keep the dialog open until the preference has actually been saved.
       const configure = header.configure_dialog_for_columns_selector;

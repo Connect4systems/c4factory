@@ -97,7 +97,7 @@ with sync_playwright() as p:
     }""")
     page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / "c4factory/c4factory/doctype/part_list/part_list.js"))
     page.evaluate("""() => {
-      const names = ['part_name','part_name_ar','lenght','width','hight','thickness','qty','material','note','edite_color','basic_color'];
+      const names = ['part_name','part_name_ar','lenght','width','hight','thickness','qty','material','note','is_assembly','edite_color','basic_color'];
       const assert = (ok, message) => {if (!ok) throw Error(message);};
       const root = document.createElement('div');
       root.innerHTML = '<div class="grid-body"><div class="grid-row">old cells</div></div>';
@@ -123,6 +123,37 @@ with sync_playwright() as p:
       row.closed = false;
       form.querySelector('.grid-collapse-row').click();
       assert(row.closed, 'collapse closes editor');
+    }""")
+    page.evaluate("""() => {
+      frappe.get_user_settings = () => null;
+      frappe.model.no_value_type = [];
+      window.$ = () => ({on() {}});
+    }""")
+    page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / "c4factory/public/js/doctype/part_list_columns.js"))
+    page.evaluate("""() => {
+      const assert = (ok, message) => {if (!ok) throw Error(message);};
+      for (const doctype of ['Part List Materials', 'Accessorise Table']) {
+        const element = document.createElement('div');
+        const row = {doc:{is_assembly:1}, wrapper:{toggleClass(name, value) {element.classList.toggle(name, value);}}};
+        const grid = {doctype, df:{fieldname:'rows'}, docfields:[
+          {fieldname:'is_assembly',fieldtype:'Check',in_list_view:1,columns:1}], grid_rows:[row],
+          refresh() {}, make_head() {}, reset_grid() {this.setup_visible_columns();this.refresh();}};
+        const frm = {wrapper:{}, fields_dict:{rows:{grid}}, get_perm:()=>true,
+          refresh_field() {grid.refresh();}};
+        materialHandlers['Part List'].refresh(frm);
+        assert(element.classList.contains('c4-assembly-row'), 'Saved assembly paints on first grid render');
+        assert(grid.visible_columns.some(([df])=>df.fieldname==='is_assembly'), 'Assembly checkbox visible');
+        row.doc.is_assembly = 0;
+        locals[doctype] = {test:{parentfield:'rows'}};
+        materialHandlers[doctype].is_assembly(frm, doctype, 'test');
+        assert(!element.classList.contains('c4-assembly-row'), 'Clearing checkbox removes highlight');
+        row.doc.is_assembly = 1;
+        materialHandlers[doctype].is_assembly(frm, doctype, 'test');
+        assert(element.classList.contains('c4-assembly-row'), 'Setting checkbox restores highlight');
+        const original = grid.refresh;
+        materialHandlers['Part List'].refresh(frm);
+        assert(grid.refresh === original, 'Refresh does not install duplicate handlers');
+      }
     }""")
     browser.close()
 print("PASS: column paste, rectangular paste, validation, row extension, and draft guard")

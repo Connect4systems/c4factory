@@ -84,8 +84,16 @@ If no Material column is mapped, a Part Material must be chosen before opening
 the preview. Click a valid row or its checkbox to toggle inclusion, or use
 **Select All Valid Rows** / **Deselect All**. **Back to Mapping** returns to the
 column and material settings to correct errors.
-Possible `Drawer Unit` assembly rows start unchecked so the user can decide
-whether to count the assembly alongside its components. **Add Rows** is the
+Section matching uses deterministic aliases without an AI API. Other Material,
+Marble, Glass, Corian, and Plexi suggest Other Materials. Unknown standalone
+section titles followed by column headers are offered for manual mapping and
+start as Skip. Review every suggested destination before importing.
+
+Possible Drawer Unit, Assembly, and Subassembly rows are highlighted in red.
+Include and Assembly are independent checkboxes: valid rows start included;
+Assembly can be confirmed or cleared without changing inclusion. The assembly
+flag is saved with the row and remains editable in the Part List tables, where
+assembly rows retain their red highlight. **Add Rows** is the
 default; **Replace Table Rows** must be explicitly selected. Nothing is persisted
 until the Part List is saved. Uploads remain private File records.
 

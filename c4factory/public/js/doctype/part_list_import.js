@@ -3,7 +3,7 @@
   const api = 'c4factory.api.part_list_import.';
   const tables = {
     panel_materials: 'Panel Materials', metal_material: 'Metal Material',
-    other_material: 'Other Material', accessorise_table: 'Accessories',
+    other_material: 'Other Materials', accessorise_table: 'Accessories',
   };
   const labels = {
     part_name: 'Part Name English', part_name_ar: 'Part Name Arabic', material: 'Material',
@@ -87,7 +87,7 @@
 
   function possibleAssembly(row) {
     return row.values.is_assembly === undefined
-      ? /\b(drawer unit|assembly|subassembly|sub assembly)\b/i.test(row.values.part_name || row.values.requested_name || '')
+      ? /\b(drawer unit|assembly|sub[ -]?assembly)\b|\u062a\u062c\u0645\u064a\u0639|\u0645\u062c\u0645\u0639/i.test([row.values.part_name, row.values.part_name_ar, row.values.requested_name].filter(Boolean).join(' '))
       : Boolean(Number(row.values.is_assembly));
   }
   function assemblyInput(row, index) {
@@ -122,7 +122,14 @@
       if (cells.some(v => String(v ?? '').trim() && Number.isFinite(Number(v)))) return;
       if (cells.filter(v => /^(sn|code|materials?|qty\.?|u\.?o\.?m\.?|dim\.?)$/i.test(String(v || '').trim())).length >= 2) return;
       const table = sectionType(first);
-      if (table) sections.push({index, label: first.trim(), table});
+      // Unknown standalone titles can be mapped manually. Avoid treating names
+      // in ordinary data rows or known document footers as section boundaries.
+      const nonempty = row.filter(v => String(v ?? '').trim());
+      const next = matrix.slice(index + 1).find(r => r.some(v => String(v ?? '').trim())) || [];
+      const headerCount = next.filter(v => /^(part name( english| arabic)?|requested item name|sn|code|items?|materials?|qty\.?|quantity|length|width|height|thickness|supplier|notes|u\.?o\.?m\.?)$/i.test(String(v ?? '').trim())).length;
+      const unknownTitle = nonempty.length === 1 && headerCount >= 2 &&
+        !/^(drawn? by|checked by|revision no\.?)$/i.test(first.trim());
+      if (table || unknownTitle) sections.push({index, label: first.trim(), table});
     });
     return sections;
   }
@@ -136,7 +143,7 @@
     // Accessories commonly have a second header row: Code / Items / Supplier / Qty.
     while (start <= end) {
       const cells = matrix[start - 1].map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean);
-      const header = cells.filter(v => /^(sn|s n|code|items?|materials?|qty\.?|quantity|supplier|notes|u\.?o\.?m\.?)$/.test(v)).length >= 2;
+      const header = cells.filter(v => /^(part name( english| arabic)?|requested item name|sn|s n|code|items?|materials?|qty\.?|quantity|length|width|height|thickness|supplier|notes|u\.?o\.?m\.?)$/.test(v)).length >= 2;
       if (cells.length && !header) break;
       start++;
     }
@@ -243,7 +250,7 @@
           options: ['Skip', ...choices].join('\n'), default: slot.source < 0 ? 'Skip' : choices[slot.source]})),
         {fieldtype: 'Column Break'},
         ...slots.map((slot, i) => ({fieldtype: 'Select', fieldname: `section_${i}_table`, label: __('System Table'),
-          options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[slot.table],
+          options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[slot.table] || 'Skip',
           onchange: () => {
             if (!setup) return;
             const target = setup.get_value(`section_${i}_table`);
@@ -253,7 +260,7 @@
         ...slots.map((slot, i) => ({fieldtype: 'Link', fieldname: `section_${i}_default_material`, label: __('Part Material'),
           options: 'Part Material', hidden: slot.table === 'accessorise_table'})),
         {fieldtype: 'Section Break', label: __('Shared Column Mapping')},
-        {fieldtype: 'HTML', options: `<p>${__('Map columns once for all tables. The name column also supplies Requested Item Name for accessories. Data ranges are detected from the selected section headers.')}</p><div style="overflow:auto;max-height:240px"><table class="table table-bordered"><thead><tr><th>#</th>${columns.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody>${matrix.slice(0, 12).map((row, i) => `<tr><td>${i + 1}</td>${columns.map((_, c) => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
+        {fieldtype: 'HTML', options: `<p>${__('Map columns once for all tables. The name column also supplies Requested Item Name for accessories. Data ranges are detected from the selected section headers.')}</p><div style="overflow:auto;max-height:240px"><table class="table table-bordered"><thead><tr><th>#</th>${columns.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody>${matrix.slice(0, 12).map((row, i) => `<tr><td>${i + 1}</td>${populatedColumns(matrix).map(c => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
         ...materialFields.map(field => ({fieldtype: 'Select', fieldname: 'map_' + field,
           label: field === 'part_name' ? __('Part Name English / Requested Item Name') : __(labels[field]),
           options: columnOptions, default: columns.includes(defaults[field]) ? defaults[field] : 'Skip'})),
@@ -278,7 +285,7 @@
               const mappedFields = table === 'accessorise_table' ? ['requested_name', 'qty', 'note'] : materialFields;
               const mapping = {};
               mappedFields.forEach(field => {
-                const index = columns.indexOf(values['map_' + (field === 'requested_name' ? 'part_name' : field)]);
+                const index = Array.from({length: count}, (_, c) => column(c)).indexOf(values['map_' + (field === 'requested_name' ? 'part_name' : field)]);
                 if (index >= 0) mapping[field] = index;
               });
               if (table !== 'accessorise_table' && !values[prefix + 'default_material'] && mapping.material === undefined) {
@@ -333,9 +340,9 @@
             onchange: async () => {
               if (!sectionDialog) return;
               const section = selected();
-              if (section) await sectionDialog.set_value('target_table', tables[section.table]);
+              if (section) await sectionDialog.set_value('target_table', tables[section.table] || 'Skip');
             }},
-          {fieldtype: 'Select', fieldname: 'target_table', label: __('Import into Table'), options: Object.values(tables).join('\n'), default: tables[initial.table], reqd: 1,
+          {fieldtype: 'Select', fieldname: 'target_table', label: __('Import into Table'), options: ['Skip', ...Object.values(tables)].join('\n'), default: tables[initial.table] || 'Skip', reqd: 1,
             onchange: () => {
               if (sectionDialog) sectionDialog.set_df_property('section_material', 'hidden', sectionDialog.get_value('target_table') === tables.accessorise_table);
             }},
@@ -343,6 +350,7 @@
         ],
         primary_action_label: __('Map Columns'),
         primary_action: values => {
+          if (values.target_table === 'Skip') { sectionDialog.hide(); return; }
           table = Object.keys(tables).find(key => tables[key] === values.target_table);
           const section = selected();
           configure(section, sections, values.section_material || '');
@@ -534,7 +542,7 @@
 
   function isEmptyImportRow(row) {
     const text = ['material', 'part_name', 'part_name_ar', 'note', 'requested_name', 'item', 'basic_color', 'color_palette', 'color_doctype', 'requested_uom', 'stock_uom'];
-    const numbers = ['qty', 'lenght', 'width', 'hight', 'thickness', 'edite_color', 'stock_qty', 'conversion_factor'];
+    const numbers = ['qty', 'lenght', 'width', 'hight', 'thickness', 'edite_color', 'is_assembly', 'stock_qty', 'conversion_factor'];
     return text.every(key => !String(row[key] ?? '').trim()) && numbers.every(key => !Number(row[key] || 0));
   }
 
@@ -616,5 +624,5 @@
       }
     },
   });
-  if (typeof module !== 'undefined') module.exports = {parsePaste, column, populatedColumns, sectionType, detectSections, sectionRange, isEmptyImportRow, prepareCellPaste, pasteIntoCells};
+  if (typeof module !== 'undefined') module.exports = {parsePaste, column, populatedColumns, sectionType, detectSections, sectionRange, possibleAssembly, applyImportBatches, isEmptyImportRow, prepareCellPaste, pasteIntoCells};
 })();

@@ -11,7 +11,7 @@ const context = vm.createContext({
   __: value => value, $: () => wrapper,
   document: {getElementById: () => true},
   frappe: {
-    ui: {form: {on(type, events) {assert.equal(type, 'Part List'); handlers.push(events);}}},
+    ui: {form: {on(type, events) {if (type === 'Part List') handlers.push(events);}}},
     get_user_settings: (type, key) => preferences[key],
     model: {no_value_type: ['Section Break', 'HTML'], user_settings: Object.assign({}, {
       async save(type, key, value) {preferences[key] = value; return {message: preferences};},
