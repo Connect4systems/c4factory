@@ -6,6 +6,16 @@ from frappe.model.document import Document
 
 
 class PartList(Document):
+	def before_cancel(self):
+		from c4factory.api.part_list_links import unlink_references
+
+		unlink_references(self)
+
+	def on_trash(self):
+		from c4factory.api.part_list_links import unlink_references
+
+		unlink_references(self)
+
 	def validate(self):
 		from c4factory.api.part_list_accessories import validate_requirements
 

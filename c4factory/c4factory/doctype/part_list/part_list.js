@@ -60,6 +60,23 @@ frappe.ui.form.on("Part List", {
     configurePartListMaterialColumns(frm);
     frm.refresh_field("image");
     configurePartListVersionActions(frm);
+    if (!frm.is_new() && (frm.doc.docstatus === 1 ? frm.perm?.[0]?.cancel : frm.perm?.[0]?.delete)) {
+      frm.add_custom_button(__("Unlink Sales Contracts / PDS Requests"), () => {
+        frappe.confirm(
+          __("Remove this Part List from linked Sales Contracts and PDS Requests? You can then cancel or delete the Part List. The linked documents will remain intact."),
+          async () => {
+            await frappe.call({
+              method: "c4factory.api.part_list_links.unlink_part_list",
+              args: {name: frm.doc.name},
+              freeze: true,
+              freeze_message: __("Unlinking Part List..."),
+            });
+            await frm.reload_doc();
+            frappe.msgprint(__("Sales Contract and PDS Request references removed. You can now cancel or delete this Part List."));
+          }
+        );
+      }, __("Actions"));
+    }
   },
   product: refreshPartListProductImage,
   material_line(frm) {
