@@ -9,6 +9,7 @@ app_license = "mit"
 
 # Reapply after customization sync, including sites that ran the original patch.
 after_migrate = [
+    "c4factory.patches.v1_0.remove_item_colors.execute",
     "c4factory.patches.v1_0.setup_part_list_import.execute",
     "c4factory.patches.v1_0.remove_sales_order_header_colors.execute",
     "c4factory.patches.v1_0.allow_sales_order_part_list_after_submit.execute",
@@ -33,7 +34,6 @@ app_include_js = [
 # ---------------------------------------------------------
 
 doctype_js = {
-    "Item": "public/js/doctype/item_material_color.js",
     "Pick List": "public/js/doctype/pick_list.js",
     "Stock Entry": "public/js/doctype/stock_entry.js",
     "BOM": "public/js/doctype/bom/bom_measurement_qty.js",
@@ -66,7 +66,6 @@ doc_events = {
         "before_validate": "c4factory.api.bom.calculate_item_qty",
     },
     "Item": {
-        "before_validate": "c4factory.api.item_material_color.validate_material_color",
         "validate": "c4factory.api.item_uom.validate_item_uoms",
     },
     # Work Order – source warehouse autofill from Item Group

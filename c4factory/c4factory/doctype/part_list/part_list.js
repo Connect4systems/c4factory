@@ -192,7 +192,7 @@ function openPartBundleSelector(frm) {
       }
 
       const details = await frappe.db.get_value("Item", it.item_code, [
-        "item_group", "description", "custom_basic_color",
+        "item_group", "description",
       ]);
       const item = details.message || {};
       const row = frm.add_child(config.target_table);
@@ -201,7 +201,7 @@ function openPartBundleSelector(frm) {
         Object.assign(rowValues, {
           part_type: values.part_type,
           item_group: item.item_group,
-          basic_color: item.custom_basic_color || "",
+          basic_color: "",
           width: flt(values.width),
           hight: flt(values.hight),
           thickness: flt(values.thickness),
