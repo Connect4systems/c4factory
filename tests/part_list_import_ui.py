@@ -133,7 +133,7 @@ def main():
         page.evaluate(r"""async () => {
           const {sectionType, detectSections, sectionRange, possibleAssembly, applyImportBatches} = module.exports;
           const assert = (ok, message) => {if (!ok) throw Error(message);};
-          for (const name of ['Other Material', 'Other Materials', 'Marble', 'Glass', 'Corian', 'Plexi'])
+          for (const name of ['Other Material', 'Other Materials', 'Marble', 'Marbel', 'Glass', 'Corian', 'Plexi'])
             assert(sectionType(name) === 'other_material', name);
           const matrix = [['Custom Finish'], ['Part Name English', 'Part Name Arabic', 'Qty'],
             ['Door', 'Arabic', 1], ['Glass'], ['Part Name English', 'Part Name Arabic', 'Qty'], ['Pane', 'Arabic', 2]];
@@ -223,12 +223,23 @@ def main():
         page.evaluate('window.testWorkbook=' + json.dumps({'Customer layout': worksheet}))
         detected = page.evaluate('module.exports.detectSections(testWorkbook["Customer layout"])')
         assert [s['table'] for s in detected] == ['panel_materials', 'metal_material', 'other_material', 'accessorise_table']
+        # Legacy sheets have no column-header row after material section titles.
+        # Summary cells to the right must not hide the customer's 'Marbel' title.
+        for label in ['Marble', 'Marbel', 'Glass', 'Corian', 'Plexi']:
+            legacy = [['Metal'], [1, '', 'Leg', 'Arabic', '', '', 10, 20, 30, 2, 1],
+                      [label] + [''] * 15 + ['m2', 'M.12'],
+                      [1, '', 'Top', 'Arabic', '', '', 100, 200, '', 25, 1],
+                      ['Accessories']]
+            sections = page.evaluate('module.exports.detectSections(' + json.dumps(legacy) + ')')
+            assert [s['table'] for s in sections] == ['metal_material', 'other_material', 'accessorise_table']
+            ranges = page.evaluate('m => {const s=module.exports.detectSections(m);return s.map(x=>module.exports.sectionRange(m,x,s));}', legacy)
+            assert ranges[:2] == [{'start': 2, 'end': 2}, {'start': 4, 'end': 4}]
         for label in ['Material', 'Materials', 'Wooden Panel', 'Woodin Panel', 'Panel']:
             assert page.evaluate('module.exports.sectionType(' + json.dumps(label) + ')') == 'panel_materials'
         for header, target, material, expected_row in [
             ('2: Wooden Panel', 'Panel Materials', 'MDF', 3),
             ('4: Metal', 'Metal Material', 'Steel', 5),
-            ('6: Other', 'Other Materials', 'Foam', 7),
+            ('6: Other', 'Other Material', 'Foam', 7),
             ('8: Accessories', 'Accessories', '', 10),
         ]:
             page.evaluate("frm.doc.docstatus=0;handlers['Part List'].refresh(frm);frm.buttons['Panel Materials']()")
@@ -399,7 +410,7 @@ def main():
         page.locator('.dialog').last.locator('[data-field=paste]').fill(sparse)
         page.locator('.dialog').last.locator('[data-primary]').click()
         setup = page.locator('.dialog').last
-        assert setup.locator('[data-field=section_0_table]').input_value() == 'Other Materials'
+        assert setup.locator('[data-field=section_0_table]').input_value() == 'Other Material'
         assert setup.locator('[data-field=map_qty]').input_value() == 'D'
         setup.locator('[data-field=mode]').select_option('Replace Table Rows')
         setup.locator('[data-primary]').click()

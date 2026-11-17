@@ -85,7 +85,8 @@ the preview. Click a valid row or its checkbox to toggle inclusion, or use
 **Select All Valid Rows** / **Deselect All**. **Back to Mapping** returns to the
 column and material settings to correct errors.
 Section matching uses deterministic aliases without an AI API. Other Material,
-Marble, Glass, Corian, and Plexi suggest Other Materials. Unknown standalone
+Marble (including the legacy spelling Marbel), Glass, Corian, and Plexi suggest
+Other Material. Unknown standalone
 section titles followed by column headers are offered for manual mapping and
 start as Skip. Review every suggested destination before importing.
 

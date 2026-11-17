@@ -3,7 +3,7 @@
   const api = 'c4factory.api.part_list_import.';
   const tables = {
     panel_materials: 'Panel Materials', metal_material: 'Metal Material',
-    other_material: 'Other Materials', accessorise_table: 'Accessories',
+    other_material: 'Other Material', accessorise_table: 'Accessories',
   };
   const labels = {
     part_name: 'Part Name English', part_name_ar: 'Part Name Arabic', material: 'Material',
@@ -108,7 +108,7 @@
     const text = String(label || '').trim().toLowerCase().replace(/[._-]+/g, ' ').replace(/\s+/g, ' ');
     if (/^(wood(en|in)? panels?|panels?|panel materials?|materials?|wood|خشب|الخشب|ألواح خشبية)$/.test(text)) return 'panel_materials';
     if (/^(metal(s| materials?)?|steel|معدن|المعدن|معادن)$/.test(text)) return 'metal_material';
-    if (/^(other(s| materials?)?|marble|glass|corian|plexi(glass)?|أخرى|اخرى)$/.test(text)) return 'other_material';
+    if (/^(other(s| materials?)?|marble|marbel|glass|corian|plexi(glass)?|أخرى|اخرى)$/.test(text)) return 'other_material';
     if (/^(accessor(y|ies|ise)( materials?)?|اكسسوارات|إكسسوارات)$/.test(text)) return 'accessorise_table';
     return null;
   }
