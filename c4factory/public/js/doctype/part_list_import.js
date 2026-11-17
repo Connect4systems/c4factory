@@ -85,11 +85,30 @@
     return rows;
   }
 
+  function possibleAssembly(row) {
+    return row.values.is_assembly === undefined
+      ? /\b(drawer unit|assembly|subassembly|sub assembly)\b/i.test(row.values.part_name || row.values.requested_name || '')
+      : Boolean(Number(row.values.is_assembly));
+  }
+  function assemblyInput(row, index) {
+    return `<input type="checkbox" data-assembly="${index}" ${possibleAssembly(row) ? 'checked' : ''} aria-label="${esc(__('Assembly'))}">`;
+  }
+  function readAssemblies(dialog, rows) {
+    for (const input of dialog.fields_dict.rows.$wrapper.find('input[data-assembly]')) {
+      rows[Number(input.dataset.assembly)].values.is_assembly = input.checked ? 1 : 0;
+    }
+  }
+  function bindAssemblies(dialog) {
+    dialog.fields_dict.rows.$wrapper.on('change', 'input[data-assembly]', function () {
+      this.closest('tr').classList.toggle('c4-possible-assembly', this.checked);
+    });
+  }
+
   function sectionType(label) {
     const text = String(label || '').trim().toLowerCase().replace(/[._-]+/g, ' ').replace(/\s+/g, ' ');
     if (/^(wood(en|in)? panels?|panels?|panel materials?|materials?|wood|خشب|الخشب|ألواح خشبية)$/.test(text)) return 'panel_materials';
     if (/^(metal(s| materials?)?|steel|معدن|المعدن|معادن)$/.test(text)) return 'metal_material';
-    if (/^(other(s| materials?)?|أخرى|اخرى)$/.test(text)) return 'other_material';
+    if (/^(other(s| materials?)?|marble|glass|corian|plexi(glass)?|أخرى|اخرى)$/.test(text)) return 'other_material';
     if (/^(accessor(y|ies|ise)( materials?)?|اكسسوارات|إكسسوارات)$/.test(text)) return 'accessorise_table';
     return null;
   }
@@ -211,13 +230,13 @@
         return {section, range, headers, defaults};
       });
       const choices = sources.map(section => section.index < 0 ? section.label : `${section.index + 1}: ${section.label}`);
-      const slots = Object.keys(tables).map(table => ({table, source: sources.findIndex(section => section.table === table)}));
+      const slots = sources.map((section, source) => ({table: section.table, source}));
       const common = configs.find(config => config.section.table !== 'accessorise_table') || configs[0];
       const defaults = {...common.defaults};
       if (defaults.part_name === 'Skip') defaults.part_name = common.defaults.requested_name;
       let setup;
       const fields = [
-        {fieldtype: 'HTML', options: `<p>${__('Confirm the four section rows below. Select an Excel header, its system table, and a Part Material where needed. Column mapping is shared by all selected sections, including accessories.')}</p>`},
+        {fieldtype: 'HTML', options: `<p>${__('Confirm the detected section rows below. Select an Excel header, its system table, and a Part Material where needed. Column mapping is shared by all selected sections, including accessories.')}</p>`},
         {fieldtype: 'Select', fieldname: 'mode', label: __('Import Mode'), options: 'Add Rows\nReplace Table Rows', default: 'Add Rows'},
         {fieldtype: 'Section Break', label: __('Excel Sections and System Tables')},
         ...slots.map((slot, i) => ({fieldtype: 'Select', fieldname: `section_${i}_header`, label: __('Excel Header'),
@@ -278,10 +297,11 @@
             const review = new frappe.ui.Dialog({title: __('Review Import: All Tables'), size: 'extra-large', fields: [
               {fieldtype: 'HTML', options: `<p>${esc(values.mode)}. ${__('Rows with errors are disabled. Return to mapping to correct them. Possible assembly rows are included and highlighted.')}</p>`},
               {fieldtype: 'Button', fieldname: 'back', label: __('Back to Mapping'), click: () => {review.hide(); setup.show();}},
-              {fieldtype: 'HTML', fieldname: 'rows', options: `<style>.c4-possible-assembly > td { background-color: #fff3cd !important; color: #664d03 !important; }</style><div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Excel Section')}</th><th>${__('Table')}</th><th>${__('Source Row')}</th><th>${__('Name')}</th><th>${__('Material')}</th><th>${__('Qty')}</th><th>${__('Review')}</th></tr></thead><tbody>${entries.map((row, i) => `<tr${/drawer unit/i.test(row.values.part_name || '') ? ' class="c4-possible-assembly"' : ''}><td><input type="checkbox" data-row="${i}" ${row.errors.length ? 'disabled' : 'checked'}></td><td>${esc(row.section)}</td><td>${esc(tables[row.table])}</td><td>${row.source_row}</td><td>${esc(row.values.part_name || row.values.requested_name)}</td><td>${esc(row.values.material)}</td><td>${esc(row.values.qty)}</td><td>${row.errors.map(esc).join('<br>')}${/drawer unit/i.test(row.values.part_name || '') ? '<div class="font-weight-bold">' + esc(__('Possible assembly: counted alongside its components.')) + '</div>' : ''}</td></tr>`).join('')}</tbody></table></div>`},
+              {fieldtype: 'HTML', fieldname: 'rows', options: `<style>.c4-possible-assembly > td { background-color: #f8d7da !important; color: #842029 !important; }</style><div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Assembly')}</th><th>${__('Excel Section')}</th><th>${__('Table')}</th><th>${__('Source Row')}</th><th>${__('Name')}</th><th>${__('Material')}</th><th>${__('Qty')}</th><th>${__('Review')}</th></tr></thead><tbody>${entries.map((row, i) => `<tr${possibleAssembly(row) ? ' class="c4-possible-assembly"' : ''}><td><input type="checkbox" data-row="${i}" ${row.errors.length ? 'disabled' : 'checked'}></td><td>${assemblyInput(row, i)}</td><td>${esc(row.section)}</td><td>${esc(tables[row.table])}</td><td>${row.source_row}</td><td>${esc(row.values.part_name || row.values.requested_name)}</td><td>${esc(row.values.material)}</td><td>${esc(row.values.qty)}</td><td>${row.errors.map(esc).join('<br>')}${possibleAssembly(row) ? '<div class="font-weight-bold">' + esc(__('Assembly parent: keep components as the material rows.')) + '</div>' : ''}</td></tr>`).join('')}</tbody></table></div>`},
             ], primary_action_label: __('Import All Selected Rows'), primary_action: async () => {
               if (importing) return;
-              const selected = [...review.fields_dict.rows.$wrapper.find('input:checked')].map(input => entries[Number(input.dataset.row)]).filter(row => !row.errors.length);
+              readAssemblies(review, entries);
+            const selected = [...review.fields_dict.rows.$wrapper.find('input[data-row]:checked')].map(input => entries[Number(input.dataset.row)]).filter(row => !row.errors.length);
               if (!selected.length) return frappe.msgprint(__('Select at least one valid row.'));
               importing = true;
               review.get_primary_btn().prop('disabled', true);
@@ -292,6 +312,7 @@
               } finally {importing = false; review.get_primary_btn().prop('disabled', false);}
             }});
             review.show();
+            bindAssemblies(review);
           } finally {setup.get_primary_btn().prop('disabled', false);}
         },
       });
@@ -410,8 +431,8 @@
       if (!rows.length) return frappe.msgprint(__('No data rows found.'));
       let adding = false;
       const content = rows.map((r, i) => {
-        const assembly = /drawer unit/i.test(r.values.part_name || '');
-        return `<tr${assembly ? ' class="c4-possible-assembly"' : ''}><td><input type="checkbox" data-row="${i}" ${!r.errors.length ? 'checked' : ''} ${r.errors.length ? 'disabled' : ''}></td><td>${r.source_row}</td>${fields.map(f => `<td>${esc(r.values[f])}</td>`).join('')}<td>${r.errors.map(esc).join('<br>')}${assembly ? '<div class="font-weight-bold">' + esc(__('Possible assembly: counted alongside its components.')) + '</div>' : ''}</td></tr>`;
+        const assembly = possibleAssembly(r);
+        return `<tr${assembly ? ' class="c4-possible-assembly"' : ''}><td><input type="checkbox" data-row="${i}" ${!r.errors.length ? 'checked' : ''} ${r.errors.length ? 'disabled' : ''}></td><td>${assemblyInput(r, i)}</td><td>${r.source_row}</td>${fields.map(f => `<td>${esc(r.values[f])}</td>`).join('')}<td>${r.errors.map(esc).join('<br>')}${assembly ? '<div class="font-weight-bold">' + esc(__('Assembly parent: keep components as the material rows.')) + '</div>' : ''}</td></tr>`;
       }).join('');
       const p = new frappe.ui.Dialog({
         title: __('Review Import: {0}', [__(tables[table])]), size: 'extra-large',
@@ -433,19 +454,20 @@
             }},
           ] : []),
           {fieldtype: 'Button', fieldname: 'select_all', label: __('Select All Valid Rows'), click: () => {
-            for (const input of p.fields_dict.rows.$wrapper.find('input:not(:disabled)')) input.checked = true;
+            for (const input of p.fields_dict.rows.$wrapper.find('input[data-row]:not(:disabled)')) input.checked = true;
           }},
           {fieldtype: 'Button', fieldname: 'deselect_all', label: __('Deselect All'), click: () => {
-            for (const input of p.fields_dict.rows.$wrapper.find('input')) input.checked = false;
+            for (const input of p.fields_dict.rows.$wrapper.find('input[data-row]')) input.checked = false;
           }},
           {fieldtype: 'Button', fieldname: 'back_to_mapping', label: __('Back to Mapping'), click: () => {p.hide(); mappingDialog.show();}},
-          {fieldtype: 'HTML', fieldname: 'rows', options: `<p>${esc(mode)} — ${__('Click a row or its checkbox to include it. Rows with errors are disabled; use Back to Mapping to correct them.')}</p><style>.c4-possible-assembly > td { background-color: #fff3cd !important; color: #664d03 !important; }</style><div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Source Row')}</th>${fields.map(f => `<th>${__(labels[f])}</th>`).join('')}<th>${__('Review')}</th></tr></thead><tbody>${content}</tbody></table></div>`},
+          {fieldtype: 'HTML', fieldname: 'rows', options: `<p>${esc(mode)} — ${__('Click a row or its checkbox to include it. Rows with errors are disabled; use Back to Mapping to correct them.')}</p><style>.c4-possible-assembly > td { background-color: #f8d7da !important; color: #842029 !important; }</style><div style="max-height:500px;overflow:auto"><table class="table table-bordered"><thead><tr><th>${__('Include')}</th><th>${__('Assembly')}</th><th>${__('Source Row')}</th>${fields.map(f => `<th>${__(labels[f])}</th>`).join('')}<th>${__('Review')}</th></tr></thead><tbody>${content}</tbody></table></div>`},
         ],
         primary_action_label: __('Add Selected Rows'),
         primary_action: async () => {
           if (adding) return;
           if (frm.doc.docstatus !== 0 || frm.read_only) return frappe.msgprint(__('Import requires an editable draft.'));
-          const selected = [...p.fields_dict.rows.$wrapper.find('input:checked')].map(el => rows[Number(el.dataset.row)]).filter(r => !r.errors.length);
+          readAssemblies(p, rows);
+          const selected = [...p.fields_dict.rows.$wrapper.find('input[data-row]:checked')].map(el => rows[Number(el.dataset.row)]).filter(r => !r.errors.length);
           if (!selected.length) return frappe.msgprint(__('Select at least one valid row.'));
           adding = true;
           try {
@@ -456,6 +478,7 @@
         },
       });
       p.show();
+      bindAssemblies(p);
       for (const tr of p.fields_dict.rows.$wrapper.find('tbody tr')) {
         tr.style.cursor = 'pointer';
         tr.addEventListener('click', event => {

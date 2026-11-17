@@ -7,7 +7,7 @@
   const material_columns = [
     ["part_name", 1], ["part_name_ar", 1], ["lenght", 1], ["width", 1], ["hight", 1],
     ["thickness", 1], ["qty", 1], ["material", 1], ["note", 2],
-    ["edite_color", 1], ["basic_color", 1],
+    ["is_assembly", 1], ["edite_color", 1], ["basic_color", 1],
   ];
   function contain_table(grid) {
     if (!grid.wrapper) return;
@@ -99,7 +99,20 @@
         preferences[grid.df.fieldname] = columns;
         const response = await frappe.model.user_settings.save(frm.doctype, settings_key(frm), preferences);
         frappe.model.user_settings[frm.doctype] = response.message || response;
-        grid.reset_grid();
+        const paintAssembly = (row) => {
+      const wrapper = row.wrapper || row.$wrapper;
+      if (wrapper) wrapper.toggleClass("c4-assembly-row", Boolean(Number(row.doc.is_assembly)));
+    };
+    const render = grid.refresh;
+    grid.refresh = function (...args) {
+      const result = render.apply(this, args);
+      (this.grid_rows || []).forEach(paintAssembly);
+      return result;
+    };
+    $(frm.wrapper).on("grid-row-render", (event, row) => {
+      if (row.grid === grid) paintAssembly(row);
+    });
+    grid.reset_grid();
       }
       // Keep the dialog open until the preference has actually been saved.
       const configure = header.configure_dialog_for_columns_selector;
@@ -117,6 +130,19 @@
       };
       return result;
     };
+    const paintAssembly = (row) => {
+      const wrapper = row.wrapper || row.$wrapper;
+      if (wrapper) wrapper.toggleClass("c4-assembly-row", Boolean(Number(row.doc.is_assembly)));
+    };
+    const render = grid.refresh;
+    grid.refresh = function (...args) {
+      const result = render.apply(this, args);
+      (this.grid_rows || []).forEach(paintAssembly);
+      return result;
+    };
+    $(frm.wrapper).on("grid-row-render", (event, row) => {
+      if (row.grid === grid) paintAssembly(row);
+    });
     grid.reset_grid();
   }
 
@@ -142,6 +168,7 @@
           .c4-table-columns .grid-static-col[data-fieldname="image_view"] {
             height: auto; min-height: calc(1cm + 4px);
           }
+          .c4-assembly-row > .data-row, .c4-assembly-row .grid-static-col { background-color: #f8d7da !important; color: #842029; }
           .c4-table-columns .form-grid { left: 0 !important; }
           /* The expanded editor must not inherit the scrolling table's width. */
           .c4-table-columns .grid-row-open > .form-in-grid {
@@ -194,5 +221,11 @@
       });
     },
   };
+  ["Part List Materials", "Accessorise Table"].forEach(doctype => frappe.ui.form.on(doctype, {
+    is_assembly(frm, cdt, cdn) {
+      const row = locals[cdt][cdn];
+      frm.refresh_field(row.parentfield);
+    },
+  }));
   ["Part List"].forEach((doctype) => frappe.ui.form.on(doctype, events));
 })();
