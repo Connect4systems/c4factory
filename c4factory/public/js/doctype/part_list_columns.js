@@ -55,6 +55,14 @@
           const current = grid.docfields.find((field) => field.fieldname === df.fieldname);
           return current && { ...current, columns: df.columns };
         }).filter((df) => allowed(frm, df));
+      // Old saved column selections predate Assembly. Keep this control visible
+      // on Part List tables while preserving the user's other columns.
+      if (["Part List Materials", "Accessorise Table"].includes(grid.doctype)) {
+        const assembly = grid.docfields.find(df => df.fieldname === "is_assembly");
+        if (allowed(frm, assembly) && !fields.some(df => df.fieldname === "is_assembly")) {
+          fields.unshift({ ...assembly, columns: 1, in_list_view: 1 });
+        }
+      }
       grid.user_defined_columns = fields;
       grid.visible_columns = fields.map((df) => {
         if (!df.columns) grid.update_default_colsize(df);
@@ -155,7 +163,7 @@
           .c4-table-columns .grid-static-col[data-fieldname="image_view"] {
             height: auto; min-height: calc(1cm + 4px);
           }
-          .c4-assembly-row > .data-row, .c4-assembly-row .grid-static-col { background-color: #f8d7da !important; color: #842029; }
+          .c4-assembly-row > .data-row, .c4-assembly-row .grid-static-col { background-color: #e99a9a !important; color: #58151c; }
           .c4-table-columns .form-grid { left: 0 !important; }
           /* The expanded editor must not inherit the scrolling table's width. */
           .c4-table-columns .grid-row-open > .form-in-grid {

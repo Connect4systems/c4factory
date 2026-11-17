@@ -159,7 +159,7 @@ def main():
         assert page.locator('.dialog').last.locator('input:checked').count() == 3, 'Valid assemblies are included by default'
         assembly = page.locator('.dialog').last.locator('tr.c4-possible-assembly')
         assert assembly.count() == 1
-        assert assembly.locator('td').first.evaluate('(cell) => getComputedStyle(cell).backgroundColor') == 'rgb(248, 215, 218)'
+        assert assembly.locator('td').first.evaluate('(cell) => getComputedStyle(cell).backgroundColor') == 'rgb(233, 154, 154)'
         assert 'Assembly parent' in assembly.inner_text()
         assembly.locator('input[data-assembly]').uncheck()
         assert page.locator('.dialog').last.locator('input[data-row="1"]').is_checked(), 'Assembly does not change Include'

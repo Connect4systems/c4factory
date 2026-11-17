@@ -125,7 +125,7 @@ with sync_playwright() as p:
       assert(row.closed, 'collapse closes editor');
     }""")
     page.evaluate("""() => {
-      frappe.get_user_settings = () => null;
+      frappe.get_user_settings = () => ({rows:[{fieldname:'qty',columns:1}]});
       frappe.model.no_value_type = [];
       window.$ = () => ({on() {}});
     }""")
@@ -136,13 +136,14 @@ with sync_playwright() as p:
         const element = document.createElement('div');
         const row = {doc:{is_assembly:1}, wrapper:{toggleClass(name, value) {element.classList.toggle(name, value);}}};
         const grid = {doctype, df:{fieldname:'rows'}, docfields:[
-          {fieldname:'is_assembly',fieldtype:'Check',in_list_view:1,columns:1}], grid_rows:[row],
+          {fieldname:'is_assembly',fieldtype:'Check',in_list_view:1,columns:1},
+          {fieldname:'qty',fieldtype:'Float',in_list_view:1,columns:1}], grid_rows:[row],
           refresh() {}, make_head() {}, reset_grid() {this.setup_visible_columns();this.refresh();}};
         const frm = {wrapper:{}, fields_dict:{rows:{grid}}, get_perm:()=>true,
           refresh_field() {grid.refresh();}};
         materialHandlers['Part List'].refresh(frm);
         assert(element.classList.contains('c4-assembly-row'), 'Saved assembly paints on first grid render');
-        assert(grid.visible_columns.some(([df])=>df.fieldname==='is_assembly'), 'Assembly checkbox visible');
+        assert(grid.visible_columns.some(([df])=>df.fieldname==='is_assembly'), 'Assembly checkbox visible even with older saved columns');
         row.doc.is_assembly = 0;
         locals[doctype] = {test:{parentfield:'rows'}};
         materialHandlers[doctype].is_assembly(frm, doctype, 'test');
