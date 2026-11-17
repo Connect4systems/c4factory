@@ -28,6 +28,7 @@ class TestPDSDuplicates(unittest.TestCase):
 		self.frappe = ModuleType("frappe")
 		self.frappe._ = lambda message: message
 		self.frappe.whitelist = lambda: lambda fn: fn
+		self.frappe.validate_and_sanitize_search_inputs = lambda fn: fn
 		self.frappe.throw = Mock(side_effect=ValueError)
 		self.frappe.db = Mock()
 		self.frappe.db.sql.return_value = []
@@ -37,6 +38,12 @@ class TestPDSDuplicates(unittest.TestCase):
 		utils.now_datetime = lambda: "NOW"
 		with patch.dict(sys.modules, {"frappe": self.frappe, "frappe.utils": utils}):
 			self.api = load_module("c4factory/api/pds_request.py", "pds_duplicates_test")
+			self.boq_api = load_module("c4factory/api/boq_items.py", "boq_items_test")
+		self.frappe.get_meta = Mock(return_value=Doc(fields=[
+			Doc(fieldname="custom_item_type", fieldtype="Link", options="Item Type")]))
+		modules = patch.dict(sys.modules, {"c4factory.api.boq_items": self.boq_api})
+		modules.start()
+		self.addCleanup(modules.stop)
 
 	def request(self, items, previous=None):
 		return Doc(name="NEW", items=items, get_doc_before_save=lambda: previous)
@@ -80,10 +87,33 @@ class TestPDSDuplicates(unittest.TestCase):
 		self.frappe.get_doc = Mock(return_value=Doc(name="SO", customer="Customer", items=rows, check_permission=Mock()))
 		self.frappe.new_doc = Mock(return_value=Doc(check_permission=Mock()))
 		self.frappe.db.get_value.return_value = {"item_name": "Product", "image": "image.png"}
+		self.frappe.get_all.side_effect = [["BOQ"], ["A", "B", "C", "D"]]
 		with patch.object(self.api, "get_pds_item_blockers", return_value={"A": "Part List", "B": "Request"}):
 			result = self.api.make_pds_request("SO")
 		self.assertEqual([row.item for row in result.items], ["C"])
 		self.assertEqual(result.items[0].sales_order_item, "3")
+
+	def test_mapping_excludes_items_without_boq_required_type(self):
+		self.frappe.get_doc = Mock(return_value=Doc(name="SO", customer="Customer", items=[
+			Doc(name=item, idx=i, item_code=item, qty=1)
+			for i, item in enumerate(["BOQ-ITEM", "NON-BOQ", "NO-TYPE"], 1)
+		], check_permission=Mock()))
+		self.frappe.new_doc = Mock(return_value=Doc(check_permission=Mock()))
+		self.frappe.db.get_value.return_value = {}
+		self.frappe.get_all.side_effect = [["BOQ-TYPE"], ["BOQ-ITEM"]]
+		with patch.object(self.api, "get_pds_item_blockers", return_value={}):
+			result = self.api.make_pds_request("SO")
+		self.assertEqual([row.item for row in result.items], ["BOQ-ITEM"])
+		self.assertEqual(self.frappe.get_all.call_args.kwargs["filters"]["custom_item_type"], ["in", ["BOQ-TYPE"]])
+
+	def test_product_picker_requires_enabled_sales_and_boq_type(self):
+		self.frappe.get_all.return_value = ["BOQ-TYPE"]
+		self.frappe.get_list = Mock(return_value=[["A", "Product A"]])
+		self.assertEqual(self.boq_api.get_part_list_products("Item", "A", "name", 20, 10), [["A", "Product A"]])
+		args = self.frappe.get_list.call_args.kwargs
+		self.assertEqual(args["filters"], {
+			"custom_item_type": ["in", ["BOQ-TYPE"]], "disabled": 0, "is_sales_item": 1})
+		self.assertEqual((args["start"], args["page_length"]), (20, 10))
 
 	def test_mapping_all_blocked_shows_message(self):
 		self.frappe.get_doc = Mock(return_value=Doc(name="SO", customer="Customer", items=[

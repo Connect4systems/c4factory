@@ -42,7 +42,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Product",
-   "link_filters": "[[\"Item\",\"is_sales_item\",\"=\",1]]",
+   "link_filters": "[[\"Item\",\"is_sales_item\",\"=\",1],[\"Item\",\"disabled\",\"=\",0]]",
    "options": "Item",
    "reqd": 1
   },

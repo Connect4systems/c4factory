@@ -51,6 +51,11 @@ function configurePartListMaterialColumns(frm) {
 }
 
 frappe.ui.form.on("Part List", {
+  setup(frm) {
+    frm.set_query("product", () => ({
+      query: "c4factory.api.boq_items.get_part_list_products",
+    }));
+  },
   refresh(frm) {
     configurePartListMaterialColumns(frm);
     frm.refresh_field("image");
