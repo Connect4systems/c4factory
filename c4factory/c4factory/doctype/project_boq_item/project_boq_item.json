@@ -1,0 +1,141 @@
+{
+ "doctype": "DocType",
+ "name": "Project BOQ Item",
+ "module": "C4Factory",
+ "istable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "description",
+  "actual_qty",
+  "uom",
+  "delivered_qty",
+  "installed_qty",
+  "pds_status",
+  "pds_request",
+  "part_list",
+  "delivery_status",
+  "installation_status",
+  "create_delivery",
+  "create_installation_note",
+  "sales_order_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "label": "Item Code",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Item",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "item_name",
+   "label": "Item Name",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "description",
+   "label": "Description",
+   "fieldtype": "Text Editor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_qty",
+   "label": "Actual Qty",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "uom",
+   "label": "UOM",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "UOM"
+  },
+  {
+   "fieldname": "delivered_qty",
+   "label": "Delivered Qty",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "installed_qty",
+   "label": "Installed Qty",
+   "fieldtype": "Float",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pds_status",
+   "label": "PDS Status",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "pds_request",
+   "label": "PDS Request",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "PDS Request"
+  },
+  {
+   "fieldname": "part_list",
+   "label": "PDS / Part List",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Part List"
+  },
+  {
+   "fieldname": "delivery_status",
+   "label": "Delivery Status",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "installation_status",
+   "label": "Installation Status",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "create_delivery",
+   "label": "Create Delivery",
+   "fieldtype": "Button",
+   "read_only": 0
+  },
+  {
+   "fieldname": "create_installation_note",
+   "label": "Create Installation Note",
+   "fieldtype": "Button",
+   "read_only": 0
+  },
+  {
+   "fieldname": "sales_order_item",
+   "label": "Sales Order Item",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "permissions": [],
+ "links": [],
+ "actions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

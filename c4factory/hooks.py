@@ -9,6 +9,7 @@ app_license = "mit"
 
 # Reapply after customization sync, including sites that ran the original patch.
 after_migrate = [
+    "c4factory.patches.v1_0.setup_project_boq.execute",
     "c4factory.patches.v1_0.remove_item_colors.execute",
     "c4factory.patches.v1_0.setup_part_list_import.execute",
     "c4factory.patches.v1_0.remove_sales_order_header_colors.execute",
@@ -41,6 +42,7 @@ doctype_js = {
     "Job Card": "public/js/doctype/job_card.js",
 
     "Sample Request": "public/js/doctype/sample_request/sample_request.js",
+    "Project": "public/js/doctype/project.js",
 }
 
 # ---------------------------------------------------------
@@ -48,6 +50,31 @@ doctype_js = {
 # ---------------------------------------------------------
 
 doc_events = {
+    "Project": {
+        "onload": "c4factory.api.project_boq.onload",
+        "validate": "c4factory.api.project_boq.validate_project",
+    },
+    "Delivery Note": {
+        "before_submit": "c4factory.api.project_boq.guard_delivery_change",
+        "before_cancel": "c4factory.api.project_boq.guard_delivery_change",
+        "on_submit": "c4factory.api.project_boq.sync_progress",
+        "on_cancel": "c4factory.api.project_boq.sync_progress",
+    },
+    "Installation Note": {
+        "validate": "c4factory.api.project_boq.validate_installation",
+        "before_submit": "c4factory.api.project_boq.validate_installation",
+        "on_submit": "c4factory.api.project_boq.sync_progress",
+        "on_cancel": "c4factory.api.project_boq.sync_progress",
+    },
+    "PDS Request": {
+        "on_update": "c4factory.api.project_boq.sync_progress",
+        "on_cancel": "c4factory.api.project_boq.sync_progress",
+    },
+    "Part List": {
+        "on_submit": "c4factory.api.project_boq.sync_progress",
+        "on_update_after_submit": "c4factory.api.project_boq.sync_progress",
+        "on_cancel": "c4factory.api.project_boq.sync_progress",
+    },
 	"Color sample": {
 		"before_cancel": "c4factory.api.production_order.prevent_sample_cancel",
 	},
@@ -55,6 +82,8 @@ doc_events = {
         "before_validate": "c4factory.api.part_list_material_colors.validate_material_colors",
     },
     "Sales Order": {
+        "on_update_after_submit": "c4factory.api.project_boq.sync_progress",
+        "on_cancel": "c4factory.api.project_boq.sync_progress",
         "before_update_after_submit": "c4factory.api.sales_order_part_list.before_update_after_submit",
         "before_validate": [
             "c4factory.api.part_list_versions.set_sales_order_active_parts",
@@ -71,7 +100,7 @@ doc_events = {
     "Item": {
         "validate": "c4factory.api.item_uom.validate_item_uoms",
     },
-    # Work Order – source warehouse autofill from Item Group
+    # Work Order â€“ source warehouse autofill from Item Group
     "Work Order": {
         "validate": [
             "c4factory.c4_manufacturing.work_order_hooks.set_source_warehouse_from_item_group",
@@ -89,7 +118,7 @@ doc_events = {
         "on_trash": "c4factory.api.work_order_flow.on_pick_list_trash",
     },
 
-    # Stock Entry – costing + WO update
+    # Stock Entry â€“ costing + WO update
     "Stock Entry": {
         "validate": [
             "c4factory.c4_manufacturing.stock_entry_hooks.validate_additional_material_transfer",
@@ -114,7 +143,7 @@ doc_events = {
         "on_trash": "c4factory.api.work_order_flow.on_stock_entry_trash",
     },
 
-    # Job Card – keep partial completion from becoming process loss
+    # Job Card â€“ keep partial completion from becoming process loss
     "Job Card": {
         "before_validate": "c4factory.c4_manufacturing.job_card_hooks.set_operation_row_reference",
         "validate": "c4factory.c4_manufacturing.job_card_hooks.set_operation_row_reference",

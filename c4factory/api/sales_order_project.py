@@ -3,55 +3,46 @@ from frappe import _
 
 
 def set_project_number(project, project_no):
-	# Project customizations can come from the site or another installed app.
 	for field in frappe.get_meta("Project").fields:
 		if field.fieldname in {"custom_project_no", "project_no"} or field.label == "Project No":
 			project.set(field.fieldname, project_no)
 
 
 def on_submit(doc, method=None):
-	# Workflow requests must not create projects while the order is still a draft.
 	if doc.docstatus != 1:
 		return
-	project_name = (doc.get("custom_project_no") or "").strip()
-	if not project_name:
+	project_no = (doc.get("custom_project_no") or "").strip()
+	if not project_no:
 		frappe.throw(_("Project No is required before submitting the Sales Order."))
-	doc.custom_project_no = project_name
-
-	def matches(project):
-		return (
-			project.project_name == project_name
-			and project.get("customer") == doc.customer
-			and project.get("company") == doc.company
-			and (not project.get("sales_order") or project.get("sales_order") in
-				{doc.name, doc.get("amended_from")})
-		)
-
-	project = frappe.get_doc("Project", doc.project) if doc.get("project") else None
-	if project is None or not matches(project):
-		# An old/manual link must not prevent creating the order's own Project.
-		existing = frappe.db.exists("Project", {"project_name": project_name})
-		project = frappe.get_doc("Project", existing) if existing else None
-		if project is not None and not matches(project):
-			frappe.throw(_("A Project named {0} belongs to another customer, company or Sales Order. Enter a unique Project No.").format(project_name))
-
-	if project is not None:
-		project.sales_order = doc.name
-		set_project_number(project, project_name)
+	frappe.db.sql("select name from `tabSales Order` where name=%s for update", doc.name)
+	project = None
+	legacy = frappe.db.exists("Project", {"custom_project_no": project_no})
+	for candidate in dict.fromkeys(filter(None, [doc.get("project"), project_no, legacy])):
+		if not frappe.db.exists("Project", candidate):
+			continue
+		current = frappe.get_doc("Project", candidate)
+		if (current.customer == doc.customer and current.company == doc.company
+			and current.get("sales_order") in {None, "", doc.name, doc.get("amended_from")}
+			and (current.name == project_no or current.get("custom_project_no") == project_no
+				or current.project_name == project_no)):
+			project = current
+			break
+		if candidate in {project_no, legacy}:
+			frappe.throw(_("Project No {0} already belongs to another Project.").format(project_no))
+	if project is None:
+		project = frappe.new_doc("Project")
+		project.status = "Open"
+	project.project_name = f"{project_no} \u2013 {doc.get('customer_name') or doc.customer}"
+	project.customer = doc.customer
+	project.company = doc.company
+	project.sales_order = doc.name
+	project.custom_technical_team = doc.get("custom_technical_team")
+	project.expected_start_date = doc.get("transaction_date")
+	project.expected_end_date = doc.get("delivery_date")
+	set_project_number(project, project_no)
+	# Creation belongs to the authorized Sales Order submission transaction.
+	if project.is_new():
+		project.insert(ignore_permissions=True, set_name=project_no)
+	else:
 		project.save(ignore_permissions=True)
-		doc.db_set({"project": project.name, "custom_project_no": project_name}, update_modified=False)
-		return
-
-	project = frappe.get_doc({
-		"doctype": "Project",
-		"project_name": project_name,
-		"sales_order": doc.name,
-		"customer": doc.customer,
-		"company": doc.company,
-		"status": "Open",
-	})
-	set_project_number(project, project_name)
-	# Project creation is part of the authorized Sales Order submission transaction.
-	project.insert(ignore_permissions=True)
-	# on_submit runs after the Sales Order has been written; persist the link too.
-	doc.db_set({"project": project.name, "custom_project_no": project_name}, update_modified=False)
+	doc.db_set({"project": project.name, "custom_project_no": project_no}, update_modified=False)
