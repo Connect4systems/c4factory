@@ -18,6 +18,8 @@ def material_color_target(doc, field, row):
 def validate_palette_color(palette, color):
 	if color and (not palette or not frappe.db.exists("Material Color", {"name": color, "palette": palette})):
 		frappe.throw(_("Color {0} must belong to Color Palette {1}.").format(color, palette or ""))
+	if color and frappe.db.get_value("Material Color", color, "disable"):
+		frappe.throw(_("Material Color {0} is disabled. Select an enabled color.").format(color))
 
 
 def validate_material_colors(doc, method=None):
@@ -47,6 +49,6 @@ def material_color_query(doctype, txt, searchfield, start, page_len, filters):
 		palette = frappe.db.get_value("Part Material", filters["material"], "color_palette")
 	if not palette:
 		return []
-	return frappe.get_list("Material Color", filters={"palette": palette},
+	return frappe.get_list("Material Color", filters={"palette": palette, "disable": 0},
 		or_filters={"name": ["like", "%" + txt + "%"]},
 		fields=["name"], order_by="name", start=start, page_length=page_len, as_list=True)

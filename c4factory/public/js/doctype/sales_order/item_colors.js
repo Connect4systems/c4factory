@@ -117,7 +117,7 @@ function renderSalesOrderColors(frm, cdt, cdn) {
         df: {
           fieldname: 'color', fieldtype: 'Link', options: row.color_doctype,
           label: __('Color'), read_only: !editable || !row.color_palette,
-          get_query: () => ({filters: {palette: row.color_palette || ''}}),
+          get_query: () => ({filters: {palette: row.color_palette || '', disable: 0}}),
           onchange: async () => {
             if (!editable || (item.custom_part_list || item.part_list) !== partList) return;
             const current = salesOrderStoredColors(item);

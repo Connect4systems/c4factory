@@ -30,6 +30,7 @@ class TestSalesOrderColorCleanup(TestPartListSave):
 		]})
 		self.frappe.get_meta = Mock(return_value=SimpleNamespace(istable=False, issingle=False))
 		self.frappe.db.exists.return_value = True
+		self.frappe.db.get_value.return_value = 0
 		config = {"rows": [{"source_row": "M", "color_doctype": "Material Color", "color_palette": "Wood", "color": "Oak"}]}
 		with patch.object(api, "get_part_list_colors", return_value=config):
 			api.validate_colors(SimpleNamespace(items=[item]))

@@ -13,6 +13,7 @@ class TestMaterialPalettes(unittest.TestCase):
         self.frappe.validate_and_sanitize_search_inputs = lambda fn: fn
         self.frappe._ = lambda message: message
         self.frappe.db = Mock()
+        self.frappe.db.get_value.return_value = 0
         self.frappe.throw = Mock(side_effect=ValueError)
         self.modules = patch.dict(sys.modules, {'frappe': self.frappe})
         self.modules.start()
@@ -28,6 +29,13 @@ class TestMaterialPalettes(unittest.TestCase):
         self.frappe.db.exists.return_value = False
         with self.assertRaises(ValueError):
             self.api.validate_palette_color('Metal', 'Oak')
+
+    def test_rejects_disabled_color_in_selected_palette(self):
+        self.frappe.db.exists.return_value = True
+        self.frappe.db.get_value.return_value = 1
+        with self.assertRaises(ValueError):
+            self.api.validate_palette_color('Wood', 'Oak')
+        self.frappe.db.get_value.assert_called_once_with('Material Color', 'Oak', 'disable')
 
     def test_rejects_color_without_palette(self):
         with self.assertRaises(ValueError):
@@ -45,7 +53,7 @@ class TestMaterialPalettes(unittest.TestCase):
         self.assertEqual(result, [['White', 'White']])
         self.frappe.db.get_value.assert_called_once_with('Part Material', 'HPL', 'color_palette')
         self.assertEqual(self.frappe.get_list.call_args.args, ('Material Color',))
-        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL'})
+        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL', 'disable': 0})
         self.assertEqual(self.frappe.get_list.call_args.kwargs['fields'], ['name'])
         self.assertEqual(set(self.frappe.get_list.call_args.kwargs['or_filters']), {'name'})
 
@@ -59,7 +67,7 @@ class TestMaterialPalettes(unittest.TestCase):
         self.api.material_color_query('Material Color', 'White', 'name', 0, 20,
                                       {'palette': 'HPL', 'material': 'Panel'})
         self.frappe.db.get_value.assert_not_called()
-        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL'})
+        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL', 'disable': 0})
         self.assertEqual(self.frappe.get_list.call_args.kwargs['fields'], ['name'])
         self.assertEqual(set(self.frappe.get_list.call_args.kwargs['or_filters']), {'name'})
 

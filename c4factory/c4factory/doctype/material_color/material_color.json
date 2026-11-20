@@ -8,6 +8,7 @@
  "field_order": [
   "palette",
   "color",
+  "disable",
   "item_code",
   "supplier",
   "color_note",
@@ -29,6 +30,12 @@
    "fieldtype": "Data",
    "label": "Color",
    "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "disable",
+   "fieldtype": "Check",
+   "label": "Disable"
   },
   {
    "fieldname": "item_code",
