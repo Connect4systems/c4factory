@@ -331,8 +331,11 @@ def main():
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Map Excel Section'")
         page.locator('.dialog').last.locator('[data-field=section_palette]').fill('Wood')
+        page.locator('.dialog').last.locator('[data-field=section_base_color]').fill('Oak')
         page.locator('.dialog').last.locator('[data-primary]').click()
         assert page.locator('.dialog').last.locator('[data-field=color_palette]').input_value() == 'Wood'
+        page.wait_for_function("dialogs[dialogs.length-1].get_value('base_color') === 'Oak'")
+        page.locator('.dialog').last.locator('[data-field=base_color]').fill('')
         page.locator('.dialog').last.locator('[data-field=color_palette]').fill('Wood')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")

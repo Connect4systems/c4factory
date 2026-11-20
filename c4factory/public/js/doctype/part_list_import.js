@@ -418,10 +418,10 @@
           {fieldtype: 'Int', fieldname: 'start', label: __('First Data Row'), default: start, reqd: 1},
           {fieldtype: 'Int', fieldname: 'end', label: __('Last Data Row'), default: end, reqd: 1},
           {fieldtype: 'Section Break'},
-          {fieldtype: 'Link', fieldname: 'color_palette', label: __('Color Palette'), options: 'Color Palette', hidden: accessories, default: sectionPalette,
+          {fieldtype: 'Link', fieldname: 'color_palette', label: __('Color Palette'), options: 'Color Palette', hidden: accessories,
             onchange: () => mappingDialog?.set_value('base_color', null)},
           {fieldtype: 'Column Break'},
-          {fieldtype: 'Link', fieldname: 'base_color', label: __('Base Color'), options: 'Material Color', hidden: accessories, default: sectionBaseColor,
+          {fieldtype: 'Link', fieldname: 'base_color', label: __('Base Color'), options: 'Material Color', hidden: accessories,
             get_query: () => ({query: 'c4factory.api.part_list_material_colors.material_color_query',
               filters: {palette: mappingDialog?.get_value('color_palette') || ''}})},
           {fieldtype: 'Section Break', label: __('Column Mapping')},
@@ -465,6 +465,10 @@
         },
       });
       mappingDialog.show();
+      // Frappe runs palette onchange while initializing Link defaults. Set these
+      // in sequence so that handler cannot clear the selected section color.
+      Promise.resolve(mappingDialog.set_value('color_palette', sectionPalette || null))
+        .then(() => mappingDialog.set_value('base_color', sectionBaseColor || null));
     }
 
     function preview(rows, mode, fields, accessories, table, refreshPalette, color_palette = '') {
