@@ -1,5 +1,7 @@
-/* global frappe, __, flt */
+/* global frappe, __, flt, locals */
 (() => {
+	if (frappe._c4factory_project_boq_registered) return;
+	frappe._c4factory_project_boq_registered = true;
 	const api = "c4factory.api.project_boq.";
 
 	function quantity_dialog(frm, rows, installation_row = null) {
@@ -59,30 +61,45 @@
 		})));
 	}
 
+	async function load_boq(frm) {
+		if (frm.is_new() || !frm.fields_dict.custom_project_boq) return;
+		const request = (frm._boq_request || 0) + 1;
+		frm._boq_request = request;
+		const project = frm.doc.name;
+		const grid = frm.fields_dict.custom_project_boq.grid;
+		grid.cannot_add_rows = true;
+		grid.cannot_delete_rows = true;
+		grid.df.cannot_add_rows = true;
+		grid.df.cannot_delete_rows = true;
+		const response = await frappe.call({method: api + "get_project_boq", args: {project}});
+		if (frm.doc.name !== project || frm._boq_request !== request) return;
+		const result = response.message || {};
+		// Display authoritative rows without marking the Project as edited.
+		frm.doc.custom_project_boq = (result.rows || []).map((row, idx) => ({
+			...row, doctype: "Project BOQ Item", name: `boq-${idx}-${project}`,
+			parent: project, parenttype: "Project", parentfield: "custom_project_boq", idx: idx + 1,
+		}));
+		locals["Project BOQ Item"] = locals["Project BOQ Item"] || {};
+		frm.doc.custom_project_boq.forEach(row => { locals["Project BOQ Item"][row.name] = row; });
+		if (result.sales_order && !frm.doc.sales_order) {
+			frm.doc.sales_order = result.sales_order;
+			frm.refresh_field("sales_order");
+		}
+		frm.set_df_property("custom_project_boq", "description", result.sales_order
+			? __("Quantities and statuses follow Sales Order {0}.", [result.sales_order])
+			: __("Select the Project's Sales Order and save to load its BOQ items."));
+		frm.refresh_field("custom_project_boq");
+		frm.remove_custom_button(__("Create Delivery Note"));
+		if (result.active) {
+			frm.add_custom_button(__("Create Delivery Note"), () => deliver(frm, grid.get_selected_children()));
+		}
+	}
+
 	frappe.ui.form.on("Project", {
 		refresh(frm) {
-			if (frm.is_new() || !frm.doc.sales_order) return;
-			const grid = frm.fields_dict.custom_project_boq.grid;
-			grid.cannot_add_rows = true;
-			grid.cannot_delete_rows = true;
-			const live = frm.doc.__onload && frm.doc.__onload.project_boq;
-			if (live) {
-				// Display current transactions without marking the Project as edited.
-				frm.doc.custom_project_boq = live.map((row, idx) => ({
-					...row, doctype: "Project BOQ Item", name: `boq-${idx}-${frm.doc.name}`,
-					parent: frm.doc.name, parenttype: "Project", parentfield: "custom_project_boq", idx: idx + 1,
-				}));
-				locals["Project BOQ Item"] = locals["Project BOQ Item"] || {};
-				frm.doc.custom_project_boq.forEach(row => { locals["Project BOQ Item"][row.name] = row; });
-				frm.refresh_field("custom_project_boq");
-			}
-			if (frm.doc.__onload && frm.doc.__onload.project_boq_active) {
-				frm.add_custom_button(__("Create Delivery Note"), () => {
-					const selected = frm.fields_dict.custom_project_boq.grid.get_selected_children();
-					deliver(frm, selected);
-				});
-			}
-			frm.add_custom_button(__("Refresh BOQ"), () => frm.reload_doc());
+			if (frm.is_new() || !frm.fields_dict.custom_project_boq) return;
+			frm.add_custom_button(__("Refresh BOQ"), () => load_boq(frm));
+			return load_boq(frm);
 		},
 	});
 

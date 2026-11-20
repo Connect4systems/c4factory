@@ -2,7 +2,7 @@
 
 import sys
 import unittest
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 from test_part_list_save import load_module
@@ -13,9 +13,18 @@ class TestProjectBOQMigration(unittest.TestCase):
 		frappe = ModuleType("frappe")
 		frappe.db = Mock()
 		frappe.db.get_value.return_value = existing_type
+		frappe.get_meta = Mock(return_value=SimpleNamespace(fields=[SimpleNamespace(fieldname=name) for name in (
+			"custom_project_boq", "project_name", "custom_project_boq_tab", "expected_start_date",
+			"custom_site_field", "sales_order",
+		)]))
+		frappe.clear_cache = Mock()
 		custom_field = ModuleType("frappe.custom.doctype.custom_field.custom_field")
 		custom_field.create_custom_fields = Mock()
-		with patch.dict(sys.modules, {"frappe": frappe, custom_field.__name__: custom_field}):
+		property_setter = ModuleType("frappe.custom.doctype.property_setter.property_setter")
+		property_setter.make_property_setter = Mock()
+		frappe.make_property_setter = property_setter.make_property_setter
+		with patch.dict(sys.modules, {"frappe": frappe, custom_field.__name__: custom_field,
+			property_setter.__name__: property_setter}):
 			module = load_module("c4factory/patches/v1_0/setup_project_boq.py", "project_boq_migration_test")
 			module.execute()
 		return frappe, custom_field.create_custom_fields
@@ -44,3 +53,15 @@ class TestProjectBOQMigration(unittest.TestCase):
 		_, create_fields = self.run_migration("Link")
 		create_fields.assert_called_once()
 		self.assertNotIn("ignore_validate", create_fields.call_args.kwargs)
+
+	def test_tab_has_anchor_section_and_preserves_site_fields(self):
+		import json
+
+		frappe, create_fields = self.run_migration("Data")
+		fields = {f["fieldname"]: f for f in create_fields.call_args.args[0]["Project"]}
+		self.assertEqual(fields["custom_project_boq_tab"]["insert_after"], "sales_order")
+		self.assertEqual(fields["custom_project_boq_section"]["fieldtype"], "Section Break")
+		self.assertEqual(fields["custom_project_boq"]["insert_after"], "custom_project_boq_section")
+		order = json.loads(frappe.make_property_setter.call_args.args[3])
+		self.assertEqual(order, ["project_name", "expected_start_date", "custom_site_field", "sales_order",
+			"custom_project_boq_tab", "custom_project_boq_section", "custom_project_boq"])

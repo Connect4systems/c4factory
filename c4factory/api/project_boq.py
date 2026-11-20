@@ -36,6 +36,40 @@ def installed_quantities(names, exclude=None):
 	""", {"names": names, "exclude": exclude or ""}))
 
 
+def resolve_sales_order(project):
+	"""Older Projects may only be linked from the Sales Order side."""
+	if project.get("sales_order"):
+		return project.sales_order
+	if not project.get("name"):
+		return None
+	filters = {"project": project.name, "docstatus": 1}
+	orders = frappe.get_all("Sales Order", filters=filters, pluck="name")
+	if not orders and project.get("custom_project_no") and project.get("customer") and project.get("company"):
+		orders = frappe.get_all("Sales Order", filters={
+			"custom_project_no": str(project.custom_project_no), "customer": project.customer,
+			"company": project.company, "docstatus": 1,
+		}, pluck="name")
+	if len(orders) == 1:
+		project.sales_order = orders[0]
+		return orders[0]
+	if len(orders) > 1:
+		frappe.throw(_("Multiple Sales Orders match this Project. Select its Sales Order before loading the BOQ."))
+	return None
+
+
+@frappe.whitelist()
+def get_project_boq(project):
+	doc = frappe.get_doc("Project", project)
+	doc.check_permission("read")
+	sales_order = resolve_sales_order(doc)
+	if not sales_order:
+		return {"rows": [], "sales_order": None, "active": False}
+	order = frappe.get_doc("Sales Order", sales_order)
+	order.check_permission("read")
+	return {"rows": build_rows(doc), "sales_order": sales_order,
+		"active": order.docstatus == 1 and order.status not in {"Closed", "On Hold", "Cancelled"}}
+
+
 def build_rows(project):
 	if not project.get("sales_order"):
 		return []
@@ -85,14 +119,14 @@ def build_rows(project):
 
 
 def onload(doc, method=None):
-	if doc.get("sales_order"):
+	if resolve_sales_order(doc):
 		doc.set_onload("project_boq", build_rows(doc))
 		order = frappe.db.get_value("Sales Order", doc.sales_order, ["docstatus", "status"], as_dict=True)
 		doc.set_onload("project_boq_active", order.docstatus == 1 and order.status not in {"Closed", "On Hold", "Cancelled"})
 
 
 def validate_project(doc, method=None):
-	if doc.get("sales_order"):
+	if resolve_sales_order(doc):
 		doc.set("custom_project_boq", build_rows(doc))
 
 
@@ -128,7 +162,7 @@ def sync_progress(doc, method=None):
 def active_order(project):
 	doc = frappe.get_doc("Project", project)
 	doc.check_permission("read")
-	if not doc.get("sales_order"):
+	if not resolve_sales_order(doc):
 		frappe.throw(_("This Project has no Sales Order."))
 	order = frappe.get_doc("Sales Order", doc.sales_order)
 	order.check_permission("read")

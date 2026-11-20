@@ -41,6 +41,13 @@ Progress recalculates on Project load and through Refresh BOQ. Transaction hooks
 persist derived BOQ rows for reporting without changing the Project's modified timestamp.
 The grid's counters are read-only and rebuilt on Project save.
 
+The BOQ occupies its own full-width tab after the existing Project fields. Setup repairs
+the field order even when the site already has a Customize Form field-order override.
+The Project script loads globally so another app's Project script cannot replace it.
+Opening a saved Project explicitly fetches current items and statuses. Older Projects
+can resolve a unique submitted order from the Sales Order's Project link, or from the
+same Project No, customer and company. Ambiguous matches require selecting the order.
+
 ## Deployment
 
 Run from the Frappe bench after deploying this app version:

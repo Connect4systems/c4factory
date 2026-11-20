@@ -46,6 +46,35 @@ class TestProjectBOQ(unittest.TestCase):
 		self.assertEqual(self.api.progress_status(10, 0, 0), ("Not Delivered", "Not Delivered"))
 		self.assertEqual(self.api.progress_status(10, 4, 2), ("Partly Delivered", "Partly Installed"))
 
+	def test_existing_project_resolves_sales_order_reverse_link(self):
+		self.frappe.get_all.return_value = ["SO-OLD"]
+		project = Doc(name="P-OLD")
+		self.assertEqual(self.api.resolve_sales_order(project), "SO-OLD")
+		self.assertEqual(project.sales_order, "SO-OLD")
+		self.assertEqual(self.frappe.get_all.call_args.kwargs["filters"], {"project": "P-OLD", "docstatus": 1})
+
+	def test_ambiguous_reverse_link_requires_explicit_order(self):
+		self.frappe.get_all.return_value = ["SO-1", "SO-2"]
+		with self.assertRaises(ValueError):
+			self.api.resolve_sales_order(Doc(name="P"))
+
+	def test_fetch_returns_rows_and_status_for_legacy_project(self):
+		project = Doc(name="P", check_permission=Mock())
+		order = Doc(name="SO", docstatus=1, status="To Deliver", check_permission=Mock())
+		self.frappe.get_all.return_value = ["SO"]
+		self.frappe.get_doc.side_effect = [project, order]
+		rows = [{"item_code": "A", "pds_status": "PDS Request: REQ", "delivered_qty": 2}]
+		with patch.object(self.api, "build_rows", return_value=rows):
+			result = self.api.get_project_boq("P")
+		self.assertEqual(result, {"rows": rows, "sales_order": "SO", "active": True})
+		project.check_permission.assert_called_once_with("read")
+		order.check_permission.assert_called_once_with("read")
+
+	def test_no_source_returns_empty_result_without_active_actions(self):
+		self.frappe.get_all.return_value = []
+		self.frappe.get_doc.return_value = Doc(name="P", check_permission=Mock())
+		self.assertEqual(self.api.get_project_boq("P"), {"rows": [], "sales_order": None, "active": False})
+
 	def test_selection_rejects_invalid_quantities_and_duplicates(self):
 		for rows in ([], [{"sales_order_item": "R", "qty": -1}],
 			[{"sales_order_item": "R", "qty": float("inf")}],
