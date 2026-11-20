@@ -32,7 +32,7 @@ window.frappe = {
   ui: {form: {on(type, events) {handlers[type] = events;}}},
   user_roles: ['Technical'],
   msgprint(message) { alerts.push(message); }, show_alert(message) {alerts.push(message);},
-  db: {async get_value(type) {if(window.failLookup) throw Error('Lookup failed');return {message:type === 'Material Color' ? {palette:'Wood',disable:0} : {color_palette:'Wood'}};}},
+  db: {async get_value(type, name) {if(window.failLookup) throw Error('Lookup failed');return {message:type === 'Material Color' ? {palette:'Wood',disable:0} : {name}};}},
   async call(request) {
     calls.push(request);
     if(request.method.endsWith('preview_import')) return {message:await previewServer(request.args)};
@@ -117,7 +117,7 @@ def main():
         print(f'{Path(path).name}: {json.dumps(counts)}')
 
     def preview_server(args):
-        return api.build_preview(json.loads(args['matrix']), json.loads(args['mapping']), args['table'], args['material'], args['start_row'], args['end_row'])
+        return api.build_preview(json.loads(args['matrix']), json.loads(args['mapping']), args['table'], args['color_palette'], args['start_row'], args['end_row'])
 
     with sync_playwright() as p:
         browser = p.chromium.launch(channel='msedge', headless=True)
@@ -153,8 +153,19 @@ def main():
         page.evaluate("handlers['Part List'].refresh(frm);frm.buttons['Panel Materials']()")
         page.locator('[data-field=paste]').fill('Top\tقرصة\t1200\t800\t\t25\t3\nDrawer Unit\tوحدة أدراج\t428\t700\t627\t\t1')
         page.locator('.dialog').last.locator('[data-primary]').click()
-        page.locator('[data-field=default_material]').fill('MDF')
+        page.locator('[data-field=color_palette]').fill('Wood')
+        page.locator('[data-field=color_palette]').fill('Wood')
         page.locator('[data-field=base_color]').fill('Oak')
+        assert page.evaluate("""() => {
+          const dialog = dialogs[dialogs.length-1];
+          const fields = dialog.options.fields;
+          const a = fields.findIndex(f => f.fieldname === 'color_palette');
+          const b = fields.findIndex(f => f.fieldname === 'base_color');
+          return fields[a].options === 'Color Palette' && fields[b].options === 'Material Color' &&
+            !fields.slice(a+1,b).some(f=>f.fieldtype === 'Section Break') &&
+            fields[b].get_query().filters.palette === 'Wood' &&
+            !fields.some(f=>f.options === 'Part Material');
+        }""")
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('dialogs.length === 3')
         assert page.locator('.dialog').last.locator('input:checked').count() == 3, 'Valid assemblies are included by default'
@@ -179,7 +190,7 @@ def main():
         page.evaluate("frm.buttons['Panel Materials']()")
         page.locator('.dialog').last.locator('[data-field=paste]').fill('Bottom\tقاعدة\t100\t80\t\t18\t2')
         page.locator('.dialog').last.locator('[data-primary]').click()
-        page.locator('.dialog').last.locator('[data-field=default_material]').fill('MDF')
+        page.locator('.dialog').last.locator('[data-field=color_palette]').fill('Wood')
         page.locator('.dialog').last.locator('[data-field=mode]').select_option('Replace Table Rows')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('dialogs.length === 6')
@@ -240,9 +251,9 @@ def main():
         for label in ['Material', 'Materials', 'Wooden Panel', 'Woodin Panel', 'Panel']:
             assert page.evaluate('module.exports.sectionType(' + json.dumps(label) + ')') == 'panel_materials'
         for header, target, material, expected_row in [
-            ('2: Wooden Panel', 'Panel Materials', 'MDF', 3),
-            ('4: Metal', 'Metal Material', 'Steel', 5),
-            ('6: Other', 'Other Material', 'Foam', 7),
+            ('2: Wooden Panel', 'Panel Materials', 'Wood', 3),
+            ('4: Metal', 'Metal Material', 'Wood', 5),
+            ('6: Other', 'Other Material', 'Wood', 7),
             ('8: Accessories', 'Accessories', '', 10),
         ]:
             page.evaluate("frm.doc.docstatus=0;handlers['Part List'].refresh(frm);frm.buttons['Panel Materials']()")
@@ -256,7 +267,7 @@ def main():
             if header == '6: Other':
                 chooser.locator('[data-field=target_table]').select_option('Panel Materials')
             if material and header != '2: Wooden Panel':
-                chooser.locator('[data-field=section_material]').fill(material)
+                chooser.locator('[data-field=section_palette]').fill('Wood')
             chooser.locator('[data-primary]').click()
             config = page.locator('.dialog').nth(page.locator('.dialog').count() - 1)
             assert config.locator('[data-field=start]').input_value() == str(expected_row)
@@ -265,17 +276,18 @@ def main():
                 before = page.evaluate('dialogs.length')
                 config.locator('[data-primary]').click()
                 assert page.evaluate('dialogs.length') == before, 'Missing material must be resolved before review'
-                assert 'Choose a Part Material' in page.evaluate('alerts[alerts.length-1]')
-                config.locator('[data-field=default_material]').fill(material)
+                assert 'Choose a Color Palette' in page.evaluate('alerts[alerts.length-1]')
+                config.locator('[data-field=color_palette]').fill(material)
             if material:
-                assert config.locator('[data-field=default_material]').input_value() == material
+                config.locator('[data-field=color_palette]').fill(material)
+                assert config.locator('[data-field=color_palette]').input_value() == material
             config.locator('[data-primary]').click()
             page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
             review = page.locator('.dialog').last
             if header == '2: Wooden Panel':
                 review.locator('[data-field=back_to_mapping]').click()
                 assert config.is_visible()
-                assert config.locator('[data-field=default_material]').input_value() == material
+                assert config.locator('[data-field=color_palette]').input_value() == material
                 config.locator('[data-primary]').click()
                 page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
                 review = page.locator('.dialog').last
@@ -304,27 +316,28 @@ def main():
         page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
         review = page.locator('.dialog').last
         assert review.locator('input[type=checkbox]:disabled').count() == 1
-        review.locator('[data-field=review_material]').fill('Steel')
-        review.locator('[data-field=apply_material]').click()
+        review.locator('[data-field=review_palette]').fill('Wood')
+        review.locator('[data-field=apply_palette]').click()
         page.wait_for_function("dialogs[dialogs.length-1].element.querySelector('input[type=checkbox]:checked') !== null")
         review = page.locator('.dialog').last
         assert review.locator('input[type=checkbox]:disabled').count() == 0
         review.locator('[data-primary]').click()
         page.wait_for_function('frm.doc.metal_material.length === 2')
-        assert page.evaluate('frm.doc.metal_material[1].material') == 'Steel'
+        assert page.evaluate('frm.doc.metal_material[1].color_palette') == 'Wood'
         # Reopen using the saved attachment, without uploading it again.
         assert page.evaluate('frm.doc.pds_table') == [{'title':'Part File', 'arttach':'/private/files/test.xls'}]
         assert page.evaluate('uploadOptions.fieldname') == 'pds_table'
         page.evaluate("frm.buttons['Metal Material']()")
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Map Excel Section'")
-        page.locator('.dialog').last.locator('[data-field=section_material]').fill('Steel')
+        page.locator('.dialog').last.locator('[data-field=section_palette]').fill('Wood')
         page.locator('.dialog').last.locator('[data-primary]').click()
-        assert page.locator('.dialog').last.locator('[data-field=default_material]').input_value() == 'Steel'
+        assert page.locator('.dialog').last.locator('[data-field=color_palette]').input_value() == 'Wood'
+        page.locator('.dialog').last.locator('[data-field=color_palette]').fill('Wood')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title.startsWith('Review Import:')")
         review = page.locator('.dialog').last
-        assert review.locator('[data-field=review_material]').count() == 0, 'Material must not be requested twice'
+        assert review.locator('[data-field=review_palette]').count() == 0, 'Material must not be requested twice'
         assert review.locator('input[type=checkbox]:checked').count() == 1
         page.evaluate("frm.doc.metal_material.unshift({qty:0,lenght:0,width:0,hight:0,thickness:0});frm.doc.metal_material.push({part_name:'Keep me',qty:0})")
         review.locator('[data-primary]').click()
@@ -368,7 +381,7 @@ def main():
         assert setup.locator('[data-field=section_0_table]').input_value() == 'Panel Materials'
         assert setup.locator('[data-field=section_3_table]').input_value() == 'Accessories'
         assert setup.locator('[data-field=map_part_name]').input_value() == 'A'
-        assert setup.locator('[data-field=map_material]').input_value() == 'H'
+        assert setup.locator('[data-field=map_color_palette]').input_value() == 'H'
         assert setup.locator('select[data-field$="_header"]').count() == 4
         assert setup.locator('select[data-field^="map_"]').count() == 9
         # Header choices are editable; switching them changes the section ranges.
@@ -387,7 +400,10 @@ def main():
         setup.locator('[data-field=section_0_header]').select_option(panel_header)
         setup.locator('[data-field=section_1_header]').select_option(metal_header)
         setup.locator('[data-field=mode]').select_option('Replace Table Rows')
-        setup.locator('[data-field=section_0_default_material]').fill('MDF')
+        setup.locator('[data-field=section_0_color_palette]').fill('Wood')
+        setup.locator('[data-field=section_1_color_palette]').fill('Wood')
+        setup.locator('[data-field=section_2_color_palette]').fill('Wood')
+        setup.locator('[data-field=section_0_color_palette]').fill('Wood')
         setup.locator('[data-field=section_0_base_color]').fill('Oak')
         before = page.evaluate('JSON.stringify(frm.doc)')
         setup.locator('[data-primary]').click()
@@ -396,8 +412,8 @@ def main():
         assert review.locator('input:checked').count() == 4
         assert review.locator('input:disabled').count() == 1
         assert page.evaluate('JSON.stringify(frm.doc)') == before, 'Preview must not change tables'
-        # Failure in a later table must leave every table intact, including in Replace mode.
-        page.evaluate("window.originalLookup=frappe.db.get_value;frappe.db.get_value=async(type,name)=>{if(name==='Steel')throw Error('Batch lookup failed');return originalLookup(type,name)}")
+        # A palette lookup failure must leave every table intact, including in Replace mode.
+        page.evaluate("window.originalLookup=frappe.db.get_value;frappe.db.get_value=async(type,name)=>{if(type==='Color Palette')throw Error('Batch lookup failed');return originalLookup(type,name)}")
         review.locator('[data-primary]').click()
         page.wait_for_function("window.lastError === 'Batch lookup failed'")
         assert page.evaluate('JSON.stringify(frm.doc)') == before
@@ -431,7 +447,7 @@ def main():
         assert not errors, errors
         assert not page.evaluate('window.lastError'), page.evaluate('window.lastError')
         browser.close()
-    print('Browser passed: paste/upload, section-header selection, destination override, vertical mapping, material requirement, checkbox/row/bulk selection, Arabic, dimensions, assemblies, invalid quantity, stock mapping.')
+    print('Browser passed: paste/upload, section-header selection, destination override, vertical mapping, palette requirement, checkbox/row/bulk selection, Arabic, dimensions, assemblies, invalid quantity, stock mapping.')
 
 
 if __name__ == '__main__':

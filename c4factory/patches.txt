@@ -27,3 +27,4 @@ c4factory.patches.v1_0.migrate_material_color_palettes
 
 c4factory.patches.v1_0.setup_project_boq
 c4factory.patches.v1_0.set_accessory_linking_status
+c4factory.patches.v1_0.replace_part_material_with_palette

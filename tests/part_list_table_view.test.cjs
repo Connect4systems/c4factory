@@ -25,7 +25,7 @@ function grid(fieldname) {
   return {
     df: {fieldname}, doctype: 'Part List Materials',
     docfields: [
-      {fieldname: 'material', fieldtype: 'Link', in_list_view: 1, columns: 2},
+      {fieldname: 'color_palette', fieldtype: 'Link', in_list_view: 1, columns: 2},
       {fieldname: 'qty', fieldtype: 'Float', in_list_view: 1, columns: 1},
       {fieldname: 'secret', fieldtype: 'Data', hidden: 1, columns: 2},
     ],
@@ -52,19 +52,19 @@ function grid(fieldname) {
     fields_dict: {panel: {grid: panel}, metal: {grid: metal}}};
   const before = JSON.stringify(frm.doc);
   handlers[0].refresh(frm);
-  assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['qty', 'material']);
+  assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['qty', 'color_palette']);
   preferences.C4TableColumns = {panel_materials: [
-    {fieldname: 'qty', columns: 8}, {fieldname: 'material', columns: 7},
+    {fieldname: 'qty', columns: 8}, {fieldname: 'color_palette', columns: 7},
     {fieldname: 'secret', columns: 1}, {fieldname: 'removed', columns: 1},
   ]};
   panel.setup_visible_columns();
   assert.equal(panel.visible_columns.reduce((sum, [, width]) => sum + width, 0), 15,
     'Extended columns can exceed the native ten-column limit');
-  assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['qty', 'material']);
-  assert.deepEqual(Array.from(metal.visible_columns, ([df]) => df.fieldname), ['qty', 'material'],
+  assert.deepEqual(Array.from(panel.visible_columns, ([df]) => df.fieldname), ['qty', 'color_palette']);
+  assert.deepEqual(Array.from(metal.visible_columns, ([df]) => df.fieldname), ['qty', 'color_palette'],
     'Material tables retain separate preferences despite sharing a child DocType');
   const header = panel.header_row;
-  header.selected_columns_for_grid = [{fieldname: 'qty', columns: 8}, {fieldname: 'material', columns: 7}];
+  header.selected_columns_for_grid = [{fieldname: 'qty', columns: 8}, {fieldname: 'color_palette', columns: 7}];
   header.configure_dialog_for_columns_selector();
   const dialog = header.grid_settings_dialog;
   await dialog.primary();

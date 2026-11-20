@@ -104,10 +104,10 @@ function renderSalesOrderColors(frm, cdt, cdn) {
       wrapper.append($('<p class="text-muted">').text(__('No matching materials.')));
       continue;
     }
-    const table = $(`<table class="table table-bordered"><thead><tr><th>${__('Table')}</th><th>${__('Material')}</th><th>${__('Part Name')}</th><th>${__('Color')}</th></tr></thead><tbody></tbody></table>`).appendTo(wrapper);
+    const table = $(`<table class="table table-bordered"><thead><tr><th>${__('Table')}</th><th>${__('Color Palette')}</th><th>${__('Part Name')}</th><th>${__('Color')}</th></tr></thead><tbody></tbody></table>`).appendTo(wrapper);
     const labels = { panel_materials: __('Panel Materials'), metal_material: __('Metal Material'), other_material: __('Other Material') };
     for (const row of rows) {
-      const tr = $(`<tr><td>${esc(labels[row.source_table] || '')}</td><td>${esc(row.material || '')}</td><td>${esc(row.part_name || '')}</td><td></td></tr>`).appendTo(table.find('tbody'));
+      const tr = $(`<tr><td>${esc(labels[row.source_table] || '')}</td><td>${esc(row.color_palette || row.material || '')}</td><td>${esc(row.part_name || '')}</td><td></td></tr>`).appendTo(table.find('tbody'));
       if (field === 'custom_part_list_color') {
         tr.find('td').last().text(row.color || '');
         continue;

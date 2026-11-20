@@ -6,6 +6,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "color_palette",
   "material",
   "part_name",
   "color_doctype",
@@ -13,12 +14,21 @@
  ],
  "fields": [
   {
-   "fieldname": "material",
+   "fieldname": "color_palette",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_preview": 1,
-   "label": "Material",
-   "options": "Part Material"
+   "label": "Color Palette",
+   "options": "Color Palette",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "material",
+   "fieldtype": "Data",
+   "in_list_view": 0,
+   "in_preview": 0,
+   "label": "Legacy Part Material",
+   "hidden": 1,
+   "read_only": 1,
+   "reqd": 0
   },
   {
    "fieldname": "part_name",

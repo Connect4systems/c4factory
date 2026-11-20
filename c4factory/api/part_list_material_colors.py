@@ -8,7 +8,7 @@ def material_table_fields(doc):
 
 
 def material_palette(row):
-	return row.get("color_palette") or (frappe.db.get_value("Part Material", row.material, "color_palette") if row.material else None)
+	return row.get("color_palette")
 
 
 def material_color_target(doc, field, row):
@@ -41,9 +41,6 @@ def validate_material_colors(doc, method=None):
 		old_rows = {row.name: row for row in previous.get(field) or []} if previous else {}
 		for row in doc.get(field) or []:
 			old = old_rows.get(row.name)
-			if old and old.material != row.material:
-				row.color_palette = frappe.db.get_value("Part Material", row.material, "color_palette") if row.material else None
-				row.basic_color = None
 			if palette or palette_changed:
 				row.color_palette = palette
 				if palette_changed and row.basic_color and not frappe.db.exists("Material Color", {"name": row.basic_color, "palette": palette}):
@@ -62,8 +59,6 @@ def material_color_query(doctype, txt, searchfield, start, page_len, filters):
 	"""Search only the new catalog; never interpret a material as a DocType."""
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	palette = filters.get("palette")
-	if not palette and filters.get("material"):
-		palette = frappe.db.get_value("Part Material", filters["material"], "color_palette")
 	if not palette:
 		return []
 	return frappe.get_list("Material Color", filters={"palette": palette, "disable": 0},

@@ -98,16 +98,11 @@ class TestMaterialPalettes(unittest.TestCase):
         self.assertEqual(doc.panel_materials[1].color_palette, 'Wood')
 
 
-    def test_search_uses_material_palette_when_row_palette_is_missing(self):
-        self.frappe.db.get_value.return_value = 'HPL'
-        self.frappe.get_list = Mock(return_value=[['White', 'White']])
-        result = self.api.material_color_query('P-Wood', '', 'name', 0, 20, {'material': 'HPL'})
-        self.assertEqual(result, [['White', 'White']])
-        self.frappe.db.get_value.assert_called_once_with('Part Material', 'HPL', 'color_palette')
-        self.assertEqual(self.frappe.get_list.call_args.args, ('Material Color',))
-        self.assertEqual(self.frappe.get_list.call_args.kwargs['filters'], {'palette': 'HPL', 'disable': 0})
-        self.assertEqual(self.frappe.get_list.call_args.kwargs['fields'], ['name'])
-        self.assertEqual(set(self.frappe.get_list.call_args.kwargs['or_filters']), {'name'})
+    def test_search_never_looks_up_retired_part_material(self):
+        self.frappe.get_list = Mock()
+        self.assertEqual(self.api.material_color_query('Material Color', '', 'name', 0, 20, {'material': 'Old'}), [])
+        self.frappe.db.get_value.assert_not_called()
+        self.frappe.get_list.assert_not_called()
 
     def test_search_without_palette_returns_no_colors(self):
         self.frappe.get_list = Mock()

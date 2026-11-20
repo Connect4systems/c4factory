@@ -6,7 +6,7 @@
   const width = (value) => Math.min(10, Math.max(1, Math.trunc(Number(value) || 2)));
   const material_columns = [
     ["part_name", 1], ["part_name_ar", 1], ["lenght", 1], ["width", 1], ["hight", 1],
-    ["thickness", 1], ["qty", 1], ["material", 1], ["note", 2],
+    ["thickness", 1], ["qty", 1], ["color_palette", 1], ["note", 2],
     ["is_assembly", 1], ["edite_color", 1], ["basic_color", 1],
   ];
   function contain_table(grid) {

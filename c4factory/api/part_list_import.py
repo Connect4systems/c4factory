@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 
 TABLES = ("panel_materials", "metal_material", "other_material", "accessorise_table")
-FIELDS = ("part_name", "part_name_ar", "material", "lenght", "width", "hight", "thickness", "qty", "note", "requested_name")
+FIELDS = ("part_name", "part_name_ar", "color_palette", "lenght", "width", "hight", "thickness", "qty", "note", "requested_name")
 MAX_ROWS = 3000
 MAX_COLUMNS = 60
 
@@ -30,7 +30,7 @@ def download_template(table):
         if table == "all":
             sheet.append([titles[target]])
         sheet.append(["Requested Item Name", "Qty", "Notes"] if target == "accessorise_table" and table != "all" else
-            ["Part Name English", "Part Name Arabic", "Length", "Width", "Height", "Thickness", "Qty", "Material", "Notes"])
+            ["Part Name English", "Part Name Arabic", "Length", "Width", "Height", "Thickness", "Qty", "Color Palette", "Notes"])
         if table == "all":
             sheet.append([])
     output = io.BytesIO()
@@ -76,7 +76,7 @@ def parse_paste(text):
     return list(csv.reader(io.StringIO(text), delimiter="\t"))
 
 
-def build_preview(matrix, mapping, table, material="", start_row=1, end_row=None):
+def build_preview(matrix, mapping, table, color_palette="", start_row=1, end_row=None):
     if table not in TABLES or not isinstance(matrix, list) or not isinstance(mapping, dict):
         raise ValueError("Invalid import configuration.")
     if len(matrix) > MAX_ROWS or any(not isinstance(r, list) or len(r) > MAX_COLUMNS for r in matrix):
@@ -105,9 +105,9 @@ def build_preview(matrix, mapping, table, material="", start_row=1, end_row=None
             if not values.get(key):
                 errors.append(f"{key} is required")
         if table != "accessorise_table":
-            values["material"] = values.get("material") or material
-            if not values["material"]:
-                errors.append("Select a material")
+            values["color_palette"] = values.get("color_palette") or color_palette
+            if not values["color_palette"]:
+                errors.append("Select a Color Palette")
         for key in ("qty", "lenght", "width", "hight", "thickness"):
             if key not in values:
                 continue
@@ -139,11 +139,11 @@ def inspect_workbook(file_url):
 
 
 @frappe.whitelist()
-def preview_import(matrix, mapping, table, material="", start_row=1, end_row=None):
+def preview_import(matrix, mapping, table, color_palette="", start_row=1, end_row=None):
     if not frappe.has_permission("Part List", "create"):
         frappe.throw(_("You do not have permission to import Part Lists."), frappe.PermissionError)
     try:
         return build_preview(json.loads(matrix) if isinstance(matrix, str) else matrix,
-            json.loads(mapping) if isinstance(mapping, str) else mapping, table, material, start_row, end_row)
+            json.loads(mapping) if isinstance(mapping, str) else mapping, table, color_palette, start_row, end_row)
     except (ValueError, TypeError) as exc:
         frappe.throw(str(exc))

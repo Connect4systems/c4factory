@@ -20,7 +20,7 @@ with sync_playwright() as p:
       const parsed = prepareCellPaste('10\\n20\\n', 'width');
       assert(parsed.length === 2 && parsed[1].width === 20, 'single column');
       const full = prepareCellPaste('Panel A\\tلوح\\t100\\t50\\t20\\t18\\t2\\tMDF\\tTest note\\t1\\tOak', 'part_name')[0];
-      assert(full.part_name === 'Panel A' && full.part_name_ar === 'لوح' && full.lenght === 100 && full.qty === 2 && full.material === 'MDF' && full.note === 'Test note' && full.edite_color === 1 && full.basic_color === 'Oak', 'standard Excel sequence');
+      assert(full.part_name === 'Panel A' && full.part_name_ar === 'لوح' && full.lenght === 100 && full.qty === 2 && full.color_palette === 'MDF' && full.note === 'Test note' && full.edite_color === 1 && full.basic_color === 'Oak', 'standard Excel sequence');
       assert(prepareCellPaste('"a\\nb"', 'note')[0].note === 'a\\nb', 'quoted cell');
       for (const [text, field] of [['abc', 'width'], ['x\\ty', 'basic_color'], ['maybe', 'edite_color']]) {
         let rejected = false;
@@ -97,13 +97,13 @@ with sync_playwright() as p:
     }""")
     page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / "c4factory/c4factory/doctype/part_list/part_list.js"))
     page.evaluate("""() => {
-      const names = ['part_name','part_name_ar','lenght','width','hight','thickness','qty','material','note','is_assembly','edite_color','basic_color'];
+      const names = ['part_name','part_name_ar','lenght','width','hight','thickness','qty','color_palette','note','is_assembly','edite_color','basic_color'];
       const assert = (ok, message) => {if (!ok) throw Error(message);};
       const root = document.createElement('div');
       root.innerHTML = '<div class="grid-body"><div class="grid-row">old cells</div></div>';
       const grid = {docfields: names.map(fieldname => ({fieldname})),
-        visible_columns: [[{fieldname: 'material'}, 1]],
-        user_defined_columns: [{fieldname: 'material'}],
+        visible_columns: [[{fieldname: 'color_palette'}, 1]],
+        user_defined_columns: [{fieldname: 'color_palette'}],
         grid_rows: [{}], wrapper: wrap([root]), refresh() {this.refreshes = (this.refreshes || 0)+1;}};
       const frm = {doc: {doctype: 'Part List'}, fields_dict: {panel_materials: {grid}}};
       configurePartListMaterialColumns(frm);

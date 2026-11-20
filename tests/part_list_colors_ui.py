@@ -19,7 +19,7 @@ def main():
             ui: {form: {on(type, events) {Object.assign(handlers[type] ||= {}, events);}}},
             utils: {escape_html: text => text},
             db: {async get_value(type, name) {
-              return {message: type === 'Part Material' ? {color_palette: 'Wood'} :
+              return {message: type === 'Color Palette' ? {name} :
                 {palette: name === 'Chrome' ? 'Metal' : 'Wood', disable: name === 'Retired' ? 1 : 0}};
             }},
           };
@@ -31,7 +31,7 @@ def main():
           const frm = {doc: {doctype:'Part List', docstatus:0, panel_materials:[], metal_material:[]},
             refresh_field() {}, dirty() {}, clear_table(table) {this.doc[table] = [];},
             add_child(table, value) {(this.doc[table] ||= []).push(value);}, set_query() {}};
-          const batch = color => [{table:'panel_materials', rows:[{values:{material:'MDF',
+          const batch = color => [{table:'panel_materials', rows:[{values:{color_palette:'Wood',
             part_name:'Top', qty:1, basic_color:color}}]}];
           const apply = module.exports.applyImportBatches;
           await apply(frm, batch('Oak'), 'Add Rows');

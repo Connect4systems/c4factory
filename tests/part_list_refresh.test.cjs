@@ -4,10 +4,10 @@ const vm = require('node:vm');
 const handlers = {};
 let writes = 0;
 let lookups = 0;
-const row = {doctype: 'Part List Materials', name: 'row1', parentfield: 'panel_materials', material: 'MDF', color_doctype: '', basic_color: ''};
+const row = {doctype: 'Part List Materials', name: 'row1', parentfield: 'panel_materials', color_palette: 'Wood', color_doctype: '', basic_color: ''};
 const frm = {
   doc: {doctype: 'Part List', docstatus: 0, product: 'CUBE', product_image: 'image.png', material_line: 'LINE-1', metal_material_line: 'LINE-1', panel_materials: [row]},
-  fields_dict: {}, refresh_field() {}, add_custom_button() {},
+  is_new: () => true, fields_dict: {}, refresh_field() {}, add_custom_button() {},
   async set_value(field, value) {writes++; Object.assign(this.doc, typeof field === "object" ? field : {[field]: value});},
 };
 const context = vm.createContext({
@@ -31,10 +31,10 @@ for (const path of ['c4factory/public/js/doctype/part_list_versions.js', 'c4fact
   }
   assert.equal(writes, 0);
   assert.equal(lookups, 0, 'Refresh must not start asynchronous data updates after save');
-  await handlers['Part List Materials'].find(events => events.material).material(frm, row.doctype, row.name);
+  await handlers['Part List Materials'].find(events => events.color_palette).color_palette(frm, row.doctype, row.name);
   assert.equal(row.color_doctype, 'Material Color');
   assert.equal(row.color_palette, 'Wood');
-  assert.equal(row.basic_color, null, 'Material selection sets its palette and leaves color for the user');
+  assert.equal(row.basic_color, null, 'Palette selection leaves color for the user');
   await handlers['Part List Materials'].find(events => events.color_palette).color_palette(frm, row.doctype, row.name);
   assert.equal(row.basic_color, null, 'Changing palette clears the previous color');
   assert.ok(writes > 0, 'User edits must still update row values');

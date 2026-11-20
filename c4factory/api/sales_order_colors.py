@@ -13,7 +13,7 @@ def get_color_rows(part_list):
 	return [
 		{
 			"source_row": row.name,
-			"material": row.material,
+			"material": material_palette(row) or row.get("material"),
 			"part_name": row.part_name,
 			"color_doctype": material_color_target(part, field, row),
 			"color_palette": material_palette(row),
@@ -32,7 +32,7 @@ def get_part_list_colors(part_list):
 		"rows": [
 			{
 				"source_row": row.name, "source_table": field,
-				"material": row.material, "part_name": row.part_name,
+				"material": material_palette(row) or row.get("material"), "part_name": row.part_name,
 				"color_doctype": material_color_target(part, field, row),
 				"color_palette": material_palette(row),
 				"color": row.basic_color, "has_source_color": bool(row.basic_color), "edite_color": row.edite_color,

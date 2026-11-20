@@ -27,7 +27,7 @@ Choose **Import / Paste > All Tables** to import sections from one sheet or
 pasted range together. One section contains four rows for Panel Materials,
 Metal Material, Other Material, and Accessories. Each row has an editable Excel
 Header selector and System Table selector, with detected matches selected by
-default. The first three rows also provide Part Material. Choose Skip to exclude
+default. The first three rows provide Color Palette and Base Color side by side. Base Color lists only enabled Material Colors in the selected palette. Choose Skip to exclude
 a row. Each source header can be selected only once, and its data range is detected
 automatically.
 
@@ -40,7 +40,7 @@ be selected as a whole range in one row.
 
 **Preview All Tables** shows all sections together with row checkboxes and errors.
 Use **Back to Mapping** to correct settings, then **Import All Selected Rows** to
-populate all destination tables in one operation. Material lookups finish before
+populate all destination tables in one operation. Palette and color validation finishes before
 any table changes. Replace mode clears each destination table once, combining
 selected rows from sections mapped to the same table. Tables with no selected rows
 are preserved. Save the Part List to store the result. Import All uses the selected
@@ -60,8 +60,7 @@ The supplied `Part L.` layout has suggested column mappings and section ranges;
 other sheets can be mapped manually. Source contents never execute as code.
 
 When the sheet or pasted range contains section headers, first select **Excel
-Section Header**, then **Import into Table**, then **Part Material for this
-Section**. Wooden Panel / Panel / Material suggest Panel Materials; Metal, Other,
+Section Header**, then **Import into Table**, then **Color Palette** and **Base Color**. Wooden Panel / Panel / Material suggest Panel Materials; Metal, Other,
 and Accessories suggest their corresponding tables. The destination is editable.
 The section's row range is filled automatically, stopping at the next section;
 accessory column headings and document footers are excluded. Column mappings are
@@ -69,21 +68,20 @@ shown vertically in the next step. Choose Whole sheet / pasted rows to set the
 range manually instead.
 
 The template download provides a plain `.xlsx` header row. Pasted names are text;
-no Part Name masters or Item masters are created. Material defaults can be applied
-to a whole import and overridden through a mapped Material column. These values
-must reference existing Part Materials. Quantity must be positive; unused
+no Part Name masters or Item masters are created. Choose a Color Palette for the section or map a Color Palette column. These values
+must reference existing Color Palettes. A selected section palette applies to every imported row. Quantity must be positive; unused
 dimensions remain blank. Column mappings are remembered in this browser when
 storage is available.
 
 The preview shows source row numbers and errors. Invalid rows cannot be included.
-The selected section material carries through mapping and preview. The preview
-material repair controls appear only when rows still have no material.
+The selected palette and Base Color carry through mapping and preview. The preview
+palette repair controls appear only when rows still have no palette.
 Adding imported rows removes untouched empty starter rows, preserving existing
 rows that contain entered data.
-If no Material column is mapped, a Part Material must be chosen before opening
+If no Color Palette column is mapped, a Color Palette must be chosen before opening
 the preview. Click a valid row or its checkbox to toggle inclusion, or use
 **Select All Valid Rows** / **Deselect All**. **Back to Mapping** returns to the
-column and material settings to correct errors.
+column and palette settings to correct errors.
 Section matching uses deterministic aliases without an AI API. Other Material,
 Marble (including the legacy spelling Marbel), Glass, Corian, and Plexi suggest
 Other Material. Unknown standalone
@@ -132,3 +130,17 @@ python tests/part_list_import_ui.py --workbook /path/to/customer.xls
 The browser test uses Playwright with Edge and a small Frappe adapter. It exercises
 the real JavaScript dialogs and Python preview parser. It does not replace a
 live-site migration and role-permission acceptance test.
+
+## Palette defaults and migration
+
+Part Material is no longer required by Part List imports or rows. Each material
+row links directly to Color Palette; colors are restricted to enabled Material
+Colors in that palette. Migration preserves existing assignments, inferring
+missing palettes from the old Part Material or selected Material Color. Legacy
+material names remain hidden text for historical reference.
+
+Panels, Metal, and Other have independent Color Palette and Base Color headers.
+Changing Base Color replaces the colors in that table. Changing palette clears
+the header color and incompatible row colors. Individual row colors can then be
+edited. Add Rows requires matching header palette and Base Color; Replace Table
+Rows can change them. Submitted technical data remains locked.

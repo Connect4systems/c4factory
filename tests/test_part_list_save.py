@@ -85,7 +85,7 @@ class TestPartListSave(unittest.TestCase):
 		self.frappe.db.get_value.return_value = "Wood"
 		for table in ("panel_materials", "metal_material", "other_material"):
 			self.assertEqual(api.material_color_target(
-				SimpleNamespace(doctype="Part List"), table, SimpleNamespace(material="Natural Wood", get=lambda key: None)
+				SimpleNamespace(doctype="Part List"), table, SimpleNamespace(material="Natural Wood", get=lambda key: "Wood" if key == "color_palette" else None)
 			), "Material Color")
 
 	def test_submit_still_updates_originating_sales_order(self):

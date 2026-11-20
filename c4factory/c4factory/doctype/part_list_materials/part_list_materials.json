@@ -14,12 +14,12 @@
   "thickness",
   "is_assembly",
   "qty",
+  "color_palette",
   "material",
   "note",
   "edite_color",
   "basic_color",
-  "color_doctype",
-  "color_palette"
+  "color_doctype"
  ],
  "fields": [
   {
@@ -76,13 +76,14 @@
   },
   {
    "fieldname": "material",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_preview": 1,
-   "label": "Material",
-   "options": "Part Material",
-   "reqd": 1,
-   "columns": 1
+   "fieldtype": "Data",
+   "in_list_view": 0,
+   "in_preview": 0,
+   "label": "Legacy Part Material",
+   "reqd": 0,
+   "columns": 1,
+   "hidden": 1,
+   "read_only": 1
   },
   {
    "default": "0",
@@ -113,10 +114,13 @@
   {
    "fieldname": "color_palette",
    "fieldtype": "Link",
-   "in_list_view": 0,
+   "in_list_view": 1,
    "label": "Color Palette",
    "options": "Color Palette",
-   "columns": 0
+   "columns": 1,
+   "hidden": 0,
+   "in_preview": 1,
+   "read_only": 0
   },
   {
    "fieldname": "lenght",

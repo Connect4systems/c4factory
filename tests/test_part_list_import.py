@@ -77,6 +77,22 @@ class ImportTests(unittest.TestCase):
         pasted = self.api.parse_paste('"Screw\nlong"\t8\n')
         self.assertEqual(pasted, [['Screw\nlong', '8']])
 
+    def test_import_requires_palette_without_part_material(self):
+        mapping = {'part_name': 0, 'part_name_ar': 1, 'qty': 2}
+        rows = [['Top', 'Arabic', 2]]
+        missing = self.api.build_preview(rows, mapping, 'panel_materials')
+        self.assertIn('Select a Color Palette', missing[0]['errors'])
+        selected = self.api.build_preview(rows, mapping, 'panel_materials', 'Wood')
+        self.assertEqual(selected[0]['errors'], [])
+        self.assertEqual(selected[0]['values']['color_palette'], 'Wood')
+        self.assertNotIn('material', selected[0]['values'])
+
+    def test_palette_column_is_supported(self):
+        result = self.api.build_preview([['Top', 'Arabic', 2, 'Wood']],
+            {'part_name': 0, 'part_name_ar': 1, 'qty': 2, 'color_palette': 3}, 'panel_materials')
+        self.assertEqual(result[0]['errors'], [])
+        self.assertEqual(result[0]['values']['color_palette'], 'Wood')
+
     def test_all_template_has_four_sections_and_their_columns(self):
         self.frappe.response = {}
         self.api.download_template('all')
