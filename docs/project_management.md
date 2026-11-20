@@ -55,6 +55,11 @@ Migration creates the Project fields and Installation Note Project link. The Pro
 BOQ Item child DocType is synchronized from app metadata. No additional installation
 DocType is required. Existing Projects gain a live BOQ when opened.
 
+Sites with an existing Float `Project.custom_project_no` receive a targeted conversion
+to Data through Frappe's schema updater. Existing numeric values are retained; text
+project numbers become supported. Only this known conversion bypasses Custom Field
+type-change validation. The patch can be rerun after a failed migration.
+
 ## Site acceptance checks
 
 1. Submit an order with a unique Project No, two rows with the same item code, dates
