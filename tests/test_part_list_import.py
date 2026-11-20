@@ -123,8 +123,21 @@ class ImportTests(unittest.TestCase):
         self.stock.validate_requirements(doc)
         self.assertEqual(doc.accessorise_table[0].mapping_status, 'Pending')
         self.assertIsNone(doc.accessorise_table[0].mapped_by)
+        self.assertEqual(doc.accessory_linking_status, 'Pending Linking')
         with self.assertRaises(ValueError):
             self.stock.require_mapped(doc)
+
+    def test_linking_status_tracks_partial_complete_and_removed_mappings(self):
+        self.frappe.get_doc.return_value = self.item()
+        doc = self.document([self.accessory(item='SCREW'), self.accessory(name='ACC-2')])
+        for selected, expected in ((None, 'Partly Linked'), ('SCREW', 'Completed'), (None, 'Partly Linked')):
+            doc.accessorise_table[1].item = selected
+            doc.accessory_linking_status = 'spoof'
+            self.stock.validate_requirements(doc)
+            self.assertEqual(doc.accessory_linking_status, expected)
+        empty = self.document([])
+        self.stock.validate_requirements(empty)
+        self.assertEqual(empty.accessory_linking_status, 'Completed')
 
     def test_mapping_validates_item_uom_and_records_stock_quantity(self):
         self.frappe.get_doc.return_value = self.item()
@@ -218,7 +231,8 @@ class ImportTests(unittest.TestCase):
         result = self.stock.map_accessories('PL-1', [{'row':'ACC-1', 'item':'SCREW',
             'requested_uom':'Box', 'conversion_factor':10, 'qty':999, 'requested_name':'spoof'}], 'STAMP')
         doc.save.assert_called_once_with(ignore_permissions=True)
-        self.assertEqual(result, {'matched':1, 'total':1})
+        self.assertEqual(result, {'matched':1, 'total':1, 'accessory_linking_status':'Completed'})
+        self.assertEqual(doc.accessory_linking_status, 'Completed')
         self.assertEqual(doc.accessorise_table[0].qty, 4)
         self.assertEqual(doc.accessorise_table[0].requested_name, 'Screw')
         self.assertEqual(doc.accessorise_table[0].stock_qty, 40)

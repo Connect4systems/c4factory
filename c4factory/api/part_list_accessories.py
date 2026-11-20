@@ -35,6 +35,14 @@ def require_mapped(doc):
         frappe.throw(_("Map accessory rows {0} to stock items before creating or submitting a Production Order.").format(", ".join(pending)))
 
 
+def linking_status(rows):
+    total = len(rows)
+    mapped = sum(bool(row.get("item")) for row in rows)
+    if mapped == total:
+        return "Completed"
+    return "Partly Linked" if mapped else "Pending Linking"
+
+
 def validate_requirements(doc):
     previous = doc.get_doc_before_save()
     for table in ("panel_materials", "metal_material", "other_material"):
@@ -84,6 +92,7 @@ def validate_requirements(doc):
         changed = not before or any(row.get(f) != before.get(f) for f in ("item", "requested_uom", "conversion_factor"))
         row.mapped_by = frappe.session.user if changed else before.get("mapped_by")
         row.mapped_on = now_datetime() if changed else before.get("mapped_on")
+    doc.accessory_linking_status = linking_status(doc.get("accessorise_table") or [])
 
 
 def validate_submitted_update(doc):
@@ -139,4 +148,5 @@ def map_accessories(part_list, mappings, modified):
     # Stock roles only have read permission on the parent. The dedicated operation
     # sets a strict whitelist of fields; controller validation guards all other edits.
     doc.save(ignore_permissions=True)
-    return {"matched": sum(bool(r.item) for r in rows.values()), "total": len(rows)}
+    return {"matched": sum(bool(r.item) for r in rows.values()), "total": len(rows),
+        "accessory_linking_status": doc.accessory_linking_status}

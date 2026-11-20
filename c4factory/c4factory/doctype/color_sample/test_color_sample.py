@@ -99,7 +99,9 @@ class TestColorsample(unittest.TestCase):
             {"source_row": "M", "color_doctype": "P-Wood", "color": "Row Override"}
         ]})
         before = dict(self.source)
-        with patch.object(api, "get_part_list_colors", side_effect=lambda name: copy.deepcopy(config)):
+        with patch.object(api, "get_part_list_colors", side_effect=lambda name: copy.deepcopy(config)), patch.object(
+            api.frappe, "get_doc", return_value=Doc(docstatus=1, check_permission=Mock())
+        ):
             result = api.source_colors(self.source)
         self.assertNotIn("custom_wood", result)
         self.assertNotIn("custom_metal", result)

@@ -56,6 +56,10 @@ def source_colors(row):
 	part_list = row.get("custom_part_list") or row.get("part_list")
 	if not part_list:
 		frappe.throw(_("Item {0} does not have a Part List.").format(row.item_code))
+	part = frappe.get_doc("Part List", part_list)
+	part.check_permission("read")
+	if part.docstatus != 1:
+		frappe.throw(_("Part List {0} for item {1} must be submitted by Technical before creating a Color Sample.").format(part_list, row.item_code))
 	config = get_part_list_colors(part_list)
 	try:
 		stored = json.loads(row.get("custom_color_sample_data") or "{}")

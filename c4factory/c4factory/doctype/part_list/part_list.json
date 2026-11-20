@@ -8,6 +8,7 @@
  "field_order": [
   "is_default",
   "version_of",
+  "accessory_linking_status",
   "product",
   "product_name",
   "description",
@@ -37,6 +38,17 @@
   "amended_from"
  ],
  "fields": [
+  {
+   "allow_on_submit": 1,
+   "default": "Completed",
+   "fieldname": "accessory_linking_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Accessory Linking Status",
+   "options": "Pending Linking\nPartly Linked\nCompleted",
+   "read_only": 1
+  },
   {
    "fieldname": "product",
    "fieldtype": "Link",
