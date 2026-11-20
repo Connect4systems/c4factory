@@ -20,13 +20,13 @@ after_migrate = [
 
 app_include_js = [
     "/assets/c4factory/js/doctype/project.js?v=20261120-boq-loading",
-    "/assets/c4factory/js/doctype/part_list_columns.js?v=20261117-assembly-review",
+    "/assets/c4factory/js/doctype/part_list_columns.js?v=20261121-color-palette",
     "/assets/c4factory/js/doctype/part_list_table_fullscreen.js?v=20261111-scoped-init",
-    "/assets/c4factory/js/doctype/part_list_import.js?v=20261117-other-material-marbel",
+    "/assets/c4factory/js/doctype/part_list_import.js?v=20261121-palette-base-color",
     "/assets/c4factory/js/doctype/item_uom.js",
     "/assets/c4factory/js/doctype/part_list_versions.js",
-    "/assets/c4factory/js/doctype/part_list_material_colors.js",
-    "/assets/c4factory/js/doctype/sales_order/item_colors.js",
+    "/assets/c4factory/js/doctype/part_list_material_colors.js?v=20261121-color-palette",
+    "/assets/c4factory/js/doctype/sales_order/item_colors.js?v=20261121-color-palette",
     # Register Sales Order actions independently of other apps' doctype_js hooks.
     "/assets/c4factory/js/doctype/sales_order/sales_order.js",
 ]
