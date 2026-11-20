@@ -40,10 +40,22 @@ def execute():
 			 "options": "Project", "insert_after": "customer", "read_only": 1},
 		],
 	}, update=True)
+	# Reuse ERPNext's standard Customer link and populate it whenever an order is selected.
+	for property_name, value, property_type in (
+		("hidden", 0, "Check"),
+		("depends_on", "", "Data"),
+		("fetch_from", "sales_order.customer", "Small Text"),
+		("fetch_if_empty", 0, "Check"),
+	):
+		make_property_setter("Project", "customer", property_name, value, property_type)
 	# A site's Customize Form field_order takes precedence over insert_after.
 	# Retain its other fields, then move the whole BOQ block to a final full-width tab.
 	meta = frappe.get_meta("Project", cached=False)
 	field_order = [f.fieldname for f in meta.fields if f.fieldname not in boq_fields] + boq_fields
+	if "customer" in field_order:
+		field_order.remove("customer")
+		anchor = "custom_technical_team" if "custom_technical_team" in field_order else "project_name"
+		field_order.insert(field_order.index(anchor) + 1, "customer")
 	if [f.fieldname for f in meta.fields] != field_order:
 		make_property_setter("Project", None, "field_order", json.dumps(field_order), "Data", for_doctype=True)
 	frappe.clear_cache(doctype="Project")

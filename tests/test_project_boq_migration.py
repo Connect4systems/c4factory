@@ -65,3 +65,13 @@ class TestProjectBOQMigration(unittest.TestCase):
 		order = json.loads(frappe.make_property_setter.call_args.args[3])
 		self.assertEqual(order, ["project_name", "expected_start_date", "custom_site_field", "sales_order",
 			"custom_project_boq_tab", "custom_project_boq_section", "custom_project_boq"])
+
+	def test_standard_customer_link_is_visible_and_fetches_from_order(self):
+		frappe, create_fields = self.run_migration("Data")
+		customer_settings = {call.args[2]: call.args[3] for call in frappe.make_property_setter.call_args_list
+			if call.args[1] == "customer"}
+		self.assertEqual(customer_settings["fetch_from"], "sales_order.customer")
+		self.assertEqual(customer_settings["fetch_if_empty"], 0)
+		self.assertEqual(customer_settings["hidden"], 0)
+		self.assertFalse(any(f["fieldname"] == "customer"
+			for f in create_fields.call_args.args[0]["Project"]))

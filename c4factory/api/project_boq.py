@@ -121,12 +121,14 @@ def build_rows(project):
 def onload(doc, method=None):
 	if resolve_sales_order(doc):
 		doc.set_onload("project_boq", build_rows(doc))
-		order = frappe.db.get_value("Sales Order", doc.sales_order, ["docstatus", "status"], as_dict=True)
+		order = frappe.db.get_value("Sales Order", doc.sales_order, ["docstatus", "status", "customer"], as_dict=True)
+		doc.customer = order.customer
 		doc.set_onload("project_boq_active", order.docstatus == 1 and order.status not in {"Closed", "On Hold", "Cancelled"})
 
 
 def validate_project(doc, method=None):
 	if resolve_sales_order(doc):
+		doc.customer = frappe.db.get_value("Sales Order", doc.sales_order, "customer")
 		doc.set("custom_project_boq", build_rows(doc))
 
 
