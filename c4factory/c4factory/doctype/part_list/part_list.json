@@ -27,11 +27,23 @@
   "part_list_tab",
   "material_line",
   "section_break_lgnl",
+  "panel_color_palette",
+  "panel_color_column",
+  "panel_base_color",
+  "panel_table_section",
   "panel_materials",
   "metal_tab",
   "metal_material_line",
+  "metal_color_palette",
+  "metal_color_column",
+  "metal_base_color",
+  "metal_table_section",
   "metal_material",
   "others_tab",
+  "other_color_palette",
+  "other_color_column",
+  "other_base_color",
+  "other_table_section",
   "other_material",
   "accessorise_tab",
   "accessorise_table",
@@ -220,6 +232,66 @@
    "no_copy": 1,
    "options": "Part List",
    "read_only": 1
+  },
+  {
+   "fieldname": "panel_color_palette",
+   "fieldtype": "Link",
+   "label": "Color Palette",
+   "options": "Color Palette"
+  },
+  {
+   "fieldname": "panel_color_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "panel_base_color",
+   "fieldtype": "Link",
+   "label": "Base Color",
+   "options": "Material Color"
+  },
+  {
+   "fieldname": "panel_table_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "metal_color_palette",
+   "fieldtype": "Link",
+   "label": "Color Palette",
+   "options": "Color Palette"
+  },
+  {
+   "fieldname": "metal_color_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metal_base_color",
+   "fieldtype": "Link",
+   "label": "Base Color",
+   "options": "Material Color"
+  },
+  {
+   "fieldname": "metal_table_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "other_color_palette",
+   "fieldtype": "Link",
+   "label": "Color Palette",
+   "options": "Color Palette"
+  },
+  {
+   "fieldname": "other_color_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "other_base_color",
+   "fieldtype": "Link",
+   "label": "Base Color",
+   "options": "Material Color"
+  },
+  {
+   "fieldname": "other_table_section",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,

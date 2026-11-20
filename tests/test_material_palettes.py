@@ -3,7 +3,16 @@ import sys
 import unittest
 from types import ModuleType
 from unittest.mock import Mock, patch
+from types import SimpleNamespace
 from test_part_list_save import load_module
+
+
+class ColorDoc(dict):
+    def __getattr__(self, key):
+        return self.get(key)
+
+    def __setattr__(self, key, value):
+        self[key] = value
 
 
 class TestMaterialPalettes(unittest.TestCase):
@@ -44,6 +53,49 @@ class TestMaterialPalettes(unittest.TestCase):
     def test_empty_color_allowed(self):
         self.api.validate_palette_color('Wood', None)
         self.frappe.db.exists.assert_not_called()
+
+    def section_doc(self, palette='Wood', base='Oak'):
+        row = ColorDoc(name='ROW', material='MDF', basic_color='Walnut', color_palette='Wood')
+        doc = ColorDoc(doctype='Part List', panel_color_palette=palette, panel_base_color=base,
+                       panel_materials=[row], meta=SimpleNamespace(fields=[SimpleNamespace(
+                           fieldtype='Table', options='Part List Materials', fieldname='panel_materials')]))
+        doc.get_doc_before_save = lambda: ColorDoc(panel_color_palette='Wood', panel_base_color='Walnut',
+            panel_materials=[ColorDoc(row)])
+        self.frappe.db.exists.return_value = True
+        return doc, row
+
+    def test_header_base_change_overwrites_all_row_colors(self):
+        doc, row = self.section_doc()
+        self.api.validate_material_colors(doc)
+        self.assertEqual(row.basic_color, 'Oak')
+        self.assertEqual(row.color_palette, 'Wood')
+
+    def test_unchanged_header_preserves_individual_row_color(self):
+        doc, row = self.section_doc(base='Walnut')
+        row.basic_color = 'White'
+        self.api.validate_material_colors(doc)
+        self.assertEqual(row.basic_color, 'White')
+
+    def test_palette_change_clears_header_and_incompatible_rows(self):
+        doc, row = self.section_doc(palette='Metal', base='Walnut')
+        self.frappe.db.exists.return_value = False
+        self.api.validate_material_colors(doc)
+        self.assertIsNone(doc.panel_base_color)
+        self.assertIsNone(row.basic_color)
+        self.assertEqual(row.color_palette, 'Metal')
+
+    def test_palette_change_keeps_compatible_row_color(self):
+        doc, row = self.section_doc(palette='Metal', base=None)
+        self.api.validate_material_colors(doc)
+        self.assertEqual(row.basic_color, 'Walnut')
+        self.assertEqual(row.color_palette, 'Metal')
+
+    def test_new_row_inherits_section_default(self):
+        doc, row = self.section_doc(base='Walnut')
+        doc.panel_materials.append(ColorDoc(name='NEW', material='MDF', basic_color=None))
+        self.api.validate_material_colors(doc)
+        self.assertEqual(doc.panel_materials[1].basic_color, 'Walnut')
+        self.assertEqual(doc.panel_materials[1].color_palette, 'Wood')
 
 
     def test_search_uses_material_palette_when_row_palette_is_missing(self):

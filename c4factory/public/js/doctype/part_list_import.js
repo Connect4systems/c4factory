@@ -254,11 +254,17 @@
           onchange: () => {
             if (!setup) return;
             const target = setup.get_value(`section_${i}_table`);
-            setup.set_df_property(`section_${i}_default_material`, 'hidden', target === tables.accessorise_table || target === 'Skip');
+            for (const name of ['default_material', 'base_color']) setup.set_df_property(`section_${i}_${name}`, 'hidden', target === tables.accessorise_table || target === 'Skip');
           }})),
         {fieldtype: 'Column Break'},
         ...slots.map((slot, i) => ({fieldtype: 'Link', fieldname: `section_${i}_default_material`, label: __('Part Material'),
-          options: 'Part Material', hidden: slot.table === 'accessorise_table'})),
+          options: 'Part Material', hidden: slot.table === 'accessorise_table',
+          onchange: () => setup?.set_value(`section_${i}_base_color`, null)})),
+        {fieldtype: 'Column Break'},
+        ...slots.map((slot, i) => ({fieldtype: 'Link', fieldname: `section_${i}_base_color`, label: __('Base Color'),
+          options: 'Material Color', hidden: slot.table === 'accessorise_table',
+          get_query: () => ({query: 'c4factory.api.part_list_material_colors.material_color_query',
+            filters: {material: setup?.get_value(`section_${i}_default_material`) || ''}})})),
         {fieldtype: 'Section Break', label: __('Shared Column Mapping')},
         {fieldtype: 'HTML', options: `<p>${__('Map columns once for all tables. The name column also supplies Requested Item Name for accessories. Data ranges are detected from the selected section headers.')}</p><div style="overflow:auto;max-height:240px"><table class="table table-bordered"><thead><tr><th>#</th>${columns.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody>${matrix.slice(0, 12).map((row, i) => `<tr><td>${i + 1}</td>${populatedColumns(matrix).map(c => `<td>${esc(row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`},
         ...materialFields.map(field => ({fieldtype: 'Select', fieldname: 'map_' + field,
@@ -296,6 +302,7 @@
                 matrix: JSON.stringify(matrix), mapping: JSON.stringify(mapping), table,
                 material: values[prefix + 'default_material'] || '', start_row: config.range.start, end_row: config.range.end,
               }, freeze: true});
+              for (const row of response.message) row.values.basic_color = table === 'accessorise_table' ? null : values[prefix + 'base_color'] || null;
               batches.push({table, label: config.section.label, rows: response.message});
             }
             if (!batches.some(batch => batch.rows.length)) return frappe.msgprint(__('No data rows found.'));
@@ -399,7 +406,12 @@
           {fieldtype: 'Int', fieldname: 'start', label: __('First Data Row'), default: start, reqd: 1},
           {fieldtype: 'Int', fieldname: 'end', label: __('Last Data Row'), default: end, reqd: 1},
           {fieldtype: 'Link', fieldname: 'default_material', label: __('Part Material for Imported Rows'), options: 'Part Material', hidden: accessories, default: sectionMaterial,
-            description: __('Select a Part Material here, or map the Material column below. This is required before reviewing rows.')},
+            description: __('Select a Part Material here, or map the Material column below. This is required before reviewing rows.'),
+            onchange: () => mappingDialog?.set_value('base_color', null)},
+          {fieldtype: 'Column Break'},
+          {fieldtype: 'Link', fieldname: 'base_color', label: __('Base Color'), options: 'Material Color', hidden: accessories,
+            get_query: () => ({query: 'c4factory.api.part_list_material_colors.material_color_query',
+              filters: {material: mappingDialog?.get_value('default_material') || ''}})},
           {fieldtype: 'Section Break', label: __('Column Mapping')},
           ...fields.map(f => {
             const selected = saved[f] || defaults[f];
@@ -427,8 +439,10 @@
               matrix: JSON.stringify(matrix), mapping: JSON.stringify(mapping), table,
               material, start_row: values.start, end_row: values.end,
             }, freeze: true});
+            for (const row of refreshed.message) row.values.basic_color = mappingDialog.get_value('base_color') || null;
             return refreshed.message;
           };
+          for (const row of response.message) row.values.basic_color = values.base_color || null;
           preview(response.message, values.mode, fields, accessories, table, refreshMaterial, values.default_material || '');
         },
       });
@@ -505,6 +519,8 @@
     assertEditable();
     const palettes = {};
     const prepared = [];
+    const colors = {};
+    const prefixes = {panel_materials: 'panel', metal_material: 'metal', other_material: 'other'};
     // Resolve every material before changing any of the destination tables.
     for (const batch of batches) {
       const rows = [];
@@ -518,8 +534,28 @@
           }
           values.color_palette = palettes[values.material];
           values.color_doctype = values.color_palette ? 'Material Color' : null;
+          if (values.basic_color) {
+            if (!(values.basic_color in colors)) {
+              const result = await frappe.db.get_value('Material Color', values.basic_color, ['palette', 'disable']);
+              colors[values.basic_color] = result.message;
+            }
+            const color = colors[values.basic_color];
+            if (!color || Number(color.disable) || color.palette !== values.color_palette)
+              throw new Error(__('Base Color must be enabled and belong to the imported material palette.'));
+          }
         }
         rows.push(values);
+      }
+      if (batch.table !== 'accessorise_table' && rows.length) {
+        const palette = rows[0].color_palette || null;
+        const color = rows[0].basic_color || null;
+        if (rows.some(row => (row.color_palette || null) !== palette || (row.basic_color || null) !== color))
+          throw new Error(__('All imported rows in a table must use the same Color Palette and Base Color.'));
+        const prefix = prefixes[batch.table];
+        const existing = (frm.doc[batch.table] || []).filter(row => !isEmptyImportRow(row));
+        if (mode !== 'Replace Table Rows' && existing.length &&
+            ((frm.doc[prefix + '_color_palette'] || null) !== palette || (frm.doc[prefix + '_base_color'] || null) !== color))
+          throw new Error(__('Imported Color Palette and Base Color must match the existing table. Use Replace Table Rows or change the table header first.'));
       }
       prepared.push({table: batch.table, rows});
     }
@@ -533,6 +569,14 @@
         });
         frm.doc[table] = (frm.doc[table] || []).filter(row => !empty.includes(row));
         frm.doc[table].forEach((row, index) => {row.idx = index + 1;});
+      }
+      if (prefixes[table] && rows.length) {
+        const prefix = prefixes[table];
+        // Assign together without triggering header handlers on existing rows.
+        frm.doc[prefix + '_color_palette'] = rows[0].color_palette || null;
+        frm.doc[prefix + '_base_color'] = rows[0].basic_color || null;
+        frm.refresh_field(prefix + '_color_palette');
+        frm.refresh_field(prefix + '_base_color');
       }
       rows.forEach(values => frm.add_child(table, values));
       frm.refresh_field(table);

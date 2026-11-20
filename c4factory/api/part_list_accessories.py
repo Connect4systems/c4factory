@@ -8,6 +8,8 @@ from frappe.utils import now_datetime
 
 MAPPING_FIELDS = {"item", "description", "requested_uom", "conversion_factor", "stock_uom", "stock_qty", "mapping_status", "mapped_by", "mapped_on"}
 TECHNICAL_FIELDS = ("product", "product_name", "description", "width", "hight", "depth", "material_line", "metal_material_line")
+TECHNICAL_FIELDS += tuple(prefix + suffix for prefix in ("panel", "metal", "other")
+    for suffix in ("_color_palette", "_base_color"))
 
 
 def stock_user():

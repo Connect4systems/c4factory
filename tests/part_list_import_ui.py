@@ -32,7 +32,7 @@ window.frappe = {
   ui: {form: {on(type, events) {handlers[type] = events;}}},
   user_roles: ['Technical'],
   msgprint(message) { alerts.push(message); }, show_alert(message) {alerts.push(message);},
-  db: {async get_value() {if(window.failLookup) throw Error('Lookup failed');return {message:{color_palette:'Wood'}};}},
+  db: {async get_value(type) {if(window.failLookup) throw Error('Lookup failed');return {message:type === 'Material Color' ? {palette:'Wood',disable:0} : {color_palette:'Wood'}};}},
   async call(request) {
     calls.push(request);
     if(request.method.endsWith('preview_import')) return {message:await previewServer(request.args)};
@@ -154,6 +154,7 @@ def main():
         page.locator('[data-field=paste]').fill('Top\tقرصة\t1200\t800\t\t25\t3\nDrawer Unit\tوحدة أدراج\t428\t700\t627\t\t1')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.locator('[data-field=default_material]').fill('MDF')
+        page.locator('[data-field=base_color]').fill('Oak')
         page.locator('.dialog').last.locator('[data-primary]').click()
         page.wait_for_function('dialogs.length === 3')
         assert page.locator('.dialog').last.locator('input:checked').count() == 3, 'Valid assemblies are included by default'
@@ -172,6 +173,8 @@ def main():
         part = page.evaluate('frm.doc.panel_materials[0]')
         assert part['part_name_ar'] == 'قرصة' and part['thickness'] == 25 and part['hight'] is None
         assert part['color_palette'] == 'Wood'
+        assert part['basic_color'] == 'Oak'
+        assert page.evaluate('frm.doc.panel_base_color') == 'Oak'
         # A failed material lookup must leave the old table intact in Replace mode.
         page.evaluate("frm.buttons['Panel Materials']()")
         page.locator('.dialog').last.locator('[data-field=paste]').fill('Bottom\tقاعدة\t100\t80\t\t18\t2')
@@ -384,6 +387,8 @@ def main():
         setup.locator('[data-field=section_0_header]').select_option(panel_header)
         setup.locator('[data-field=section_1_header]').select_option(metal_header)
         setup.locator('[data-field=mode]').select_option('Replace Table Rows')
+        setup.locator('[data-field=section_0_default_material]').fill('MDF')
+        setup.locator('[data-field=section_0_base_color]').fill('Oak')
         before = page.evaluate('JSON.stringify(frm.doc)')
         setup.locator('[data-primary]').click()
         page.wait_for_function("dialogs[dialogs.length-1].options.title === 'Review Import: All Tables'")
@@ -402,6 +407,8 @@ def main():
         for table in ['panel_materials', 'metal_material', 'other_material', 'accessorise_table']:
             assert page.evaluate(f'frm.doc.{table}.length') == 1
         assert page.evaluate('frm.doc.metal_material[0].color_palette') == 'Wood'
+        assert page.evaluate('frm.doc.panel_materials[0].basic_color') == 'Oak'
+        assert page.evaluate('frm.doc.panel_base_color') == 'Oak'
         assert page.evaluate('frm.doc.accessorise_table[0].mapping_status') == 'Pending'
         assert page.evaluate('frm.doc.accessorise_table[0].qty') == 8
         # Empty spacer columns must retain their original Excel indices.
