@@ -8,6 +8,8 @@
  "field_order": [
   "item",
   "item_name",
+  "sub_code",
+  "location_code",
   "qty",
   "part_list",
   "open_part_list",
@@ -27,10 +29,12 @@
   "plexi",
   "metal",
   "fabric",
+  "leather",
   "glass",
   "column_break_yvsv",
   "direction",
   "additional_notes",
+  "other",
   "sales_order_item"
  ],
  "fields": [
@@ -186,6 +190,27 @@
    "label": "Sales Order Item",
    "hidden": 1,
    "read_only": 1
+  },
+  {
+   "fieldtype": "Data",
+   "label": "Sub Code",
+   "fieldname": "sub_code"
+  },
+  {
+   "fieldtype": "Data",
+   "label": "Location Code",
+   "fieldname": "location_code"
+  },
+  {
+   "fieldtype": "Link",
+   "label": "Leather",
+   "fieldname": "leather",
+   "options": "Leather"
+  },
+  {
+   "fieldtype": "Small Text",
+   "label": "Other",
+   "fieldname": "other"
   }
  ],
  "grid_page_length": 50,

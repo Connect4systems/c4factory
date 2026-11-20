@@ -67,14 +67,21 @@ def validate_new_pds_items(doc):
 
 @frappe.whitelist()
 def make_pds_request(sales_order: str):
-	from c4factory.api.boq_items import boq_item_filters
-
 	source = frappe.get_doc("Sales Order", sales_order)
 	source.check_permission("read")
+	return build_pds_request(source)
+
+
+def build_pds_request(source, automatic=False):
+	"""Share eligibility and mapping between manual and submission requests."""
+	from c4factory.api.boq_items import boq_item_filters
+
 	target = frappe.new_doc("PDS Request")
-	target.check_permission("create")
+	if not automatic:
+		target.check_permission("create")
 	target.sales_order = source.name
 	target.customer = source.customer
+	target.technical_team = source.get("custom_technical_team")
 	target.date = today()
 	item_codes = list({row.item_code for row in source.items if row.item_code})
 	filters = boq_item_filters()
@@ -105,8 +112,26 @@ def make_pds_request(sales_order: str):
 			values[target_field] = row.get(source_field)
 		target.append("items", values)
 	if not target.get("items"):
+		if automatic:
+			return None
 		frappe.throw(_("No items need a PDS Request. Items must have an Item Type with BOQ Required enabled and no existing Part List or previous PDS Request."))
 	return target
+
+
+def on_sales_order_submit(doc, method=None):
+	"""Persist a draft request in the Sales Order submission transaction."""
+	if doc.docstatus != 1:
+		return
+	# Use the same ordered item locks as request validation before checking eligibility.
+	for item in sorted({row.item_code for row in doc.items if row.item_code}):
+		frappe.db.sql("select name from `tabItem` where name = %s for update", (item,))
+	if frappe.db.exists("PDS Request", {"sales_order": doc.name, "docstatus": ["<", 2]}):
+		return
+	request = build_pds_request(doc, automatic=True)
+	if request is not None:
+		request.docstatus = 0
+		# Like automatic Project creation, this is part of authorized order submission.
+		request.insert(ignore_permissions=True)
 
 
 def update_sales_order_part_list(part_list):

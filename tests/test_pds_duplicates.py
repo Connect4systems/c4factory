@@ -115,6 +115,61 @@ class TestPDSDuplicates(unittest.TestCase):
 			"custom_item_type": ["in", ["BOQ-TYPE"]], "disabled": 0, "is_sales_item": 1})
 		self.assertEqual((args["start"], args["page_length"]), (20, 10))
 
+	def test_automatic_request_copies_team_specs_and_first_row_quantity(self):
+		source = Doc(name="SO", customer="Customer", custom_technical_team="Design", items=[
+			Doc(name="FIRST", idx=1, item_code="A", qty=2, custom_location_code="Room",
+				custom_sub_code="Sub", custom_leather="Leather", custom_other="Other"),
+			Doc(name="SECOND", idx=2, item_code="A", qty=5),
+		])
+		target = Doc(check_permission=Mock())
+		self.frappe.new_doc = Mock(return_value=target)
+		self.frappe.get_all.side_effect = [["BOQ"], ["A"]]
+		self.frappe.db.get_value.return_value = {}
+		with patch.object(self.api, "get_pds_item_blockers", return_value={}):
+			result = self.api.build_pds_request(source, automatic=True)
+		self.assertEqual(result.technical_team, "Design")
+		self.assertEqual(len(result.items), 1)
+		self.assertEqual(result.items[0].qty, 2)
+		self.assertEqual(result.items[0].sales_order_item, "FIRST")
+		for field, value in {"location_code": "Room", "sub_code": "Sub", "leather": "Leather", "other": "Other"}.items():
+			self.assertEqual(result.items[0][field], value)
+		target.check_permission.assert_not_called()
+
+	def test_automatic_empty_request_is_skipped(self):
+		self.frappe.new_doc = Mock(return_value=Doc())
+		with patch.object(self.api, "get_pds_item_blockers", return_value={}):
+			self.assertIsNone(self.api.build_pds_request(Doc(name="SO", customer="C", items=[]), automatic=True))
+		self.frappe.throw.assert_not_called()
+
+	def test_submit_saves_draft_under_item_locks(self):
+		source = Doc(name="SO", docstatus=1, items=[Doc(item_code="B"), Doc(item_code="A"), Doc(item_code="A")])
+		self.frappe.db.exists.return_value = False
+		request = Doc(insert=Mock())
+		with patch.object(self.api, "build_pds_request", return_value=request) as build:
+			self.api.on_sales_order_submit(source)
+		build.assert_called_once_with(source, automatic=True)
+		self.assertEqual(request.docstatus, 0)
+		request.insert.assert_called_once_with(ignore_permissions=True)
+		self.assertEqual([call.args[1] for call in self.frappe.db.sql.call_args_list], [("A",), ("B",)])
+
+	def test_submit_skips_drafts_existing_requests_and_empty_results(self):
+		with patch.object(self.api, "build_pds_request", return_value=None) as build:
+			self.api.on_sales_order_submit(Doc(name="SO", docstatus=0))
+			build.assert_not_called()
+			self.frappe.db.exists.return_value = True
+			self.api.on_sales_order_submit(Doc(name="SO", docstatus=1, items=[]))
+			build.assert_not_called()
+			self.frappe.db.exists.return_value = False
+			self.api.on_sales_order_submit(Doc(name="SO", docstatus=1, items=[]))
+			build.assert_called_once()
+
+	def test_insert_failure_propagates_to_roll_back_submission(self):
+		self.frappe.db.exists.return_value = False
+		request = Doc(insert=Mock(side_effect=ValueError("Cannot save request")))
+		with patch.object(self.api, "build_pds_request", return_value=request):
+			with self.assertRaisesRegex(ValueError, "Cannot save request"):
+				self.api.on_sales_order_submit(Doc(name="SO", docstatus=1, items=[]))
+
 	def test_mapping_all_blocked_shows_message(self):
 		self.frappe.get_doc = Mock(return_value=Doc(name="SO", customer="Customer", items=[
 			Doc(idx=1, item_code="A")], check_permission=Mock()))

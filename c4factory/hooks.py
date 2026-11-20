@@ -60,7 +60,10 @@ doc_events = {
             "c4factory.api.part_list_versions.set_sales_order_active_parts",
             "c4factory.api.sales_order_colors.validate_colors",
         ],
-        "on_submit": "c4factory.api.sales_order_project.on_submit",
+        "on_submit": [
+            "c4factory.api.sales_order_project.on_submit",
+            "c4factory.api.pds_request.on_sales_order_submit",
+        ],
     },
     "BOM": {
         "before_validate": "c4factory.api.bom.calculate_item_qty",
