@@ -19,20 +19,6 @@ frappe.ui.form.on('Sales Order', {
     if (frm.doc.docstatus === 1 && frappe.model.can_create('Color sample')) {
       frm.add_custom_button(__('Color Sample'), () => openSalesOrderColorSample(frm), __('Create'));
     }
-    if (!frm.is_new()) {
-      frm.add_custom_button(__('Request PDS'), async () => {
-        if (frm.is_dirty()) await frm.save();
-        if (frm.is_dirty()) return;
-        const result = await frappe.call({
-          method: 'c4factory.api.pds_request.make_pds_request',
-          args: { sales_order: frm.doc.name },
-          freeze: true,
-        });
-        if (!result.message) return;
-        const doc = frappe.model.sync(result.message)[0];
-        frappe.set_route('Form', doc.doctype, doc.name);
-      }, __('Create'));
-    }
   }
 });
 
