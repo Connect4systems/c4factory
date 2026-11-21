@@ -102,7 +102,7 @@
    "label": "Delivery Status",
    "fieldtype": "Data",
    "read_only": 1,
-   "in_list_view": 1,
+   "in_list_view": 0,
    "columns": 2
   },
   {
