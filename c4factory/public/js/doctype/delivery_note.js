@@ -1,5 +1,13 @@
 async function fillDeliveryNoteDetails(frm) {
   if (frm.doc.docstatus !== 0) return;
+  const projects = frm.doc.project ? [frm.doc.project] :
+    [...new Set((frm.doc.items || []).map(row => row.project).filter(Boolean))];
+  let projectNo = '';
+  if (projects.length === 1) {
+    const result = await frappe.db.get_value('Project', projects[0], 'custom_project_no');
+    projectNo = result.message?.custom_project_no || '';
+  }
+  await frm.set_value('custom_project_no', projectNo);
   const orders = [...new Set((frm.doc.items || []).map(row => row.against_sales_order).filter(Boolean))];
   const sources = await Promise.all(orders.map(async name => {
     const result = await frappe.db.get_value('Sales Order', name, ['custom_project_title', 'custom_technical_team']);
@@ -21,8 +29,12 @@ async function fillDeliveryNoteDetails(frm) {
   }));
 }
 
-frappe.ui.form.on('Delivery Note', { refresh: fillDeliveryNoteDetails });
+frappe.ui.form.on('Delivery Note', {
+  refresh: fillDeliveryNoteDetails,
+  project: fillDeliveryNoteDetails,
+});
 frappe.ui.form.on('Delivery Note Item', {
+  project(frm) { return fillDeliveryNoteDetails(frm); },
   against_sales_order(frm) { return fillDeliveryNoteDetails(frm); },
   so_detail(frm) { return fillDeliveryNoteDetails(frm); },
 });

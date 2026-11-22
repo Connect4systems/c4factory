@@ -1,0 +1,112 @@
+{% set company = frappe.get_doc("Company", doc.company) %}
+{% set customer = doc.customer_name or doc.customer %}
+{% set projects = [] %}
+{% for row in doc.items %}
+  {% if row.get("project") and row.project not in projects %}{% set _ = projects.append(row.project) %}{% endif %}
+{% endfor %}
+{% set project = doc.get("project") or (projects[0] if projects|length == 1 else none) %}
+{% set project_no = doc.get("custom_project_no") or (frappe.db.get_value("Project", project, "custom_project_no") if project else "") %}
+<style>
+  .print-format { font-family: Arial, Tahoma, sans-serif; color: #111; font-size: 11px; }
+  .handover { width: 100%; }
+  .handover-header { width: 100%; border-bottom: 1px solid #777; margin-bottom: 5px; }
+  .handover-header td { border: 0 !important; vertical-align: top; padding: 0 0 5px !important; }
+  .handover-logo { width: 20%; }
+  .handover-logo img { max-width: 115px; max-height: 90px; }
+  .handover h1 { font-size: 25px; text-decoration: underline; text-align: center; margin: 0 0 16px; }
+  .handover-details { direction: rtl; text-align: right; line-height: 1.8; }
+  .handover-details strong { display: inline-block; min-width: 120px; text-decoration: underline; }
+  .handover-items { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
+  .handover-items thead { display: table-header-group; }
+  .handover-items th, .handover-items td { border: 1px solid #333 !important; padding: 5px !important; overflow-wrap: anywhere; vertical-align: top; }
+  .handover-items th { color: #b00000; background: #f3f3f3 !important; text-align: center; font-family: Georgia, serif; }
+  .handover-items th:first-child { white-space: nowrap; }
+  .handover-items tr { page-break-inside: avoid; }
+  .handover-product { text-align: center; }
+  .handover-product strong { display: block; }
+  .handover-product img { display: block; max-width: 100%; max-height: 125px; margin: 5px auto 0; }
+  .handover-code { text-align: left; font-size: 10px; margin-top: 5px; }
+  .handover-qty, .handover-index { text-align: center; }
+  .handover-material { border-bottom: 1px solid #888; padding: 3px 0 8px; min-height: 34px; }
+  .handover-material:last-child { border: 0; }
+  .handover-material-label { color: #b00000; font-size: 9px; }
+  .handover-material-value { text-align: center; white-space: pre-wrap; }
+  .handover-notes { white-space: pre-wrap; text-align: right; }
+  .handover-signoff { direction: rtl; text-align: right; margin-top: 22px; page-break-inside: avoid; }
+  .handover-acknowledgement { font-size: 13px; font-weight: bold; line-height: 1.9; }
+  .handover-signatures { width: 100%; margin-top: 20px; border-collapse: collapse; }
+  .handover-signatures td { width: 50%; border: 0 !important; padding: 5px 12px !important; font-size: 13px; }
+  .handover-signatures .signature-line { height: 36px; }
+  .handover-footer { border-top: 1px solid #555; margin-top: 18px; padding-top: 6px; text-align: center; font-size: 9px; }
+  .handover-footer p { margin: 0; }
+  @media print { .handover-signoff { margin-top: 25mm; } }
+</style>
+<div class="handover">
+  <table class="handover-header">
+    <tr>
+      <td class="handover-logo">
+        {% if company.company_logo %}<img src="{{ company.company_logo | e }}" alt="{{ doc.company | e }}">{% endif %}
+      </td>
+      <td>
+        <h1 dir="rtl">محضر استلام نهائي</h1>
+        <div class="handover-details" lang="ar">
+          <div><strong>رقم محضر التسليم:</strong> <bdi dir="ltr">{{ doc.name | e }}</bdi></div>
+          <div><strong>اسم المشروع:</strong> {{ customer | e }}{% if doc.get("custom_project_title") %} - {{ doc.custom_project_title | e }}{% endif %}</div>
+          <div><strong>رقم المشروع:</strong> <bdi>{{ (project_no or "") | e }}</bdi></div>
+          <div><strong>التاريخ:</strong> <bdi dir="ltr">{{ frappe.utils.formatdate(doc.posting_date, "dd/MM/yyyy") }}</bdi></div>
+        </div>
+      </td>
+    </tr>
+  </table>
+  <table class="handover-items">
+    <colgroup><col style="width:4%"><col style="width:34%"><col style="width:5%"><col style="width:16%"><col style="width:23%"><col style="width:18%"></colgroup>
+    <thead><tr><th>No.</th><th>Product</th><th>QTY</th><th>Materials</th><th>Description</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% for row in doc.items %}
+        {% set source = frappe.get_doc("Sales Order Item", row.so_detail) if row.get("so_detail") else none %}
+        {% if source and (source.parent != row.get("against_sales_order") or source.item_code != row.item_code) %}{% set source = none %}{% endif %}
+        {% set image = row.get("image") or frappe.db.get_value("Item", row.item_code, "image") %}
+        {% set colors = frappe.parse_json(source.get("custom_color_sample_data") or "{}") if source else {} %}
+        <tr>
+          <td class="handover-index">{{ loop.index }}</td>
+          <td class="handover-product">
+            <strong>{{ (row.item_name or row.item_code) | e }}</strong>
+            <div class="handover-code">{{ row.item_code | e }}</div>
+            {% if image %}<img src="{{ image | e }}" alt="{{ row.item_name | e }}">{% endif %}
+          </td>
+          <td class="handover-qty">{{ row.get_formatted("qty", doc) }}</td>
+          <td>
+            {% for label, table, legacy in [("Wood", "panel_materials", "custom_wood"), ("Metal", "metal_material", "custom_metal"), ("Other", "other_material", "custom_other")] %}
+              <div class="handover-material">
+                <div class="handover-material-label">{{ label }}</div>
+                {% for material in colors.get("rows", []) if material.get("source_table") == table %}
+                  <div class="handover-material-value" dir="auto">{{ (material.get("color") or material.get("color_palette") or material.get("material") or "") | e }}</div>
+                {% endfor %}
+                {% if source and source.get(legacy) %}<div class="handover-material-value" dir="auto">{{ source.get(legacy) | e }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </td>
+          <td dir="auto">{{ row.description or "" }}</td>
+          <td class="handover-notes" dir="auto">{{ (row.get("custom_note") or "") | e }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="handover-signoff" lang="ar">
+    <div class="handover-acknowledgement">
+      <div>تم تسليم البنود أعلاه من شركة {{ doc.company | e }} لطرف شركة / عميل: {{ customer | e }}</div>
+      <div>تسليمًا نهائيًا طبقًا للمواصفات المعتمدة وعرض السعر وأمر التوريد بتاريخ: &nbsp; / &nbsp; / &nbsp; .</div>
+      <div>* في حالة وجود ملاحظات تحدد بخانة الملاحظات.</div>
+    </div>
+    <table class="handover-signatures">
+      <tr><td><strong>مندوب شركة</strong></td><td><strong>المستلم بشركة / عميل</strong></td></tr>
+      <tr><td>{{ doc.company | e }}</td><td>{{ customer | e }}</td></tr>
+      <tr><td class="signature-line">الاسم / ........................................</td><td class="signature-line">الاسم / ........................................</td></tr>
+      <tr><td class="signature-line">التوقيع / ......................................</td><td class="signature-line">التوقيع / ......................................</td></tr>
+    </table>
+  </div>
+  <div class="handover-footer">
+    {% if doc.get("company_address_display") %}<div>{{ doc.company_address_display }}</div>{% endif %}
+    <div>{{ doc.company | e }}{% if company.get("phone_no") %} &nbsp; | &nbsp; {{ company.phone_no | e }}{% endif %}{% if company.get("email") %} &nbsp; | &nbsp; {{ company.email | e }}{% endif %}{% if company.get("website") %} &nbsp; | &nbsp; {{ company.website | e }}{% endif %}</div>
+  </div>
+</div>

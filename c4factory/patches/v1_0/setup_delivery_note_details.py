@@ -9,10 +9,13 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 def execute():
     create_custom_fields({
         "Delivery Note": [
+            {"fieldname": "custom_project_no", "label": "Project No", "fieldtype": "Data",
+             "insert_after": "custom_project_title", "read_only": 1,
+             "fetch_from": "project.custom_project_no", "fetch_if_empty": 0},
             {"fieldname": "custom_project_title", "label": "Project Title", "fieldtype": "Data",
              "insert_after": "customer_name"},
             {"fieldname": "custom_technical_team", "label": "Technical Team", "fieldtype": "Link",
-             "options": "Technical Team", "insert_after": "custom_project_title"},
+             "options": "Technical Team", "insert_after": "custom_project_no"},
         ],
         "Delivery Note Item": [
             {"fieldname": "custom_note", "label": "Note", "fieldtype": "Small Text",
@@ -26,7 +29,7 @@ def execute():
         if field.fieldname in ("custom_note", "custom_sales_order_note") or (field.label or "").strip().lower() == "sales order note":
             make_property_setter("Delivery Note", field.fieldname, "hidden", 1, "Check")
     for doctype, fields, anchor in (
-        ("Delivery Note", ["custom_project_title", "custom_technical_team"], "customer_name"),
+        ("Delivery Note", ["custom_project_title", "custom_project_no", "custom_technical_team"], "customer_name"),
         ("Delivery Note Item", ["custom_note", "custom_note_initialized"], "description"),
     ):
         order = [f.fieldname for f in frappe.get_meta(doctype, cached=False).fields if f.fieldname not in fields]

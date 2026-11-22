@@ -22,3 +22,13 @@ def fill_delivery_note(doc, method=None):
         values = {source.get(field) or "" for source in orders.values()}
         if not doc.get(field) and len(values) == 1:
             doc.set(field, values.pop())
+    # A Project action supplies the header link; ordinary order mappings may
+    # supply it only on the items. Never choose one of several projects.
+    projects = {row.get("project") for row in doc.items if row.get("project")}
+    if doc.get("project"):
+        projects = {doc.project}
+    if len(projects) == 1:
+        project = next(iter(projects))
+        doc.custom_project_no = frappe.db.get_value("Project", project, "custom_project_no") or ""
+    else:
+        doc.custom_project_no = ""
