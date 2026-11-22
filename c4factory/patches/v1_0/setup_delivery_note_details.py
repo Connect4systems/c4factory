@@ -15,8 +15,8 @@ def execute():
              "options": "Technical Team", "insert_after": "custom_project_title"},
         ],
         "Delivery Note Item": [
-            {"fieldname": "custom_note", "label": "Sales Order Note", "fieldtype": "Small Text",
-             "insert_after": "description", "in_list_view": 1},
+            {"fieldname": "custom_note", "label": "Note", "fieldtype": "Small Text",
+             "insert_after": "description", "in_list_view": 1, "read_only": 0},
             {"fieldname": "custom_note_initialized", "fieldtype": "Check", "hidden": 1,
              "insert_after": "custom_note", "no_copy": 1},
         ],
