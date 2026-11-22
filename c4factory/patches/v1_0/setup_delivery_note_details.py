@@ -37,3 +37,7 @@ def execute():
         order[index:index] = fields
         make_property_setter(doctype, None, "field_order", json.dumps(order), "Data", for_doctype=True)
         frappe.clear_cache(doctype=doctype)
+    make_property_setter(
+        "Delivery Note", None, "default_print_format", "Delivery Handover", "Data", for_doctype=True,
+    )
+    frappe.clear_cache(doctype="Delivery Note")
