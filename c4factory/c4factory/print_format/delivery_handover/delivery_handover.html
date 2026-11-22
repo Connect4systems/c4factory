@@ -27,10 +27,9 @@
   .handover-product img { display: block; max-width: 100%; max-height: 125px; margin: 5px auto 0; }
   .handover-code { text-align: left; font-size: 10px; margin-top: 5px; }
   .handover-qty, .handover-index { text-align: center; }
-  .handover-material { border-bottom: 1px solid #888; padding: 3px 0 8px; min-height: 34px; }
-  .handover-material:last-child { border: 0; }
-  .handover-material-label { color: #b00000; font-size: 9px; }
-  .handover-material-value { text-align: center; white-space: pre-wrap; }
+  .handover-materials { width: 100%; border-collapse: collapse; }
+  .handover-items .handover-materials td { border: 1px solid #000 !important; font-size: 10px; padding: 2px !important; text-align: left; }
+  .handover-material-label { color: #c62828; font-weight: 800; display: inline-block; vertical-align: top; }
   .handover-notes { white-space: pre-wrap; text-align: right; }
   .handover-signoff { direction: rtl; text-align: right; margin-top: 22px; page-break-inside: avoid; }
   .handover-acknowledgement { font-size: 13px; font-weight: bold; line-height: 1.9; }
@@ -63,10 +62,8 @@
     <thead><tr><th>No.</th><th>Product</th><th>QTY</th><th>Materials</th><th>Description</th><th>Notes</th></tr></thead>
     <tbody>
       {% for row in doc.items %}
-        {% set source = frappe.get_doc("Sales Order Item", row.so_detail) if row.get("so_detail") else none %}
-        {% if source and (source.parent != row.get("against_sales_order") or source.item_code != row.item_code) %}{% set source = none %}{% endif %}
-        {% set image = row.get("image") or frappe.db.get_value("Item", row.item_code, "image") %}
-        {% set colors = json.loads(source.get("custom_color_sample_data") or "{}") if source else {} %}
+        {% set item = frappe.get_doc("Item", row.item_code) if row.item_code else {} %}
+        {% set image = row.get("image") or item.get("image") %}
         <tr>
           <td class="handover-index">{{ loop.index }}</td>
           <td class="handover-product">
@@ -76,15 +73,13 @@
           </td>
           <td class="handover-qty">{{ row.get_formatted("qty", doc) }}</td>
           <td>
-            {% for label, table, legacy in [("Wood", "panel_materials", "custom_wood"), ("Metal", "metal_material", "custom_metal"), ("Other", "other_material", "custom_other")] %}
-              <div class="handover-material">
-                <div class="handover-material-label">{{ label }}</div>
-                {% for material in colors.get("rows", []) if material.get("source_table") == table %}
-                  <div class="handover-material-value" dir="auto">{{ (material.get("color") or material.get("color_palette") or material.get("material") or "") | e }}</div>
-                {% endfor %}
-                {% if source and source.get(legacy) %}<div class="handover-material-value" dir="auto">{{ source.get(legacy) | e }}</div>{% endif %}
-              </div>
-            {% endfor %}
+            <table class="handover-materials">
+              {% for label, field in [("Material", "custom_material_line"), ("Wood", "custom_wood"), ("Metal", "custom_metal"), ("Glass", "custom_glass"), ("Fabric", "custom_fabric"), ("Other", "custom_other")] %}
+                {% if item.get(field) %}
+                  <tr><td><span class="handover-material-label">{{ label }}</span> <span dir="auto">{{ item.get(field) | e }}</span></td></tr>
+                {% endif %}
+              {% endfor %}
+            </table>
           </td>
           <td dir="auto">{{ row.description or "" }}</td>
           <td class="handover-notes" dir="auto">{{ (row.get("custom_note") or "") | e }}</td>

@@ -1,5 +1,4 @@
 """Render the actual print template with representative transaction data."""
-import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,29 +18,34 @@ class Item(Doc):
         return str(self[field])
 
 
-def render_handover(rows=None, **values):
+def render_handover(rows=None, item_values=None, **values):
     row = Item(item_code="C-1138334", item_name="Coffee table", qty=1,
         description="<p>Top made of MDF 25mm; stainless steel structure.</p>",
         so_detail="SO-ROW-1", against_sales_order="SO-001",
         custom_note="ملاحظات المستلم", project="PROJ-0001")
-    source = Doc(parent="SO-001", item_code="C-1138334", custom_note="Original order note",
-        custom_color_sample_data=json.dumps({"rows": [
-            {"source_table": "panel_materials", "color": "دوكو هاي جلوس"},
-            {"source_table": "metal_material", "color": "استانلس"}]}))
+    item = Doc(custom_material_line="HPL,Metal", image="")
+    if item_values is not None:
+        item = Doc(item_values)
     company = Doc(company_logo="", phone_no="020000000", email="info@example.com", website="example.com")
     doc = Delivery(name="DN-2026-00448", company="شركة الأثاث", customer="CUST-001",
         customer_name="بنك التنمية الصناعية", custom_project_title="المركز الرئيسي - الدور الثامن",
         project="PROJ-0001", posting_date="2026-11-22", items=rows if rows is not None else [row])
     doc.update(values)
+    def get_doc(doctype, name):
+        if doctype == "Company":
+            return company
+        if doctype == "Item":
+            return item
+        raise AssertionError(f"Print must fetch materials from Item, not {doctype}")
+
     frappe = SimpleNamespace(
-        get_doc=lambda dt, name: company if dt == "Company" else source,
+        get_doc=get_doc,
         db=SimpleNamespace(get_value=lambda dt, name, field: "P-8716" if dt == "Project" else None),
         utils=SimpleNamespace(formatdate=lambda value, pattern: "22/11/2026"))
-    # Frappe exposes JSON as a separate sandbox global, not frappe.parse_json.
     # StrictUndefined makes accidental access to unavailable helpers fail here.
     env = SandboxedEnvironment(autoescape=False, undefined=StrictUndefined)
     return env.from_string(TEMPLATE.read_text(encoding="utf-8")).render(
-        doc=doc, frappe=frappe, json=SimpleNamespace(loads=json.loads))
+        doc=doc, frappe=frappe)
 
 
 class TestDeliveryHandoverPrint(unittest.TestCase):
@@ -51,11 +55,32 @@ class TestDeliveryHandoverPrint(unittest.TestCase):
             self.assertIn(text, html)
         self.assertNotIn(">PROJ-0001<", html)
 
-    def test_uses_edited_delivery_note_and_sales_order_materials(self):
+    def test_uses_edited_delivery_note_and_item_material_line(self):
         html = render_handover()
-        for text in ("ملاحظات المستلم", "دوكو هاي جلوس", "استانلس"):
+        for text in ("ملاحظات المستلم", "HPL,Metal", 'class="handover-materials"'):
             self.assertIn(text, html)
         self.assertNotIn("Original order note", html)
+
+    def test_item_materials_use_archi_labels_and_hide_empty_fields(self):
+        html = render_handover(item_values={"custom_material_line": "HPL", "custom_wood": "Oak",
+            "custom_metal": "Steel", "custom_glass": "Clear", "custom_fabric": "Linen"})
+        for label, value in [("Material", "HPL"), ("Wood", "Oak"), ("Metal", "Steel"),
+                ("Glass", "Clear"), ("Fabric", "Linen")]:
+            self.assertIn(f'class="handover-material-label">{label}</span>', html)
+            self.assertIn(f'<span dir="auto">{value}</span>', html)
+        self.assertNotIn('class="handover-material-label">Other</span>', html)
+
+    def test_material_line_fetched_for_item_without_sales_order_reference(self):
+        row = Item(item_code="A", item_name="A", qty=1, description="", custom_material_line="Stale row material")
+        html = render_handover(rows=[row], item_values={"custom_material_line": "Item master material"})
+        self.assertIn("Item master material", html)
+        self.assertNotIn("Stale row material", html)
+
+    def test_missing_item_materials_and_html_characters(self):
+        html = render_handover(item_values={})
+        self.assertNotIn('class="handover-material-label">', html)
+        html = render_handover(item_values={"custom_material_line": "<unsafe>"})
+        self.assertIn("&lt;unsafe&gt;", html)
 
     def test_free_text_escaped_and_unlinked_items_render(self):
         row = Item(item_code="A", item_name="A", qty=2, description="", custom_note="<script>bad()</script>")
