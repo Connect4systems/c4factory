@@ -17,6 +17,7 @@ after_migrate = [
     "c4factory.patches.v1_0.move_part_file_to_pds_table.execute",
     "c4factory.patches.v1_0.repair_part_list_description.execute",
     "c4factory.patches.v1_0.setup_quotation_project_details.setup_fields",
+    "c4factory.patches.v1_0.setup_delivery_note_details.execute",
 ]
 
 app_include_js = [
@@ -45,6 +46,7 @@ doctype_js = {
 
     "Sample Request": "public/js/doctype/sample_request/sample_request.js",
     "Project": "public/js/doctype/project.js",
+    "Delivery Note": "public/js/doctype/delivery_note.js",
 }
 
 # ---------------------------------------------------------
@@ -57,6 +59,7 @@ doc_events = {
         "validate": "c4factory.api.project_boq.validate_project",
     },
     "Delivery Note": {
+        "before_validate": "c4factory.api.delivery_note_details.fill_delivery_note",
         "before_submit": "c4factory.api.project_boq.guard_delivery_change",
         "before_cancel": "c4factory.api.project_boq.guard_delivery_change",
         "on_submit": "c4factory.api.project_boq.sync_progress",
