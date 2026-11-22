@@ -29,6 +29,7 @@ class TestProjectBOQ(unittest.TestCase):
 		self.frappe.db = Mock()
 		self.frappe.get_doc = Mock()
 		self.frappe.get_all = Mock(return_value=["A"])
+		self.frappe.get_all.side_effect = lambda *args, **kwargs: self.frappe.get_all.return_value if kwargs.get("pluck") else [Doc(name="A", image="/files/a.png")]
 		self.frappe.parse_json = __import__("json").loads
 		utils = ModuleType("frappe.utils")
 		utils.flt = lambda value: float(value or 0)
@@ -98,6 +99,19 @@ class TestProjectBOQ(unittest.TestCase):
 		self.assertEqual(rows[0]["installed_qty"], 2)
 		self.assertEqual(rows[1]["delivered_qty"], 0)
 		self.assertEqual(rows[0]["description"], "R1")
+
+	def test_boq_preserves_edited_and_cleared_notes_by_source_row(self):
+		order = Doc(name="SO", items=[Doc(name=name, item_code="A", item_name="Item", qty=1,
+			description=name, uom="Nos", custom_note="Quotation " + name) for name in ("R1", "R2", "R3")])
+		self.frappe.get_doc.return_value = order
+		self.frappe.db.sql.return_value = []
+		project = Doc(sales_order="SO", custom_project_boq=[
+			Doc(sales_order_item="R1", note="Edited", note_initialized=1),
+			Doc(sales_order_item="R2", note="", note_initialized=1)])
+		with patch.object(self.api, "delivery_rows", return_value=[]):
+			rows = self.api.build_rows(project)
+		self.assertEqual([r["note"] for r in rows], ["Edited", "", "Quotation R3"])
+		self.assertTrue(all(r["image"] == "/files/a.png" for r in rows))
 
 	def test_submitted_part_list_takes_precedence_over_request(self):
 		self.frappe.get_doc.return_value = Doc(name="SO", items=[Doc(name="R", item_code="A",

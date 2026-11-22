@@ -87,6 +87,9 @@ def build_rows(project):
 		from `tabPDS Request Item` i join `tabPDS Request` r on r.name=i.parent
 		where r.docstatus<2 and i.item in %(items)s order by r.creation desc
 	""", {"items": list({r.item_code for r in order.items})}, as_dict=True)
+	existing = {r.get("sales_order_item"): r for r in project.get("custom_project_boq", [])}
+	images = {r.name: r.image for r in frappe.get_all("Item",
+		filters={"name": ["in", list({r.item_code for r in order.items})]}, fields=["name", "image"])}
 	result = []
 	for row in order.items:
 		factor = flt(row.conversion_factor) or 1
@@ -107,9 +110,12 @@ def build_rows(project):
 			elif request:
 				pds_status = f"PDS Request: {request}"
 		delivery_status, installation_status = progress_status(flt(row.qty), delivered, installed_qty)
+		previous = existing.get(row.name)
+		note = previous.get("note") if previous and (previous.get("note_initialized") or previous.get("note")) else row.get("custom_note")
 		result.append({
 			"sales_order_item": row.name, "item_code": row.item_code, "item_name": row.item_name,
 			"description": row.description, "actual_qty": row.qty, "uom": row.uom,
+			"note": note, "note_initialized": 1, "image": images.get(row.item_code),
 			"delivered_qty": delivered, "installed_qty": installed_qty,
 			"pds_status": pds_status, "pds_request": request,
 			"part_list": part if valid_part else None,
@@ -129,6 +135,8 @@ def onload(doc, method=None):
 def validate_project(doc, method=None):
 	if resolve_sales_order(doc):
 		doc.customer = frappe.db.get_value("Sales Order", doc.sales_order, "customer")
+		if not doc.get("custom_project_title"):
+			doc.custom_project_title = frappe.db.get_value("Sales Order", doc.sales_order, "custom_project_title")
 		doc.set("custom_project_boq", build_rows(doc))
 
 

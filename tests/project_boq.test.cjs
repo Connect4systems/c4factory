@@ -26,6 +26,7 @@ const frm = {
   doc: {name: 'P-OLD'},
   fields_dict: {custom_project_boq: {grid}},
   is_new: () => false,
+  is_dirty: () => false,
   add_custom_button(label, action) {buttons.set(label, action);},
   remove_custom_button(label) {buttons.delete(label);},
   refresh_field() {},

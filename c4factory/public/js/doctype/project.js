@@ -63,6 +63,7 @@
 
 	async function load_boq(frm) {
 		if (frm.is_new() || !frm.fields_dict.custom_project_boq) return;
+		if (frm.is_dirty()) return;
 		const request = (frm._boq_request || 0) + 1;
 		frm._boq_request = request;
 		const project = frm.doc.name;
@@ -72,7 +73,7 @@
 		grid.df.cannot_add_rows = true;
 		grid.df.cannot_delete_rows = true;
 		const response = await frappe.call({method: api + "get_project_boq", args: {project}});
-		if (frm.doc.name !== project || frm._boq_request !== request) return;
+		if (frm.doc.name !== project || frm._boq_request !== request || frm.is_dirty()) return;
 		const result = response.message || {};
 		// Display authoritative rows without marking the Project as edited.
 		frm.doc.custom_project_boq = (result.rows || []).map((row, idx) => ({
@@ -104,6 +105,7 @@
 	});
 
 	frappe.ui.form.on("Project BOQ Item", {
+		note(frm, cdt, cdn) { locals[cdt][cdn].note_initialized = 1; },
 		create_delivery(frm, cdt, cdn) { deliver(frm, [locals[cdt][cdn]]); },
 		async create_installation_note(frm, cdt, cdn) {
 			const row = locals[cdt][cdn];

@@ -9,6 +9,10 @@
   "item_code",
   "item_name",
   "description",
+  "note",
+  "note_initialized",
+  "image",
+  "image_preview",
   "actual_qty",
   "uom",
   "delivered_qty",
@@ -131,6 +135,32 @@
    "fieldtype": "Data",
    "read_only": 1,
    "hidden": 1
+  },
+  {
+   "fieldname": "note",
+   "label": "Note",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "note_initialized",
+   "fieldtype": "Check",
+   "hidden": 1
+  },
+  {
+   "fieldname": "image",
+   "label": "Image",
+   "fieldtype": "Attach Image",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "image_preview",
+   "label": "Item Image",
+   "fieldtype": "Image",
+   "options": "image"
   }
  ],
  "permissions": [],

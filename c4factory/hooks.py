@@ -16,10 +16,11 @@ after_migrate = [
     "c4factory.patches.v1_0.allow_sales_order_part_list_after_submit.execute",
     "c4factory.patches.v1_0.move_part_file_to_pds_table.execute",
     "c4factory.patches.v1_0.repair_part_list_description.execute",
+    "c4factory.patches.v1_0.setup_quotation_project_details.setup_fields",
 ]
 
 app_include_js = [
-    "/assets/c4factory/js/doctype/project.js?v=20261120-boq-loading",
+    "/assets/c4factory/js/doctype/project.js?v=20261122-boq-notes",
     "/assets/c4factory/js/doctype/part_list_columns.js?v=20261121-color-palette",
     "/assets/c4factory/js/doctype/part_list_table_fullscreen.js?v=20261111-scoped-init",
     "/assets/c4factory/js/doctype/part_list_import.js?v=20261121-palette-base-color-2",
@@ -87,6 +88,7 @@ doc_events = {
         "on_cancel": "c4factory.api.project_boq.sync_progress",
         "before_update_after_submit": "c4factory.api.sales_order_part_list.before_update_after_submit",
         "before_validate": [
+            "c4factory.api.quotation_project_details.fill_sales_order",
             "c4factory.api.part_list_versions.set_sales_order_active_parts",
             "c4factory.api.sales_order_colors.validate_colors",
         ],
