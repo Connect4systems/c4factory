@@ -66,7 +66,7 @@
         {% set source = frappe.get_doc("Sales Order Item", row.so_detail) if row.get("so_detail") else none %}
         {% if source and (source.parent != row.get("against_sales_order") or source.item_code != row.item_code) %}{% set source = none %}{% endif %}
         {% set image = row.get("image") or frappe.db.get_value("Item", row.item_code, "image") %}
-        {% set colors = frappe.parse_json(source.get("custom_color_sample_data") or "{}") if source else {} %}
+        {% set colors = json.loads(source.get("custom_color_sample_data") or "{}") if source else {} %}
         <tr>
           <td class="handover-index">{{ loop.index }}</td>
           <td class="handover-product">

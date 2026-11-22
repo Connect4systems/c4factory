@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from jinja2 import StrictUndefined
 from jinja2.sandbox import SandboxedEnvironment
 
 from test_delivery_note_details import Delivery
@@ -35,10 +36,12 @@ def render_handover(rows=None, **values):
     frappe = SimpleNamespace(
         get_doc=lambda dt, name: company if dt == "Company" else source,
         db=SimpleNamespace(get_value=lambda dt, name, field: "P-8716" if dt == "Project" else None),
-        parse_json=json.loads,
         utils=SimpleNamespace(formatdate=lambda value, pattern: "22/11/2026"))
-    env = SandboxedEnvironment(autoescape=False)
-    return env.from_string(TEMPLATE.read_text(encoding="utf-8")).render(doc=doc, frappe=frappe)
+    # Frappe exposes JSON as a separate sandbox global, not frappe.parse_json.
+    # StrictUndefined makes accidental access to unavailable helpers fail here.
+    env = SandboxedEnvironment(autoescape=False, undefined=StrictUndefined)
+    return env.from_string(TEMPLATE.read_text(encoding="utf-8")).render(
+        doc=doc, frappe=frappe, json=SimpleNamespace(loads=json.loads))
 
 
 class TestDeliveryHandoverPrint(unittest.TestCase):
