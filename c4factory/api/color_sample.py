@@ -77,7 +77,7 @@ def source_colors(row):
 	return {
 		"custom_part_list": part_list,
 		"custom_color_sample_data": json.dumps({
-			"part_list": part_list, "rows": config["rows"],
+			"part_list": part_list, "base_colors": config.get("base_colors", []), "rows": config["rows"],
 		}),
 	}
 
@@ -141,13 +141,18 @@ def validate_sample(doc, lock=False):
 		if item.get("custom_part_list") != baseline["custom_part_list"] or not item.get("custom_color_sample_data"):
 			item.update(baseline)
 	validate_colors(doc)
-	# Materials without individual editing enabled must retain their source color.
+	# Noneditable materials retain their source color or an authorized table base.
 	for item in doc.items:
 		source = by_name[item.sales_order_item]
 		baseline = json.loads(source_colors(source)["custom_color_sample_data"])
 		original = {row["source_row"]: row for row in baseline["rows"]}
-		for row in json.loads(item.custom_color_sample_data)["rows"]:
+		data = json.loads(item.custom_color_sample_data)
+		bases = {base["source_table"]: base for base in data.get("base_colors", [])}
+		for row in data["rows"]:
 			if row["edite_color"]:
+				continue
+			base = bases.get(row.get("source_table"))
+			if base and base.get("allow_edit") and row.get("color_palette") == base.get("color_palette") and row["color"] == base.get("color"):
 				continue
 			if row["color"] != original[row["source_row"]]["color"]:
 				frappe.throw(_("Row {0}: Individual color editing is not enabled for material {1}.").format(item.idx, row["material"]))

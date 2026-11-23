@@ -28,7 +28,7 @@ app_include_js = [
     "/assets/c4factory/js/doctype/item_uom.js",
     "/assets/c4factory/js/doctype/part_list_versions.js",
     "/assets/c4factory/js/doctype/part_list_material_colors.js?v=20261121-color-palette",
-    "/assets/c4factory/js/doctype/sales_order/item_colors.js?v=20261121-color-palette",
+    "/assets/c4factory/js/doctype/sales_order/item_colors.js?v=20261123-base-color-edit",
     # Register Sales Order actions independently of other apps' doctype_js hooks.
     "/assets/c4factory/js/doctype/sales_order/sales_order.js",
 ]

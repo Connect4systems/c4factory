@@ -60,13 +60,20 @@ async function syncSalesOrderColors(frm, cdt, cdn, reset = false) {
   const matching = !reset && saved.part_list === partList;
   const choices = new Map((matching ? saved.rows : [])
     .filter(row => row && typeof row === 'object').map(row => [row.source_row, row]));
+  const savedBases = new Map((matching ? saved.base_colors || [] : [])
+    .map(base => [base.source_table, base]));
+  const baseColors = (config.base_colors || []).map(source => {
+    const choice = savedBases.get(source.source_table);
+    return { ...source, color: cdt === 'Color Sample Item' && source.allow_edit &&
+      choice?.color_palette === source.color_palette ? choice.color : source.color };
+  });
   const rows = (config.rows || []).map(source => {
     const choice = choices.get(source.source_row);
     return { ...source, color: !source.color_doctype ? null :
       choice?.color_doctype === source.color_doctype && choice?.color_palette === source.color_palette ? choice.color : source.color };
   });
   const values = {
-    custom_color_sample_data: JSON.stringify({ part_list: partList, rows }),
+    custom_color_sample_data: JSON.stringify({ part_list: partList, base_colors: baseColors, rows }),
   };
   // Python's JSON includes spaces. Formatting alone must not dirty a saved form
   // when an item is opened or its colors are refreshed.
@@ -86,7 +93,7 @@ function renderSalesOrderColors(frm, cdt, cdn) {
   const editable = frm.doc.docstatus === 0 && !frm.read_only;
   const esc = frappe.utils.escape_html;
   const views = [
-    ['custom_part_list_color', __('Part List Color'), row => row.has_source_color],
+    ['custom_part_list_color', __('Part List Color'), row => row.has_source_color || row.color],
     ['custom_color_sample_table', __('Color Sample Table'), row => Number(row.edite_color) === 1],
   ];
   for (const [field, label, include] of views) {
@@ -98,6 +105,9 @@ function renderSalesOrderColors(frm, cdt, cdn) {
     if (data.part_list !== partList) {
       wrapper.append($('<p class="text-muted">').text(__('Click Update Part List to load colors.')));
       continue;
+    }
+    if (field === 'custom_color_sample_table' && cdt === 'Color Sample Item') {
+      renderSampleBaseColors(frm, cdt, cdn, item, data, wrapper, editable);
     }
     const rows = data.rows.filter(include);
     if (!rows.length) {
@@ -132,6 +142,40 @@ function renderSalesOrderColors(frm, cdt, cdn) {
       });
       control.set_input(row.color || '');
     }
+  }
+}
+
+function renderSampleBaseColors(frm, cdt, cdn, item, data, wrapper, editable) {
+  const labels = { panel_materials: __('Panels'), metal_material: __('Metal'), other_material: __('Others') };
+  const container = $('<div class="row">').appendTo(wrapper);
+  for (const base of data.base_colors || []) {
+    const parent = $('<div class="col-sm-4">').appendTo(container);
+    const canEdit = editable && Boolean(base.allow_edit) && Boolean(base.color_palette);
+    const control = frappe.ui.form.make_control({
+      parent,
+      df: {
+        fieldname: 'base_color_' + base.source_table, fieldtype: 'Link', options: 'Material Color',
+        label: __('{0} Base Color', [labels[base.source_table] || base.source_table]),
+        read_only: !canEdit,
+        get_query: () => ({ filters: { palette: base.color_palette || '', disable: 0 } }),
+        onchange: async () => {
+          if (!canEdit || (item.custom_part_list || item.part_list) !== data.part_list) return;
+          const current = salesOrderStoredColors(item);
+          const selected = (current.base_colors || []).find(value => value.source_table === base.source_table);
+          if (current.part_list !== data.part_list || !selected) return;
+          selected.color = control.get_value() || null;
+          for (const row of current.rows) {
+            if (row.source_table === base.source_table && row.color_palette === base.color_palette) {
+              row.color = selected.color;
+            }
+          }
+          await frappe.model.set_value(cdt, cdn, 'custom_color_sample_data', JSON.stringify(current));
+          renderSalesOrderColors(frm, cdt, cdn);
+        },
+      },
+      render_input: true,
+    });
+    control.set_input(base.color || '');
   }
 }
 
