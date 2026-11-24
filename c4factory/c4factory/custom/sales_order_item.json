@@ -1547,7 +1547,7 @@
   },
   {
    "fieldname": "custom_panel_specs",
-   "fieldtype": "Text",
+   "fieldtype": "Data",
    "label": "Panel",
    "read_only": 0,
    "dt": "Sales Order Item",
@@ -1565,7 +1565,7 @@
   },
   {
    "fieldname": "custom_metal_specs",
-   "fieldtype": "Text",
+   "fieldtype": "Data",
    "label": "Metal",
    "read_only": 0,
    "dt": "Sales Order Item",
@@ -1583,7 +1583,7 @@
   },
   {
    "fieldname": "custom_other_specs",
-   "fieldtype": "Text",
+   "fieldtype": "Data",
    "label": "Other",
    "read_only": 0,
    "dt": "Sales Order Item",

@@ -102,4 +102,4 @@ class TestItemSpecs(unittest.TestCase):
 		self.assertEqual(order[-len(names):], names)
 		for name, label in zip(SPEC_FIELDS, ("Panel", "Metal", "Other"), strict=True):
 			field = fields[prefix + name]
-			self.assertEqual((field["label"], field["fieldtype"], field.get("read_only", 0)), (label, "Text", int(read_only)))
+			self.assertEqual((field["label"], field["fieldtype"], field.get("read_only", 0)), (label, "Data", int(read_only)))

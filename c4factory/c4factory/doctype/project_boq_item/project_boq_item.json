@@ -175,7 +175,7 @@
   },
   {
    "fieldname": "panel_specs",
-   "fieldtype": "Text",
+   "fieldtype": "Data",
    "label": "Panel",
    "read_only": 1
   },
@@ -185,7 +185,7 @@
   },
   {
    "fieldname": "metal_specs",
-   "fieldtype": "Text",
+   "fieldtype": "Data",
    "label": "Metal",
    "read_only": 1
   },
@@ -195,7 +195,7 @@
   },
   {
    "fieldname": "other_specs",
-   "fieldtype": "Text",
+   "fieldtype": "Data",
    "label": "Other",
    "read_only": 1
   }

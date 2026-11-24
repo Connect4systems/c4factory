@@ -21,11 +21,11 @@ def spec_layout(prefix="", read_only=0, tabbed=False):
 	return ([{"fieldname": prefix + "spcs_tab", "fieldtype": "Tab Break", "label": "Spcs"}]
 		if tabbed else []) + [
 		{"fieldname": prefix + "spcs_section", "fieldtype": "Section Break", "label": "" if tabbed else "Spcs"},
-		{"fieldname": prefix + "panel_specs", "fieldtype": "Text", "label": "Panel", "read_only": read_only},
+		{"fieldname": prefix + "panel_specs", "fieldtype": "Data", "label": "Panel", "read_only": read_only},
 		{"fieldname": prefix + "spcs_metal_column", "fieldtype": "Column Break"},
-		{"fieldname": prefix + "metal_specs", "fieldtype": "Text", "label": "Metal", "read_only": read_only},
+		{"fieldname": prefix + "metal_specs", "fieldtype": "Data", "label": "Metal", "read_only": read_only},
 		{"fieldname": prefix + "spcs_other_column", "fieldtype": "Column Break"},
-		{"fieldname": prefix + "other_specs", "fieldtype": "Text", "label": "Other", "read_only": read_only},
+		{"fieldname": prefix + "other_specs", "fieldtype": "Data", "label": "Other", "read_only": read_only},
 	]
 
 
@@ -55,6 +55,9 @@ def setup_fields():
 	):
 		meta = frappe.get_meta(doctype, cached=False)
 		names = {field.fieldname for field in meta.fields}
+		# Reapply the type after customization sync, including existing sites.
+		for field in SPEC_FIELDS:
+			make_property_setter(doctype, prefix + field, "fieldtype", "Data", "Data")
 		for name in [prefix + field for field in LEGACY_FIELDS] + list(legacy_layout):
 			if name in names and doctype in {"Sales Order Item", "PDS Request Item"}:
 				make_property_setter(doctype, name, "hidden", 1, "Check")

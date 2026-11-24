@@ -51,6 +51,12 @@ class TestItemSpecsMigration(unittest.TestCase):
 				self.assertNotIn(prefix + "spcs_tab", orders[0])
 			if dt == "PDS Request Item":
 				self.assertEqual(orders[0][-9:-6], ["spec_notes_section", "direction", "additional_notes"])
+		for dt, prefix in (("Sales Order Item", "custom_"), ("PDS Request Item", ""), ("Part List", ""), ("Project BOQ Item", "")):
+			for field in ("panel_specs", "metal_specs", "other_specs"):
+				self.make_setter.assert_any_call(dt, prefix + field, "fieldtype", "Data", "Data")
+		for field in self.create_fields.call_args.args[0]["Sales Order Item"]:
+			if field["fieldname"] in {"custom_panel_specs", "custom_metal_specs", "custom_other_specs"}:
+				self.assertEqual(field["fieldtype"], "Data")
 		self.make_setter.assert_any_call("Sales Order Item", "custom_leather", "hidden", 1, "Check")
 		self.make_setter.assert_any_call("PDS Request Item", "leather", "reqd", 0, "Check")
 		self.assertEqual(self.create_fields.call_args.kwargs, {"update": True})
