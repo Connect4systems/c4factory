@@ -5,16 +5,10 @@ from frappe.utils import now_datetime, today
 SALES_ORDER_ITEM_SPEC_FIELD_MAP = {
     "custom_location_code": "location_code",
     "custom_sub_code": "sub_code",
-    "custom_plexi": "plexi",
-    "custom_top": "top",
-    "custom_modesty": "modesty",
-    "custom_leather": "leather",
-    "custom_drawer_body": "drawer_body",
-    "custom_drawer_face": "drawer_face",
-    "custom_glass": "glass",
-    "custom_fabric": "fabric",
+    "custom_panel_specs": "panel_specs",
+    "custom_metal_specs": "metal_specs",
+    "custom_other_specs": "other_specs",
     "custom_direction": "direction",
-    "custom_other": "other",
     "additional_notes": "additional_notes",
 }
 

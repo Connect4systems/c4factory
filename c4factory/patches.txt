@@ -32,3 +32,4 @@ c4factory.patches.v1_0.replace_part_material_with_palette
 c4factory.patches.v1_0.setup_quotation_project_details
 c4factory.patches.v1_0.setup_delivery_note_details
 c4factory.patches.v1_0.setup_project_sales_details
+c4factory.patches.v1_0.setup_item_specs

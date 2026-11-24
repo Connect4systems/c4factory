@@ -13,6 +13,9 @@ refreshes them from that order. Sales Partner uses the Project's custom_sales_pa
 link field. Project Name keeps the Project No and Customer Name format above.
 
 The Project BOQ tab has one row per Sales Order item, including repeated item codes.
+Each expanded BOQ row has one **Spcs** tab with three read-only Text fields in equal
+columns: **Panel**, **Metal**, and **Other**. These follow the exact Sales Order item
+on refresh and save, including separate specifications for repeated item codes.
 Actual Qty means ordered quantity in the order row's UOM. Delivered quantity is submitted
 Delivery Note stock quantity, net of submitted returns, converted to that UOM. Installed
 quantity comes from submitted Installation Notes referencing those delivery rows.
@@ -52,6 +55,40 @@ The Project script loads globally so another app's Project script cannot replace
 Opening a saved Project explicitly fetches current items and statuses. Older Projects
 can resolve a unique submitted order from the Sales Order's Project link, or from the
 same Project No, customer and company. Ambiguous matches require selecting the order.
+
+## Item specifications
+
+Sales Order Item, PDS Request Item, Part List, and Project BOQ Item each have one
+**Spcs** tab containing three Text fields in three columns: **Panel | Metal | Other**.
+Sales Order Item uses `custom_panel_specs`, `custom_metal_specs`, and
+`custom_other_specs`; the other three DocTypes use `panel_specs`, `metal_specs`,
+and `other_specs`.
+
+Manual and automatic PDS Request creation copy all three values from the originating
+Sales Order item, preserving multiline text and blanks. Saved PDS specifications
+remain editable and are not overwritten by later order changes. Changing a PDS row's
+Item clears its old source reference and specifications. Existing BOQ eligibility,
+Part List exclusions, duplicate checks, and first eligible row handling remain in use.
+
+Creating a Part List from a PDS Request fetches the three specifications directly
+from that request row's originating Sales Order item. The Part List records its
+Sales Order and Sales Order Item for traceability. A missing row reference is accepted
+only when the product occurs exactly once in the order; missing, mismatched, or
+ambiguous source rows block creation. Reading the source order requires permission.
+Part List specifications remain editable snapshots after creation. A standalone
+PDS Request without a Sales Order copies its own saved specifications instead.
+New Part List versions retain their specifications and source row. Importing a
+design into an existing Part List preserves that destination's specifications and
+Sales Order references.
+
+Migration combines old Wood, Top, Modesty, Drawer Body, and Drawer Face values into
+Panel; old Metal into Metal; and Plexi, Fabric, Leather, Glass, and Other into Other.
+Each value retains its original label on a separate line. Legacy controls and layout
+breaks are hidden, with their stored values retained. Direction and Additional Notes
+remain outside the new Spcs tab. Color sample and Part List color controls remain.
+Existing nonempty specification text is preserved. Existing PDS and Part List rows
+are backfilled only when their order row is unambiguous; shared Part Lists are not
+assigned an arbitrary order. Migration can be rerun without duplicating migrated text.
 
 ## Deployment
 

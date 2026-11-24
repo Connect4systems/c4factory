@@ -16,6 +16,8 @@
   "disable",
   "image",
   "product_image",
+  "sales_order",
+  "sales_order_item",
   "section_break_vncv",
   "width",
   "column_break_zktq",
@@ -53,7 +55,14 @@
   "other_material",
   "accessorise_tab",
   "accessorise_table",
-  "amended_from"
+  "amended_from",
+  "spcs_tab",
+  "spcs_section",
+  "panel_specs",
+  "spcs_metal_column",
+  "metal_specs",
+  "spcs_other_column",
+  "other_specs"
  ],
  "fields": [
   {
@@ -331,6 +340,55 @@
    "label": "Allow Edit",
    "default": "0",
    "description": "Allow selecting another base color from this palette in Color Sample."
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Data",
+   "label": "Sales Order Item",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "spcs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Spcs"
+  },
+  {
+   "fieldname": "spcs_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "panel_specs",
+   "fieldtype": "Text",
+   "label": "Panel",
+   "read_only": 0
+  },
+  {
+   "fieldname": "spcs_metal_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metal_specs",
+   "fieldtype": "Text",
+   "label": "Metal",
+   "read_only": 0
+  },
+  {
+   "fieldname": "spcs_other_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "other_specs",
+   "fieldtype": "Text",
+   "label": "Other",
+   "read_only": 0
   }
  ],
  "grid_page_length": 50,

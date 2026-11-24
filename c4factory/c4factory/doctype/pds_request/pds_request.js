@@ -23,7 +23,10 @@ frappe.ui.form.on("PDS Request Item", {
 		frappe.set_route("Form", "Part List", row.part_list);
 	},
 	item(frm, cdt, cdn) {
-		frappe.model.set_value(cdt, cdn, "part_list", null);
+		return frappe.model.set_value(cdt, cdn, {
+			part_list: null, sales_order_item: null,
+			panel_specs: null, metal_specs: null, other_specs: null,
+		});
 	},
 	async create_part_list(frm, cdt, cdn) {
 		if (frm.doc.docstatus !== 0) {

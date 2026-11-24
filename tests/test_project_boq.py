@@ -85,7 +85,8 @@ class TestProjectBOQ(unittest.TestCase):
 
 	def test_repeated_item_rows_remain_separate_and_returns_use_stock_uom(self):
 		order = Doc(name="SO", items=[Doc(name=name, item_code="A", item_name="Item", qty=5,
-			description=name, uom="Box", conversion_factor=2) for name in ("R1", "R2")])
+			description=name, uom="Box", conversion_factor=2, custom_panel_specs="Panel " + name,
+			custom_metal_specs="Metal " + name, custom_other_specs="Other " + name) for name in ("R1", "R2")])
 		self.frappe.get_doc.return_value = order
 		self.frappe.db.sql.return_value = []
 		self.frappe.db.exists.return_value = False
@@ -99,6 +100,9 @@ class TestProjectBOQ(unittest.TestCase):
 		self.assertEqual(rows[0]["installed_qty"], 2)
 		self.assertEqual(rows[1]["delivered_qty"], 0)
 		self.assertEqual(rows[0]["description"], "R1")
+		self.assertEqual([r["panel_specs"] for r in rows], ["Panel R1", "Panel R2"])
+		self.assertEqual([r["metal_specs"] for r in rows], ["Metal R1", "Metal R2"])
+		self.assertEqual([r["other_specs"] for r in rows], ["Other R1", "Other R2"])
 
 	def test_boq_preserves_edited_and_cleared_notes_by_source_row(self):
 		order = Doc(name="SO", items=[Doc(name=name, item_code="A", item_name="Item", qty=1,

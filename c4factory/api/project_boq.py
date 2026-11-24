@@ -6,6 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, today
 
+from c4factory.api.item_specs import spec_values
+
 
 def progress_status(qty, delivered, installed):
 	return (
@@ -113,6 +115,7 @@ def build_rows(project):
 		previous = existing.get(row.name)
 		note = previous.get("note") if previous and (previous.get("note_initialized") or previous.get("note")) else row.get("custom_note")
 		result.append({
+			**spec_values(row, "custom_"),
 			"sales_order_item": row.name, "item_code": row.item_code, "item_name": row.item_name,
 			"description": row.description, "actual_qty": row.qty, "uom": row.uom,
 			"note": note, "note_initialized": 1, "image": images.get(row.item_code),

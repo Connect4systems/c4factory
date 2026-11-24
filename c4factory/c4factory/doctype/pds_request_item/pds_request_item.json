@@ -32,10 +32,18 @@
   "leather",
   "glass",
   "column_break_yvsv",
+  "other",
+  "spec_notes_section",
   "direction",
   "additional_notes",
-  "other",
-  "sales_order_item"
+  "sales_order_item",
+  "spcs_tab",
+  "spcs_section",
+  "panel_specs",
+  "spcs_metal_column",
+  "metal_specs",
+  "spcs_other_column",
+  "other_specs"
  ],
  "fields": [
   {
@@ -95,69 +103,105 @@
   {
    "fieldname": "section_break_razl",
    "fieldtype": "Section Break",
-   "label": "Spcs"
+   "label": "Spcs",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "plexi",
    "fieldtype": "Link",
    "label": "Plexi",
-   "options": "P-Plexi"
+   "options": "P-Plexi",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "top",
    "fieldtype": "Link",
    "label": "Top",
-   "options": "P-Wood"
+   "options": "P-Wood",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "modesty",
    "fieldtype": "Link",
    "label": "Modesty",
-   "options": "P-Wood"
+   "options": "P-Wood",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "column_break_nale",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "wood",
    "fieldtype": "Link",
    "label": "Wood",
-   "options": "P-Wood"
+   "options": "P-Wood",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "column_break_yvsv",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "metal",
    "fieldtype": "Link",
    "label": "Metal",
-   "options": "P-Metal"
+   "options": "P-Metal",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "drawer_body",
    "fieldtype": "Link",
    "label": "Drawer Body",
-   "options": "P-Wood"
+   "options": "P-Wood",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "drawer_face",
    "fieldtype": "Link",
    "label": "Drawer Face",
-   "options": "P-Wood"
+   "options": "P-Wood",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "glass",
    "fieldtype": "Link",
    "label": "Glass",
-   "options": "P-Glass"
+   "options": "P-Glass",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "fabric",
    "fieldtype": "Link",
    "label": "Fabric",
-   "options": "P-Fabric"
+   "options": "P-Fabric",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldname": "direction",
@@ -205,12 +249,58 @@
    "fieldtype": "Link",
    "label": "Leather",
    "fieldname": "leather",
-   "options": "Leather"
+   "options": "Leather",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
   },
   {
    "fieldtype": "Small Text",
    "label": "Other",
-   "fieldname": "other"
+   "fieldname": "other",
+   "hidden": 1,
+   "reqd": 0,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "spec_notes_section",
+   "fieldtype": "Section Break",
+   "label": "Additional Details"
+  },
+  {
+   "fieldname": "spcs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Spcs"
+  },
+  {
+   "fieldname": "spcs_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "panel_specs",
+   "fieldtype": "Text",
+   "label": "Panel",
+   "read_only": 0
+  },
+  {
+   "fieldname": "spcs_metal_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metal_specs",
+   "fieldtype": "Text",
+   "label": "Metal",
+   "read_only": 0
+  },
+  {
+   "fieldname": "spcs_other_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "other_specs",
+   "fieldtype": "Text",
+   "label": "Other",
+   "read_only": 0
   }
  ],
  "grid_page_length": 50,

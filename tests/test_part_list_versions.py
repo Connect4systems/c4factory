@@ -77,14 +77,27 @@ class TestPartListVersions(unittest.TestCase):
 			self.api.get_copy_payload("CUBE-01", target="CUBE-01")
 
 	def test_import_payload_excludes_destination_product_identity(self):
+		for name in ("sales_order", "sales_order_item", "panel_specs", "metal_specs", "other_specs"):
+			self.source.meta.fields.append(field(name))
+			self.source[name] = "Source " + name
 		target = Doc(name="TARGET", docstatus=0, product="OTHER", check_permission=Mock())
 		self.frappe.get_doc.side_effect = [self.source, target]
 		values = self.api.get_copy_payload("CUBE-01", target="TARGET")["values"]
 		self.assertNotIn("product", values)
 		self.assertNotIn("product_name", values)
+		for name in ("sales_order", "sales_order_item", "panel_specs", "metal_specs", "other_specs"):
+			self.assertNotIn(name, values)
 		self.assertEqual(values["material_line"], "Custom Line")
 		self.assertEqual(values["panel_materials"][0]["qty"], 3)
 		self.assertEqual(target.product, "OTHER")
+
+	def test_new_version_retains_its_order_specs_and_source_row(self):
+		for name in ("sales_order", "sales_order_item", "panel_specs", "metal_specs", "other_specs"):
+			self.source.meta.fields.append(field(name))
+			self.source[name] = "Source " + name
+		values = self.api.get_copy_payload("CUBE-01", new_version=1)["values"]
+		self.assertEqual(values["panel_specs"], "Source panel_specs")
+		self.assertEqual(values["sales_order_item"], "Source sales_order_item")
 
 	def test_selector_filters_on_part_list_overrides_and_treats_zero_as_unset(self):
 		part = Doc(name="CUBE-01", product="CUBE", product_name="Table", description="Custom description",

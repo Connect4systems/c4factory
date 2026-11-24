@@ -84,7 +84,7 @@ class TestPDSRequest(unittest.TestCase):
 		for field in PDS_ITEM_SPCS_FIELDS:
 			row[field] = f"Saved {field}"
 		request = Mock(docstatus=0)
-		request.get.return_value = [row]
+		request.get.side_effect = lambda field: [row] if field == "items" else None
 		part_list = Mock()
 		part_list.name = "A-01"
 		item = frappe._dict(item_name="Product A", image="/files/item.jpg", custom_width=100)
@@ -98,7 +98,7 @@ class TestPDSRequest(unittest.TestCase):
 		self.assertNotIn("wood_color", values)
 		self.assertNotIn("metal_color", values)
 		for field in PDS_ITEM_SPCS_FIELDS:
-			self.assertNotIn(field, values)
+			self.assertEqual(values[field], f"Saved {field}")
 		self.assertEqual(values["description"], "Request description")
 		request.check_permission.assert_called_once_with("write")
 		part_list.insert.assert_called_once_with(ignore_permissions=False)

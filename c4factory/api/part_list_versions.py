@@ -52,8 +52,9 @@ def get_copy_payload(source, target=None, new_version=False):
 	values = copy_values(part, reset_mapping_audit=True)
 	if target:
 		# Import design data without replacing the destination product identity.
-		values.pop("product", None)
-		values.pop("product_name", None)
+		for field in ("product", "product_name", "sales_order", "sales_order_item",
+			"panel_specs", "metal_specs", "other_specs"):
+			values.pop(field, None)
 	return {"source": part.name, "values": values}
 
 

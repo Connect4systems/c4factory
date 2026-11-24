@@ -118,7 +118,7 @@ class TestPDSDuplicates(unittest.TestCase):
 	def test_automatic_request_copies_team_specs_and_first_row_quantity(self):
 		source = Doc(name="SO", customer="Customer", custom_technical_team="Design", items=[
 			Doc(name="FIRST", idx=1, item_code="A", qty=2, custom_location_code="Room",
-				custom_sub_code="Sub", custom_leather="Leather", custom_other="Other"),
+				custom_sub_code="Sub", custom_panel_specs="Panel\nDetails", custom_metal_specs="Metal", custom_other_specs="Other"),
 			Doc(name="SECOND", idx=2, item_code="A", qty=5),
 		])
 		target = Doc(check_permission=Mock())
@@ -131,8 +131,10 @@ class TestPDSDuplicates(unittest.TestCase):
 		self.assertEqual(len(result.items), 1)
 		self.assertEqual(result.items[0].qty, 2)
 		self.assertEqual(result.items[0].sales_order_item, "FIRST")
-		for field, value in {"location_code": "Room", "sub_code": "Sub", "leather": "Leather", "other": "Other"}.items():
+		for field, value in {"location_code": "Room", "sub_code": "Sub", "panel_specs": "Panel\nDetails", "metal_specs": "Metal", "other_specs": "Other"}.items():
 			self.assertEqual(result.items[0][field], value)
+		self.assertNotIn("leather", result.items[0])
+		self.assertNotIn("other", result.items[0])
 		target.check_permission.assert_not_called()
 
 	def test_automatic_empty_request_is_skipped(self):

@@ -24,7 +24,14 @@
   "installation_status",
   "create_delivery",
   "create_installation_note",
-  "sales_order_item"
+  "sales_order_item",
+  "spcs_tab",
+  "spcs_section",
+  "panel_specs",
+  "spcs_metal_column",
+  "metal_specs",
+  "spcs_other_column",
+  "other_specs"
  ],
  "fields": [
   {
@@ -161,6 +168,41 @@
    "label": "Item Image",
    "fieldtype": "Image",
    "options": "image"
+  },
+  {
+   "fieldname": "spcs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Spcs"
+  },
+  {
+   "fieldname": "spcs_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "panel_specs",
+   "fieldtype": "Text",
+   "label": "Panel",
+   "read_only": 1
+  },
+  {
+   "fieldname": "spcs_metal_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metal_specs",
+   "fieldtype": "Text",
+   "label": "Metal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "spcs_other_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "other_specs",
+   "fieldtype": "Text",
+   "label": "Other",
+   "read_only": 1
   }
  ],
  "permissions": [],
