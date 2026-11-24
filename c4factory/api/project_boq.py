@@ -135,8 +135,8 @@ def onload(doc, method=None):
 def validate_project(doc, method=None):
 	if resolve_sales_order(doc):
 		doc.customer = frappe.db.get_value("Sales Order", doc.sales_order, "customer")
-		if not doc.get("custom_project_title"):
-			doc.custom_project_title = frappe.db.get_value("Sales Order", doc.sales_order, "custom_project_title")
+		doc.custom_project_title = frappe.db.get_value("Sales Order", doc.sales_order, "custom_project_title")
+		doc.custom_sales_partner = frappe.db.get_value("Sales Order", doc.sales_order, "sales_partner")
 		doc.set("custom_project_boq", build_rows(doc))
 
 

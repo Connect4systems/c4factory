@@ -17,6 +17,7 @@ after_migrate = [
     "c4factory.patches.v1_0.move_part_file_to_pds_table.execute",
     "c4factory.patches.v1_0.repair_part_list_description.execute",
     "c4factory.patches.v1_0.setup_quotation_project_details.setup_fields",
+    "c4factory.patches.v1_0.setup_project_sales_details.execute",
     "c4factory.patches.v1_0.setup_delivery_note_details.execute",
 ]
 

@@ -38,6 +38,7 @@ def on_submit(doc, method=None):
 	project.sales_order = doc.name
 	project.custom_technical_team = doc.get("custom_technical_team")
 	project.custom_project_title = doc.get("custom_project_title")
+	project.custom_sales_partner = doc.get("sales_partner")
 	project.expected_start_date = doc.get("transaction_date")
 	project.expected_end_date = doc.get("delivery_date")
 	set_project_number(project, project_no)

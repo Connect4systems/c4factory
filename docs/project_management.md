@@ -7,6 +7,11 @@ date; end uses header delivery date. Project No collisions fail the submission t
 Retries and amendments reuse the matching Project. Existing matching Projects retain
 their IDs to preserve existing references.
 
+Project Title and Sales Partner are copied from the Sales Order on submission.
+Selecting a Sales Order on a Project also fetches these fields; saving the Project
+refreshes them from that order. Sales Partner uses the Project's custom_sales_partner
+link field. Project Name keeps the Project No and Customer Name format above.
+
 The Project BOQ tab has one row per Sales Order item, including repeated item codes.
 Actual Qty means ordered quantity in the order row's UOM. Delivered quantity is submitted
 Delivery Note stock quantity, net of submitted returns, converted to that UOM. Installed
