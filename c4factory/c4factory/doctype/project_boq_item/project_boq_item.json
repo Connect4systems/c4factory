@@ -25,7 +25,6 @@
   "create_delivery",
   "create_installation_note",
   "sales_order_item",
-  "spcs_tab",
   "spcs_section",
   "panel_specs",
   "spcs_metal_column",
@@ -170,13 +169,9 @@
    "options": "image"
   },
   {
-   "fieldname": "spcs_tab",
-   "fieldtype": "Tab Break",
-   "label": "Spcs"
-  },
-  {
    "fieldname": "spcs_section",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Spcs"
   },
   {
    "fieldname": "panel_specs",

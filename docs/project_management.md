@@ -13,7 +13,7 @@ refreshes them from that order. Sales Partner uses the Project's custom_sales_pa
 link field. Project Name keeps the Project No and Customer Name format above.
 
 The Project BOQ tab has one row per Sales Order item, including repeated item codes.
-Each expanded BOQ row has one **Spcs** tab with three read-only Text fields in equal
+Each expanded BOQ row has one **Spcs** section with three read-only Text fields in equal
 columns: **Panel**, **Metal**, and **Other**. These follow the exact Sales Order item
 on refresh and save, including separate specifications for repeated item codes.
 Actual Qty means ordered quantity in the order row's UOM. Delivered quantity is submitted
@@ -58,18 +58,19 @@ same Project No, customer and company. Ambiguous matches require selecting the o
 
 ## Item specifications
 
-Sales Order Item, PDS Request Item, Part List, and Project BOQ Item each have one
-**Spcs** tab containing three Text fields in three columns: **Panel | Metal | Other**.
+Sales Order Item, PDS Request Item, and Project BOQ Item each have one **Spcs** section
+in the normal row editor, containing three Text fields in three columns:
+**Panel | Metal | Other**. Part List keeps its separate **Spcs** tab with the same fields.
 Sales Order Item uses `custom_panel_specs`, `custom_metal_specs`, and
 `custom_other_specs`; the other three DocTypes use `panel_specs`, `metal_specs`,
 and `other_specs`.
 
-Sales Order Item, PDS Request Item, and Project BOQ Item row editors open on Details.
-Their tabs have unique IDs and remember their selection within each row editor,
-independently of the parent form's active tab. The global `item_specs_tabs.js` asset
-provides this isolation for Frappe's child form layouts without changing Part List
-or parent form tabs. After deploying this asset, build assets, clear the site cache,
-and reload the browser to load it.
+Child row editors use the regular Details layout without Tab Break fields. Migration
+removes the obsolete Sales Order Item Spcs custom tab and its tab property overrides;
+the native PDS Request Item and Project BOQ Item definitions also omit the old tabs.
+Specification values and mappings are retained. The old child-tab JavaScript workaround
+is no longer loaded. Run migration, clear the site cache, and reload the browser after
+deploying these metadata changes.
 
 Manual and automatic PDS Request creation copy all three values from the originating
 Sales Order item, preserving multiline text and blanks. Saved PDS specifications
@@ -92,7 +93,7 @@ Migration combines old Wood, Top, Modesty, Drawer Body, and Drawer Face values i
 Panel; old Metal into Metal; and Plexi, Fabric, Leather, Glass, and Other into Other.
 Each value retains its original label on a separate line. Legacy controls and layout
 breaks are hidden, with their stored values retained. Direction and Additional Notes
-remain outside the new Spcs tab. Color sample and Part List color controls remain.
+remain outside the new Spcs section. Color sample and Part List color controls remain.
 Existing nonempty specification text is preserved. Existing PDS and Part List rows
 are backfilled only when their order row is unambiguous; shared Part Lists are not
 assigned an arbitrary order. Migration can be rerun without duplicating migrated text.

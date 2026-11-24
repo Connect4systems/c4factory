@@ -84,16 +84,22 @@ class TestItemSpecs(unittest.TestCase):
 	def test_all_four_documents_have_the_same_three_column_text_layout(self):
 		for doctype in ("part_list", "pds_request_item", "project_boq_item"):
 			data = json.loads((ROOT / f"c4factory/c4factory/doctype/{doctype}/{doctype}.json").read_text())
-			self.check_layout(data["fields"], data["field_order"], "", doctype == "project_boq_item")
+			self.check_layout(data["fields"], data["field_order"], "", doctype == "project_boq_item", doctype == "part_list")
 		data = json.loads((ROOT / "c4factory/c4factory/custom/sales_order_item.json").read_text())
 		order = json.loads(next(row["value"] for row in data["property_setters"] if row["property"] == "field_order"))
 		self.check_layout(data["custom_fields"], order, "custom_", False)
 
-	def check_layout(self, fields, order, prefix, read_only):
+	def check_layout(self, fields, order, prefix, read_only, tabbed=False):
+		if not tabbed:
+			self.assertFalse(any(field["fieldtype"] == "Tab Break" for field in fields))
 		fields = {field["fieldname"]: field for field in fields}
-		names = [prefix + name for name in ("spcs_tab", "spcs_section", "panel_specs", "spcs_metal_column", "metal_specs", "spcs_other_column", "other_specs")]
-		self.assertEqual(order[-7:], names)
-		self.assertEqual(fields[names[0]]["fieldtype"], "Tab Break")
+		names = [prefix + name for name in ("spcs_section", "panel_specs", "spcs_metal_column", "metal_specs", "spcs_other_column", "other_specs")]
+		if tabbed:
+			names.insert(0, prefix + "spcs_tab")
+			self.assertEqual(fields[names[0]]["fieldtype"], "Tab Break")
+		else:
+			self.assertEqual(fields[names[0]]["label"], "Spcs")
+		self.assertEqual(order[-len(names):], names)
 		for name, label in zip(SPEC_FIELDS, ("Panel", "Metal", "Other"), strict=True):
 			field = fields[prefix + name]
 			self.assertEqual((field["label"], field["fieldtype"], field.get("read_only", 0)), (label, "Text", int(read_only)))

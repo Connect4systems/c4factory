@@ -37,7 +37,6 @@
   "direction",
   "additional_notes",
   "sales_order_item",
-  "spcs_tab",
   "spcs_section",
   "panel_specs",
   "spcs_metal_column",
@@ -268,13 +267,9 @@
    "label": "Additional Details"
   },
   {
-   "fieldname": "spcs_tab",
-   "fieldtype": "Tab Break",
-   "label": "Spcs"
-  },
-  {
    "fieldname": "spcs_section",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Spcs"
   },
   {
    "fieldname": "panel_specs",

@@ -1,4 +1,4 @@
-"""Install consistent Spcs tabs and preserve specifications from older layouts."""
+"""Install Spcs sections in child rows and a Spcs tab in Part List."""
 
 import json
 from collections import defaultdict
@@ -17,10 +17,10 @@ SO_LEGACY_LAYOUT = (
 PDS_LEGACY_LAYOUT = ("section_break_razl", "column_break_nale", "column_break_yvsv")
 
 
-def spec_layout(prefix="", read_only=0):
-	return [
-		{"fieldname": prefix + "spcs_tab", "fieldtype": "Tab Break", "label": "Spcs"},
-		{"fieldname": prefix + "spcs_section", "fieldtype": "Section Break"},
+def spec_layout(prefix="", read_only=0, tabbed=False):
+	return ([{"fieldname": prefix + "spcs_tab", "fieldtype": "Tab Break", "label": "Spcs"}]
+		if tabbed else []) + [
+		{"fieldname": prefix + "spcs_section", "fieldtype": "Section Break", "label": "" if tabbed else "Spcs"},
 		{"fieldname": prefix + "panel_specs", "fieldtype": "Text", "label": "Panel", "read_only": read_only},
 		{"fieldname": prefix + "spcs_metal_column", "fieldtype": "Column Break"},
 		{"fieldname": prefix + "metal_specs", "fieldtype": "Text", "label": "Metal", "read_only": read_only},
@@ -30,6 +30,15 @@ def spec_layout(prefix="", read_only=0):
 
 
 def setup_fields():
+	# A hidden Tab Break still enables Frappe's tabbed layout. Remove the obsolete
+	# layout field entirely; the three specification data fields are retained.
+	for doctype, tab in (("Sales Order Item", "custom_spcs_tab"),
+		("PDS Request Item", "spcs_tab"), ("Project BOQ Item", "spcs_tab")):
+		for setter in frappe.get_all("Property Setter", filters={"doc_type": doctype, "field_name": tab}, pluck="name"):
+			frappe.delete_doc("Property Setter", setter, ignore_permissions=True)
+	if frappe.db.exists("Custom Field", "Sales Order Item-custom_spcs_tab"):
+		frappe.delete_doc("Custom Field", "Sales Order Item-custom_spcs_tab", ignore_permissions=True)
+	frappe.clear_cache(doctype="Sales Order Item")
 	meta = frappe.get_meta("Sales Order Item", cached=False)
 	block = spec_layout("custom_")
 	new_names = {field["fieldname"] for field in block}
@@ -51,9 +60,10 @@ def setup_fields():
 				make_property_setter(doctype, name, "hidden", 1, "Check")
 				make_property_setter(doctype, name, "reqd", 0, "Check")
 				make_property_setter(doctype, name, "print_hide", 1, "Check")
-		layout = [field["fieldname"] for field in spec_layout(prefix)]
+		layout = [field["fieldname"] for field in spec_layout(prefix, tabbed=doctype == "Part List")]
 		# Retain site-specific fields and put only the new three-column block in Spcs.
-		order = [field.fieldname for field in meta.fields if field.fieldname not in layout]
+		obsolete = {prefix + "spcs_tab"} if doctype != "Part List" else set()
+		order = [field.fieldname for field in meta.fields if field.fieldname not in layout and field.fieldname not in obsolete]
 		if doctype == "PDS Request Item":
 			notes = [name for name in ("spec_notes_section", "direction", "additional_notes") if name in names]
 			order = [name for name in order if name not in notes] + notes

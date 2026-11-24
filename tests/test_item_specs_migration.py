@@ -15,6 +15,8 @@ class TestItemSpecsMigration(unittest.TestCase):
 		self.frappe = ModuleType("frappe")
 		self.frappe.db = Mock()
 		self.frappe.get_all = Mock()
+		self.frappe.get_all.return_value = []
+		self.frappe.delete_doc = Mock()
 		self.frappe.get_meta = Mock()
 		self.frappe.clear_cache = Mock()
 		custom_field = ModuleType("frappe.custom.doctype.custom_field.custom_field")
@@ -32,7 +34,8 @@ class TestItemSpecsMigration(unittest.TestCase):
 	def test_setup_repairs_custom_field_order_and_hides_old_controls(self):
 		layouts = {}
 		for dt, prefix in (("Sales Order Item", "custom_"), ("PDS Request Item", ""), ("Part List", ""), ("Project BOQ Item", "")):
-			layouts[dt] = ["item", "site_field", prefix + "leather", *[f["fieldname"] for f in self.api.spec_layout(prefix)]]
+			layouts[dt] = ["item", "site_field", prefix + "leather", prefix + "spcs_tab",
+				*[f["fieldname"] for f in self.api.spec_layout(prefix)]]
 		layouts["PDS Request Item"] += ["direction", "additional_notes", "spec_notes_section"]
 		self.frappe.get_meta.side_effect = lambda dt, **kwargs: Doc(fields=[Doc(fieldname=name) for name in layouts[dt]])
 		self.api.setup_fields()
@@ -42,12 +45,17 @@ class TestItemSpecsMigration(unittest.TestCase):
 				if call.args[0] == dt and call.args[2] == "field_order"]
 			self.assertEqual(orders[0], orders[1])
 			self.assertEqual(orders[0].count("site_field"), 1)
-			self.assertEqual(orders[0][-7:], [f["fieldname"] for f in self.api.spec_layout(prefix)])
+			layout = [f["fieldname"] for f in self.api.spec_layout(prefix, tabbed=dt == "Part List")]
+			self.assertEqual(orders[0][-len(layout):], layout)
+			if dt != "Part List":
+				self.assertNotIn(prefix + "spcs_tab", orders[0])
 			if dt == "PDS Request Item":
-				self.assertEqual(orders[0][-10:-7], ["spec_notes_section", "direction", "additional_notes"])
+				self.assertEqual(orders[0][-9:-6], ["spec_notes_section", "direction", "additional_notes"])
 		self.make_setter.assert_any_call("Sales Order Item", "custom_leather", "hidden", 1, "Check")
 		self.make_setter.assert_any_call("PDS Request Item", "leather", "reqd", 0, "Check")
 		self.assertEqual(self.create_fields.call_args.kwargs, {"update": True})
+		self.frappe.delete_doc.assert_any_call("Custom Field", "Sales Order Item-custom_spcs_tab", ignore_permissions=True)
+		self.assertFalse(any(f["fieldtype"] == "Tab Break" for f in self.create_fields.call_args.args[0]["Sales Order Item"]))
 
 	def test_removed_field_columns_are_migrated_even_without_metadata(self):
 		self.frappe.db.has_column.return_value = True
