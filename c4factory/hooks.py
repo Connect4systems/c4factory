@@ -23,6 +23,7 @@ after_migrate = [
 ]
 
 app_include_js = [
+    "/assets/c4factory/js/doctype/item_specs_tabs.js?v=20261124-row-tabs",
     "/assets/c4factory/js/doctype/project.js?v=20261122-boq-notes",
     "/assets/c4factory/js/doctype/part_list_columns.js?v=20261121-color-palette",
     "/assets/c4factory/js/doctype/part_list_table_fullscreen.js?v=20261111-scoped-init",

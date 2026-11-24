@@ -64,6 +64,13 @@ Sales Order Item uses `custom_panel_specs`, `custom_metal_specs`, and
 `custom_other_specs`; the other three DocTypes use `panel_specs`, `metal_specs`,
 and `other_specs`.
 
+Sales Order Item, PDS Request Item, and Project BOQ Item row editors open on Details.
+Their tabs have unique IDs and remember their selection within each row editor,
+independently of the parent form's active tab. The global `item_specs_tabs.js` asset
+provides this isolation for Frappe's child form layouts without changing Part List
+or parent form tabs. After deploying this asset, build assets, clear the site cache,
+and reload the browser to load it.
+
 Manual and automatic PDS Request creation copy all three values from the originating
 Sales Order item, preserving multiline text and blanks. Saved PDS specifications
 remain editable and are not overwritten by later order changes. Changing a PDS row's
